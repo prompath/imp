@@ -8,7 +8,9 @@ Work in the git repo at the current directory, on the current branch. `$ARGUMENT
 
 ## 1. Read the changes
 
-Run `git fetch`, then read `git status --short`, the current branch, the staged and unstaged diffs, and the unpushed commits (`git log @{u}..HEAD`; with no upstream, compare against the project's `integration_branch`, default `main`).
+Run `git fetch`, then read `git status --short`, the current branch, the staged and unstaged diffs, and the unpushed commits (`git log --oneline @{u}..HEAD`; with no upstream, compare against the project's `integration_branch`, default `main`).
+
+Tools such as RTK can condense terminal output, so write each diff to a temp file (`git diff > <file>`, `git diff --staged > <file>`) and read it in full.
 
 Stop and say why if HEAD is detached, a merge or rebase is in progress, or the branch is behind its upstream. If there's nothing to commit and nothing unpushed, say so and stop.
 

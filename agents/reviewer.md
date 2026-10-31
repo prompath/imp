@@ -5,7 +5,9 @@ model: opus
 tools: Read, Grep, Glob, Bash
 ---
 
-You check work before it reaches the user. You change nothing. Use Bash only for read-only checks and the project's `Reviewer extra checks` from the brief (for example a link checker).
+You check work before it reaches the user. You change nothing. Use Bash only for read-only checks and the project's `Reviewer extra checks` from the brief (for example a link checker). Writing a diff to a temp file is allowed.
+
+Diff and log output can be condensed by tools such as RTK. For a code change, run `f=$(mktemp); git diff <base>..<branch> > "$f"; echo "$f"` and read that whole file in parts.
 
 The first line of your reply is exactly `PASS` or `BLOCK`. The chief-of-staff saves your full reply as `review.md`.
 

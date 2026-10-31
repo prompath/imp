@@ -95,7 +95,7 @@ class TestSkillsAndCommands(unittest.TestCase):
         from impctl import parse_frontmatter
         text = read("commands/push.md")
         self.assertEqual(parse_frontmatter(text).get("disable-model-invocation"), "true")
-        for s in ["explicit yes", "Never force-push", "push_forbidden"]:
+        for s in ["explicit yes", "Never force-push", "push_forbidden", "git log --oneline @{u}..HEAD", "git diff --staged > <file>"]:
             self.assertIn(s, text, s)
 
     def test_skill(self):
@@ -105,8 +105,10 @@ class TestSkillsAndCommands(unittest.TestCase):
         for r in REFS:
             self.assertIn(f"references/{r}.md", skill, r)
             self.assertTrue((ROOT / f"skills/chief-of-staff/references/{r}.md").is_file(), r)
-        for s in ["G1", "G2", "BLOCK", "agent_overrides", "scripts/impctl.py", ".imp/workflows"]:
+        for s in ["G1", "G2", "BLOCK", "agent_overrides", "scripts/impctl.py", ".imp/workflows",
+                  "relative to the plugin folder", "replace any other plan", "> <temp file>"]:
             self.assertIn(s, skill, s)
+        self.assertIn('git diff <base>..<branch> > "$f"', read("agents/reviewer.md"))
         everything = skill + "".join(
             p.read_text() for p in (ROOT / "skills/chief-of-staff/references").glob("*.md"))
         for a in AGENTS:
