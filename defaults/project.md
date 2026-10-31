@@ -17,6 +17,10 @@ These are the defaults imp uses when a project has no `.imp/project.md`, or leav
 
 One folder per idea: `ideas/<id>/STATUS.md`, plus the idea's research, plan, decks and a git-ignored `local/` folder. The stage is recorded only in STATUS; folders don't move between stages.
 
+## Idea groups
+
+None. List domains and their use-cases here to group `/ideas`, and imp fills each idea's `group` from the list.
+
 ## Knowledge
 
 Look first in `README.md`, `CLAUDE.md` and `docs/`.

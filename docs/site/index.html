@@ -139,6 +139,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 0.86rem; border-top: 
 <tr><td><code>/notes [id] &lt;notes&gt;</code></td><td>Files your meeting notes into the feedback log, updates decisions and assumptions, and proposes the next plan.</td></tr>
 <tr><td><code>/ideas [--all] [--scan DIR]</code></td><td>Lists ideas in this project, or in every project with <code>--all</code>.</td></tr>
 <tr><td><code>/investigate &lt;case&gt;</code></td><td>Checks whether a result is a misunderstanding, a code bug or a rulebook gap.</td></tr>
+<tr><td><code>/imp:push [note]</code></td><td>Commits the repo's changes, summarizes everything unpushed, and pushes once you say yes. Under <code>push_forbidden</code> it commits and hands you the push command.</td></tr>
 <tr><td><code>/imp-init</code></td><td>Connects the current project.</td></tr>
 <tr><td><code>/imp:dashboard [--port N]</code></td><td>Starts a local page at <code>http://127.0.0.1:8765/</code> (if it isn't already running) that lists every registered project's ideas in four groups: <em>Waiting on you</em> (a permission prompt, a session waiting for your reply, or <code>waiting_on: user</code>, with the gate), <em>In progress</em> (a live session, with its running agents), <em>Idle</em> (nothing live, backlog/shelved, or 7+ days without an update) and <em>Done</em> (behind a "show finished" box), plus stat tiles, a gate track, a sequence diagram per idea and a 60-minute state timeline, under an animated banner. It refreshes every 5 seconds without reloading the page.</td></tr>
 </table></div>
@@ -196,7 +197,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 0.86rem; border-top: 
 <tr><th>Gate</th><th>When</th><th>You see</th><th>It waits for</th></tr>
 <tr><td><span class="pill">G1 Plan</span></td><td>Before any work beyond read-only looking around</td><td>Plan, business-execution assumptions (their own section), other assumptions, risks, alternatives, data runs needed, outputs</td><td>Your go-ahead or edits</td></tr>
 <tr><td><span class="pill">G-data</span></td><td>Before every data or cluster run</td><td>The full script and the exact command</td><td>Approval of that exact version</td></tr>
-<tr><td><span class="pill">G2 Ready to push</span></td><td>Code committed locally, reviewer passed</td><td>Change summary, diff, results, branch</td><td>You push and test; agents never push</td></tr>
+<tr><td><span class="pill">G2 Ready to push</span></td><td>Code committed locally, reviewer passed</td><td>Change summary, diff, results, branch</td><td>You push (or say yes to <code>/imp:push</code>) and test; agents never push on their own</td></tr>
 <tr><td><span class="pill">G3 Tested</span></td><td>Before docs and the final deck of a ship</td><td>-</td><td>You say it tested fine</td></tr>
 <tr><td><span class="pill">Meeting</span></td><td>Between stages</td><td>The deck</td><td>Your <code>/notes</code></td></tr>
 </table></div>

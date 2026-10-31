@@ -119,8 +119,9 @@ def find_ideas(root: Path) -> list:
 
 
 def format_rows(ideas: list) -> str:
+    ideas = sorted(ideas, key=lambda i: i.get("last_update") or "", reverse=True)
     rows = []
-    for i in sorted(ideas, key=lambda i: i.get("last_update") or "", reverse=True):
+    for i in ideas:
         stage = i.get("stage") or "-"
         if i.get("round"):
             stage += f" r{i['round']}"
@@ -128,9 +129,23 @@ def format_rows(ideas: list) -> str:
     if not rows:
         return "  (no ideas)"
     widths = [max(len(r[c]) for r in rows) for c in range(3)]
-    return "\n".join(
-        "  ".join(r[c].ljust(widths[c]) for c in range(3)) + "  " + r[3] for r in rows
-    )
+    lines = ["  ".join(r[c].ljust(widths[c]) for c in range(3)) + "  " + r[3] for r in rows]
+    if not any(i.get("group") for i in ideas):
+        return "\n".join(lines)
+
+    groups = {}
+    for i, line in zip(ideas, lines):
+        domain, _, use_case = (i.get("group") or "").partition("/")
+        groups.setdefault((domain.strip(), use_case.strip()), []).append(line)
+    out, last_domain = [], None
+    for domain, use_case in sorted(groups, key=lambda g: (not g[0], g)):  # ungrouped last
+        if domain != last_domain:
+            out.append(domain or "(ungrouped)")
+            last_domain = domain
+        if use_case:
+            out.append(f"  {use_case}")
+        out += [f"    {line}" for line in groups[domain, use_case]]
+    return "\n".join(out)
 
 
 def resolve(ideas: list, query: str) -> dict:

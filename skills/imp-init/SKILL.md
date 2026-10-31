@@ -19,7 +19,7 @@ Read `CLAUDE.md`, `README.md`, any `.claude/agents/*.md` and `.claude/settings.j
 
 Start from `${CLAUDE_PLUGIN_ROOT}/defaults/project.md`: the same frontmatter keys and the same prose sections. Fill each slot from what the project says. Anything not found keeps its default and gets a trailing `# default` comment so the user can see it.
 
-Slots: `name`, `kind`, `ideas_root`, `integration_branch`, `push_forbidden`, `meeting`, `deck`, `agent_overrides`, plus the sections `Ideas layout`, `Knowledge`, `Code`, `Data execution`, `Deck`, `Meeting`, `Reviewer extra checks`.
+Slots: `name`, `kind`, `ideas_root`, `integration_branch`, `push_forbidden`, `meeting`, `deck`, `agent_overrides`, plus the sections `Ideas layout`, `Idea groups`, `Knowledge`, `Code`, `Data execution`, `Deck`, `Meeting`, `Reviewer extra checks`.
 
 Signals to look for:
 - Rules against pushing or opening PRs anywhere → `push_forbidden` globs for those paths (relative to the project root, comma-separated)

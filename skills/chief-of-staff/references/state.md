@@ -3,6 +3,7 @@
 ## STATUS fields
 
 From `templates/STATUS.md`:
+- `group`: `<Domain> / <use-case>`, exactly one, from the `Idea groups` slot. An idea that spans domains goes under its cross-domain domain. If nothing fits, ask the user before adding to the slot. Blank if the slot lists none.
 - `stage`: `backlog | pitch | experiment | ship | document | done | shelved`
 - `waiting_on`: `user | marketing | agents`. `marketing` means whoever the `meeting` slot names; with `meeting: self` it's `user`.
 - `gate`: `G1 | G-data | G2 | G3 | meeting`. Set it when you stop at a gate; clear it (blank) once the user passes it. The dashboard shows it.
@@ -11,7 +12,7 @@ From `templates/STATUS.md`:
 - `last_update`: today's date, `YYYY-MM-DD`
 - `next_step`: one line
 
-`impctl.py ideas` lists any `.md` under the ideas root whose frontmatter has `waiting_on`.
+`impctl.py ideas` lists any `.md` under the ideas root whose frontmatter has `waiting_on`, nested by `group` once any idea has one.
 
 ## Where state lives
 

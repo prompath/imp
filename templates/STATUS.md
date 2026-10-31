@@ -3,6 +3,7 @@ id: <short-kebab-id>
 title: <Title>
 project: <project name>
 kind: <personal|company>
+group:                     # <Domain> / <use-case> from the Idea groups slot; blank if the project has none
 stage: pitch               # backlog | pitch | experiment | ship | document | done | shelved
 round:                     # experiment round number
 waiting_on: agents         # user | marketing | agents

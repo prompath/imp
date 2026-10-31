@@ -99,6 +99,21 @@ class TestIdeas(unittest.TestCase):
         bare = [l for l in lines if l.startswith("bare")][0]
         self.assertIn("-", bare)
 
+    def test_format_rows_groups(self):
+        rows = impctl.format_rows([
+            {"id": "loose", "stage": "pitch", "waiting_on": "user", "last_update": "2026-10-25"},
+            {"id": "vendor", "group": "General / Sertis", "waiting_on": "user", "last_update": "2026-10-01"},
+            {"id": "old", "group": "Postpaid / NBO main", "waiting_on": "user", "last_update": "2026-10-01"},
+            {"id": "new", "group": "Postpaid / NBO main", "waiting_on": "user", "last_update": "2026-10-20"},
+            {"id": "rl", "group": "Postpaid / NBO content", "waiting_on": "user", "last_update": "2026-10-02"},
+            {"id": "adhoc", "group": "General", "waiting_on": "user", "last_update": "2026-10-03"},
+        ])
+        self.assertEqual([l.split()[0] if l.startswith("    ") else l.strip() for l in rows.splitlines()], [
+            "General", "adhoc", "Sertis", "vendor",
+            "Postpaid", "NBO content", "rl", "NBO main", "new", "old",
+            "(ungrouped)", "loose",
+        ])
+
     def test_resolve_exact_substring_ambiguous_unknown(self):
         ideas = [{"id": "offer-timing"}, {"id": "offer-timing-v2"}, {"id": "price-rule-fix", "title": "Price Rule"}]
         self.assertEqual(impctl.resolve(ideas, "offer-timing")["id"], "offer-timing")

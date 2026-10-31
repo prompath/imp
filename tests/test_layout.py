@@ -36,7 +36,7 @@ class TestTemplates(unittest.TestCase):
         for k in ["kind", "ideas_root", "integration_branch", "push_forbidden", "meeting", "deck", "agent_overrides"]:
             self.assertIn(k, proj)
         st = parse_frontmatter(read("templates/STATUS.md"))
-        for k in ["id", "stage", "round", "waiting_on", "gate", "last_update"]:
+        for k in ["id", "group", "stage", "round", "waiting_on", "gate", "last_update"]:
             self.assertIn(k, st)
         self.assertEqual(read("templates/deck-outlines.md").count("Assumptions to confirm"), 3)
 
@@ -90,6 +90,13 @@ class TestSkillsAndCommands(unittest.TestCase):
             self.assertIn("imp:chief-of-staff", text, c)
         names = {p.name for p in (ROOT / "commands").iterdir()}
         self.assertFalse(names & {"status.md", "feedback.md"})
+
+    def test_push_command_waits_for_user(self):
+        from impctl import parse_frontmatter
+        text = read("commands/push.md")
+        self.assertEqual(parse_frontmatter(text).get("disable-model-invocation"), "true")
+        for s in ["explicit yes", "Never force-push", "push_forbidden"]:
+            self.assertIn(s, text, s)
 
     def test_skill(self):
         from impctl import parse_frontmatter
