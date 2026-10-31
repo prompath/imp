@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "imp",
+  "description": "Agents and workflows for Claude Code: a chief-of-staff, specialist agents, and an idea lifecycle that projects extend.",
+  "owner": {
+    "name": "prompath"
+  },
+  "plugins": [
+    {
+      "name": "imp",
+      "description": "Chief-of-staff, specialist agents and gated idea workflows (pitch, experiment, ship, document).",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
+}

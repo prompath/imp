@@ -1,0 +1,10 @@
+{
+  "name": "imp",
+  "version": "1.0.0",
+  "description": "Chief-of-staff, specialist agents and gated idea workflows that each project extends through .imp/project.md.",
+  "author": {
+    "name": "prompath"
+  },
+  "license": "MIT",
+  "hooks": "./hooks/hooks.json"
+}

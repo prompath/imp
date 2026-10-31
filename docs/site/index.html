@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>imp Guide</title>
+<style>
+:root {
+  --bg: #fbfaf7; --surface: #ffffff; --ink: #1d2320; --muted: #5d6b63; --line: #dfe3dc;
+  --accent: #2d6a4f; --accent-soft: #e3f1e8; --gate: #b4441f; --gate-soft: #fbe9e1;
+  --agent: #3b5ba5; --agent-soft: #e6ecf8; --code-bg: #f2f1ec; --term-bg: #1e2421; --term-ink: #e6ece8;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141816; --surface: #1b201d; --ink: #e5ebe7; --muted: #9aa8a0; --line: #2e3632;
+    --accent: #7cc49d; --accent-soft: #1f3329; --gate: #f0936d; --gate-soft: #3a2219;
+    --agent: #93aef0; --agent-soft: #1f2840; --code-bg: #222826; --term-bg: #0e1110; --term-ink: #dfe7e2;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141816; --surface: #1b201d; --ink: #e5ebe7; --muted: #9aa8a0; --line: #2e3632;
+  --accent: #7cc49d; --accent-soft: #1f3329; --gate: #f0936d; --gate-soft: #3a2219;
+  --agent: #93aef0; --agent-soft: #1f2840; --code-bg: #222826; --term-bg: #0e1110; --term-ink: #dfe7e2;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--sans); }
+.wrap { max-width: 880px; margin: 0 auto; padding: 32px 16px 80px; }
+header { border-bottom: 1px solid var(--line); padding-bottom: 20px; margin-bottom: 8px; }
+h1 { font-size: 2.2rem; margin: 0 0 4px; letter-spacing: -0.02em; }
+h1 span { color: var(--accent); }
+.lede { color: var(--muted); font-size: 1.08rem; margin: 0; }
+nav { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 18px 0 0; font-size: 0.9rem; }
+nav a { color: var(--accent); text-decoration: none; }
+nav a:hover { text-decoration: underline; }
+h2 { font-size: 1.45rem; margin: 48px 0 10px; padding-top: 8px; letter-spacing: -0.01em; }
+h3 { font-size: 1.08rem; margin: 26px 0 6px; }
+p, li { max-width: 72ch; }
+a { color: var(--accent); }
+code { font-family: var(--mono); font-size: 0.88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+pre { font-family: var(--mono); font-size: 0.84rem; line-height: 1.5; background: var(--code-bg); padding: 14px 16px; border-radius: 8px; overflow-x: auto; margin: 10px 0 16px; }
+pre code { background: none; padding: 0; }
+pre.term { background: var(--term-bg); color: var(--term-ink); }
+pre.term .you { color: #9fd7b4; font-weight: 600; }
+pre.term .gate { color: #f4a37f; font-weight: 600; }
+pre.term .dim { color: #8d9a93; }
+.table { overflow-x: auto; margin: 10px 0 18px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; background: var(--surface); }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; color: var(--muted); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; }
+figure { margin: 18px 0 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+figure svg { width: 100%; height: auto; display: block; }
+figcaption { color: var(--muted); font-size: 0.86rem; margin-top: 10px; }
+.box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.box-accent { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+.box-agent { fill: var(--agent-soft); stroke: var(--agent); stroke-width: 1.5; }
+.box-gate { fill: var(--gate-soft); stroke: var(--gate); stroke-width: 1.5; }
+.t { fill: var(--ink); font: 600 13px var(--sans); }
+.ts { fill: var(--muted); font: 12px var(--sans); }
+.tg { fill: var(--gate); font: 700 12px var(--sans); }
+.arrow { stroke: var(--muted); stroke-width: 1.5; fill: none; marker-end: url(#ah); }
+.arrow-gate { stroke: var(--gate); stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; marker-end: url(#ahg); }
+.callout { border-left: 3px solid var(--gate); background: var(--gate-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; }
+.note { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 14px 0; }
+.pill { display: inline-block; font-size: 0.78rem; font-weight: 600; padding: 1px 8px; border-radius: 99px; background: var(--gate-soft); color: var(--gate); }
+.theme-toggle { float: right; background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 99px; padding: 4px 12px; font: 13px var(--sans); cursor: pointer; }
+footer { margin-top: 56px; color: var(--muted); font-size: 0.86rem; border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle colour theme">Theme</button>
+  <h1><span>imp</span> guide</h1>
+  <p class="lede">A home for your agents. A chief-of-staff plans the work, hands it to specialist agents, and stops for your go-ahead at fixed checkpoints. Every project extends the same base.</p>
+  <nav aria-label="Sections">
+    <a href="#what">What it is</a><a href="#install">Install</a><a href="#commands">Commands</a>
+    <a href="#lifecycle">Lifecycle</a><a href="#gates">Gates</a><a href="#examples">Examples</a>
+    <a href="#inside">How it works</a><a href="#extend">Project settings</a><a href="#add">Adding agents &amp; workflows</a>
+  </nav>
+</header>
+
+<!-- 1 -->
+<h2 id="what">What imp is</h2>
+<p>imp (Idea-to-Merge Pipeline) is a Claude Code plugin. It holds the parts that are the same for every kind of work: the chief-of-staff, nine specialist agents, the idea lifecycle, the checkpoints, and the evidence rules. Each project fills in its own details in one settings file, <code>.imp/project.md</code>: where ideas live, where the code is, how data gets run, what decks look like, and who reviews between stages.</p>
+
+<figure>
+<svg viewBox="0 0 760 270" role="img" aria-labelledby="f1t">
+  <title id="f1t">imp base plugin extended by two projects</title>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker>
+    <marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--gate)"/></marker>
+  </defs>
+  <rect class="box-accent" x="200" y="12" width="360" height="98" rx="10"/>
+  <text class="t" x="380" y="36" text-anchor="middle">imp plugin (base, installed once per machine)</text>
+  <text class="ts" x="380" y="58" text-anchor="middle">chief-of-staff · 9 agents · workflows · gates</text>
+  <text class="ts" x="380" y="76" text-anchor="middle">evidence rules · STATUS tracking · no-push hook</text>
+  <text class="ts" x="380" y="94" text-anchor="middle">defaults/project.md</text>
+  <path class="arrow" d="M300,112 L180,160"/>
+  <path class="arrow" d="M460,112 L580,160"/>
+  <rect class="box" x="30" y="162" width="300" height="94" rx="10"/>
+  <text class="t" x="180" y="186" text-anchor="middle">acme-analytics (company)</text>
+  <text class="ts" x="180" y="206" text-anchor="middle">.imp/project.md: Acme deck theme, develop branch,</text>
+  <text class="ts" x="180" y="223" text-anchor="middle">push_forbidden clones, data-run approval,</text>
+  <text class="ts" x="180" y="240" text-anchor="middle">weekly review meeting</text>
+  <rect class="box" x="430" y="162" width="300" height="94" rx="10"/>
+  <text class="t" x="580" y="186" text-anchor="middle">a personal project</text>
+  <text class="ts" x="580" y="206" text-anchor="middle">defaults: HTML slides, main branch,</text>
+  <text class="ts" x="580" y="223" text-anchor="middle">meeting = you, no cluster</text>
+  <text class="ts" x="580" y="240" text-anchor="middle">(or its own .imp/project.md)</text>
+</svg>
+<figcaption>One base, many projects. A project changes details through slots; it can't remove a checkpoint or the evidence rules.</figcaption>
+</figure>
+
+<!-- 2 -->
+<h2 id="install">Install and connect</h2>
+<h3>Once per machine</h3>
+<p>imp needs <code>python3</code> on your <code>PATH</code>. In Claude Code, and restart afterwards:</p>
+<pre><code>/plugin marketplace add prompath/imp
+/plugin install imp@imp</code></pre>
+<h3>Once per project</h3>
+<pre><code>/imp-init</code></pre>
+<p>It reads the project's <code>CLAUDE.md</code> and <code>README.md</code>, drafts <code>.imp/project.md</code>, and shows you the draft. Slots it couldn't find are marked <code># default</code>. Nothing is written until you approve. Commit the file with the project so your other machines get it.</p>
+<h3>On a new machine</h3>
+<pre><code>/ideas --all --scan ~/Projects</code></pre>
+<p>This finds every connected project and adds it to this machine's list (<code>~/.config/imp/projects.txt</code>). Idea state travels with each project's git repo.</p>
+<h3>Updating imp</h3>
+<p>Run <code>claude plugin marketplace update imp</code>, then <code>claude plugin update imp@imp</code>, and restart Claude Code. Maintainers raise <code>version</code> in <code>.claude-plugin/plugin.json</code> for each release.</p>
+
+<!-- 3 -->
+<h2 id="commands">Commands</h2>
+<div class="table"><table>
+<tr><th>Command</th><th>What it does</th></tr>
+<tr><td><code>/idea &lt;description&gt;</code></td><td>Starts an idea. The chief-of-staff picks a workflow and says why, creates the idea's STATUS, looks around (read-only), then shows the G1 plan and waits.</td></tr>
+<tr><td><code>/continue [id]</code></td><td>Resumes an idea at its current step. It never skips a gate.</td></tr>
+<tr><td><code>/notes [id] &lt;notes&gt;</code></td><td>Files your meeting notes into the feedback log, updates decisions and assumptions, and proposes the next plan.</td></tr>
+<tr><td><code>/ideas [--all] [--scan DIR]</code></td><td>Lists ideas in this project, or in every project with <code>--all</code>.</td></tr>
+<tr><td><code>/investigate &lt;case&gt;</code></td><td>Checks whether a result is a misunderstanding, a code bug or a rulebook gap.</td></tr>
+<tr><td><code>/imp-init</code></td><td>Connects the current project.</td></tr>
+<tr><td><code>/imp:dashboard [--port N]</code></td><td>Starts a local page at <code>http://127.0.0.1:8765/</code> (if it isn't already running) that lists every registered project's ideas in four groups: <em>Waiting on you</em> (a permission prompt, a session waiting for your reply, or <code>waiting_on: user</code>, with the gate), <em>In progress</em> (a live session, with its running agents), <em>Idle</em> (nothing live, backlog/shelved, or 7+ days without an update) and <em>Done</em> (behind a "show finished" box), plus stat tiles, a gate track, a sequence diagram per idea and a 60-minute state timeline, under an animated banner. It refreshes every 5 seconds without reloading the page.</td></tr>
+</table></div>
+<div class="note"><strong>Why <code>/ideas</code> and <code>/notes</code>?</strong> Claude Code already has built-in <code>/status</code> and <code>/feedback</code> commands. You can also just describe what you want in plain words; the chief-of-staff routes it and says which workflow it picked.</div>
+<p><strong>IDs:</strong> <code>/ideas</code> prints each idea's id. Every command accepts part of one (<code>lapsing</code> → <code>lapsing-voucher</code>). If two ideas match, it asks. Without an id, <code>/notes</code> goes to the idea waiting on a meeting.</p>
+
+<!-- 4 -->
+<h2 id="lifecycle">The idea lifecycle</h2>
+<p>This is how work moves with the business team: pitch at the weekly meeting, experiment in rounds, ship, document. A personal idea follows the same stages, with you as the meeting.</p>
+<figure>
+<svg viewBox="0 0 760 300" role="img" aria-labelledby="f2t">
+  <title id="f2t">Lifecycle stages with gates and the meeting loop</title>
+  <rect class="box-accent" x="10" y="40" width="150" height="70" rx="10"/>
+  <text class="t" x="85" y="68" text-anchor="middle">1 · Pitch</text>
+  <text class="ts" x="85" y="88" text-anchor="middle">research, sizing, deck</text>
+  <rect class="box-accent" x="210" y="40" width="160" height="70" rx="10"/>
+  <text class="t" x="290" y="68" text-anchor="middle">2 · Experiment rN</text>
+  <text class="ts" x="290" y="88" text-anchor="middle">exp/&lt;id&gt;-rN, results deck</text>
+  <rect class="box-accent" x="420" y="40" width="150" height="70" rx="10"/>
+  <text class="t" x="495" y="68" text-anchor="middle">3 · Ship</text>
+  <text class="ts" x="495" y="88" text-anchor="middle">feature/&lt;id&gt; branch</text>
+  <rect class="box-accent" x="620" y="40" width="130" height="70" rx="10"/>
+  <text class="t" x="685" y="68" text-anchor="middle">4 · Document</text>
+  <text class="ts" x="685" y="88" text-anchor="middle">notes, final deck</text>
+  <path class="arrow" d="M160,75 L208,75"/>
+  <path class="arrow" d="M370,75 L418,75"/>
+  <path class="arrow" d="M570,75 L618,75"/>
+  <text class="tg" x="85" y="30" text-anchor="middle">G1</text>
+  <text class="tg" x="290" y="30" text-anchor="middle">G1 · G2</text>
+  <text class="tg" x="495" y="30" text-anchor="middle">G1 · G2 · G3</text>
+  <text class="tg" x="685" y="30" text-anchor="middle">G1</text>
+  <rect class="box-gate" x="130" y="190" width="260" height="56" rx="10"/>
+  <text class="t" x="260" y="214" text-anchor="middle">Meeting (you present the deck)</text>
+  <text class="ts" x="260" y="233" text-anchor="middle">come back with /notes</text>
+  <path class="arrow-gate" d="M85,112 L85,218 L128,218"/>
+  <path class="arrow-gate" d="M290,112 L290,188"/>
+  <path class="arrow-gate" d="M392,218 C440,218 440,150 335,114"/>
+  <text class="ts" x="445" y="170">adjust → round N+1</text>
+  <text class="ts" x="445" y="186">or "it's right" → ship</text>
+  <text class="ts" x="10" y="282">Dashed = waits for you or the business team. G-data applies whenever a query has to run.</text>
+</svg>
+<figcaption>Each experiment round keeps its own results deck, so you can show how the numbers moved between rounds.</figcaption>
+</figure>
+<div class="table"><table>
+<tr><th>Point</th><th>STATUS shows</th></tr>
+<tr><td>Agents working</td><td><code>waiting_on: agents</code></td></tr>
+<tr><td>Plan, diff or query shown to you</td><td><code>waiting_on: user</code></td></tr>
+<tr><td>Deck ready for the meeting</td><td><code>waiting_on: marketing</code> (or <code>user</code> when <code>meeting: self</code>)</td></tr>
+</table></div>
+
+<!-- 5 -->
+<h2 id="gates">Gates</h2>
+<p>Gates are fixed in the base. Project settings can add checks, but they can't remove a gate.</p>
+<div class="table"><table>
+<tr><th>Gate</th><th>When</th><th>You see</th><th>It waits for</th></tr>
+<tr><td><span class="pill">G1 Plan</span></td><td>Before any work beyond read-only looking around</td><td>Plan, business-execution assumptions (their own section), other assumptions, risks, alternatives, data runs needed, outputs</td><td>Your go-ahead or edits</td></tr>
+<tr><td><span class="pill">G-data</span></td><td>Before every data or cluster run</td><td>The full script and the exact command</td><td>Approval of that exact version</td></tr>
+<tr><td><span class="pill">G2 Ready to push</span></td><td>Code committed locally, reviewer passed</td><td>Change summary, diff, results, branch</td><td>You push and test; agents never push</td></tr>
+<tr><td><span class="pill">G3 Tested</span></td><td>Before docs and the final deck of a ship</td><td>-</td><td>You say it tested fine</td></tr>
+<tr><td><span class="pill">Meeting</span></td><td>Between stages</td><td>The deck</td><td>Your <code>/notes</code></td></tr>
+</table></div>
+
+<!-- 6 -->
+<h2 id="examples">Worked examples</h2>
+
+<p>The company examples use a made-up online store.</p>
+
+<h3>1 · Segment treatment, verify mode (company)</h3>
+<pre class="term"><span class="you">you › /idea Marketing wants to give lapsing loyalty members a 20% voucher on their next three orders. Verify.</span>
+
+Routing: Segment treatment, verify mode → Pitch. Created ideas/inbox/lapsing-voucher.md (id lapsing-voucher).
+<span class="dim">Recon: business-researcher, data-analyst, code-investigator running in parallel…</span>
+
+<span class="gate">G1 Plan: lapsing-voucher</span>
+Plan: size and profile the segment; compare the voucher with a free-delivery and a double-points option; pitch deck.
+Assumptions about business execution (check, or ask marketing):
+  A1  The voucher goes out by email only.                     Unverified, not in the project's notes
+  A2  Prices return to normal after 3 orders, no reminder.    Unverified
+Other: "lapsing" = no order in 90 days (my guess); loyalty tiers as in the pricing rules (Verified)
+Risks: anchoring, since the full price then feels like a loss; overlap with the existing win-back offer
+Data: 2 sizing queries drafted, each needs your approval.
+Go ahead?
+
+<span class="you">you › go, A1 is right, A2 unknown, keep it flagged</span>
+<span class="gate">G-data</span> query shown → you run it and paste the totals
+
+Reviewer BLOCK: "vouchers lift repeat orders by 25%" has no source → revised once → PASS
+Pitch deck ready: ideas/active/Lapsing Voucher/deck.pdf (slide 8: Assumptions to confirm, A2)
+STATUS: waiting on marketing
+
+<span class="you">you › /notes lapsing marketing likes the free-delivery option, drop double points, A2 confirmed: no reminder</span>
+Filed into lapsing-voucher. A2 confirmed; new risk: members lapse again after the offer. Experiment round 1 plan below (G1).</pre>
+
+<h3>2 · Result investigation (company)</h3>
+<pre class="term"><span class="you">you › /investigate 3 Gold members got a 10% voucher, less than their usual 15%. IDs in local/cases.csv</span>
+
+Routing: Result investigation (id inv-low-voucher).
+<span class="gate">G-data</span> case query shown → you run it and hand back results
+
+Case 1  code bug          no rule checks voucher ≥ tier discount (rule 1.1); rewards/vouchers.py › pick_voucher()
+Case 2  misunderstanding  the member's tier dropped last month, so 10% is right → explanation.md for marketing
+Case 3  rulebook gap      members in their first 30 days: welcome-offer handling undefined
+
+Open ideas? Case 1 → Experiment (fix), Case 3 → Pitch (needs a decision)
+<span class="you">you › yes case 1 only</span>
+New idea voucher-rule-fix at Experiment → G1 → exp/voucher-rule-fix-r1 → <span class="gate">G2</span> → you push and run → results deck → meeting
+→ /continue rule-fix → Ship: feature/voucher-rule-fix rebased on develop → <span class="gate">G2</span> → you merge to develop and open the PR
+→ "tested fine" (<span class="gate">G3</span>) → Document: rulebook note, idea → archive/, INDEX.md updated</pre>
+
+<h3>3 · Explore an ML idea (personal)</h3>
+<pre class="term"><span class="you">you › /idea could a graph neural net recommend products better than collaborative filtering?</span>
+
+Routing: Explore → Pitch. No .imp/project.md, using defaults (HTML slides, meeting = you). Project registered.
+<span class="gate">G1 Plan</span>: tech-researcher gathers 5–8 papers (LightGCN, PinSage…), CF vs GNN trade-offs, one POC design.
+Assumption: a public dataset stands in for real shop data (my pick). Risk: results won't transfer directly.
+<span class="you">you › go</span>
+research-technical.md + 6-slide HTML summary. STATUS: waiting on you.
+
+<span class="you">you › /continue gnn build the POC</span>
+G1 → builder: notebook + a webpage to pick a user and compare CF vs GNN side by side → <span class="gate">G2</span> → you try it
+<span class="you">you › fine</span>
+Document: README (what, why, how, results)</pre>
+
+<h3>Listing everything</h3>
+<pre class="term"><span class="you">you › /ideas --all</span>
+acme-analytics (company)
+cart-reminder     pitch          waiting: marketing  2026-10-21
+lapsing-voucher   experiment r1  waiting: agents     2026-10-30
+voucher-rule-fix  ship           waiting: user       2026-10-29
+
+recsys-playground (personal)
+gnn-vs-cf         experiment r1  waiting: user       2026-10-28</pre>
+
+<!-- 7 -->
+<h2 id="inside">How it works inside</h2>
+<p>The chief-of-staff is a skill that runs in your main Claude Code session. The specialists have no Agent tool, so all handing-out of work happens there, next to the briefs and gates. Each specialist gets a short structured brief (goal, input files, relevant settings, constraints, output path), never the whole conversation. It writes its result to a file in the idea folder and returns a short summary.</p>
+<figure>
+<svg viewBox="0 0 760 330" role="img" aria-labelledby="f3t">
+  <title id="f3t">Chief-of-staff dispatching agents that write files, checked by the reviewer</title>
+  <defs>
+    <marker id="ah2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"/></marker>
+  </defs>
+  <rect class="box" x="10" y="20" width="150" height="56" rx="10"/>
+  <text class="t" x="85" y="44" text-anchor="middle">You</text>
+  <text class="ts" x="85" y="62" text-anchor="middle">/idea, /notes, go-ahead</text>
+  <rect class="box-accent" x="220" y="14" width="320" height="68" rx="10"/>
+  <text class="t" x="380" y="38" text-anchor="middle">chief-of-staff (main session)</text>
+  <text class="ts" x="380" y="56" text-anchor="middle">routes · plans · briefs · gates · STATUS</text>
+  <text class="ts" x="380" y="72" text-anchor="middle">reads .imp/project.md + defaults</text>
+  <path class="arrow" d="M160,48 L218,48" marker-end="url(#ah2)"/>
+  <g>
+    <rect class="box-agent" x="10" y="130" width="140" height="44" rx="8"/><text class="t" x="80" y="157" text-anchor="middle">business-researcher</text>
+    <rect class="box-agent" x="160" y="130" width="130" height="44" rx="8"/><text class="t" x="225" y="157" text-anchor="middle">tech-researcher</text>
+    <rect class="box-agent" x="300" y="130" width="140" height="44" rx="8"/><text class="t" x="370" y="157" text-anchor="middle">code-investigator</text>
+    <rect class="box-agent" x="450" y="130" width="120" height="44" rx="8"/><text class="t" x="510" y="157" text-anchor="middle">data-analyst</text>
+    <rect class="box-agent" x="580" y="130" width="80" height="44" rx="8"/><text class="t" x="620" y="157" text-anchor="middle">builder</text>
+    <rect class="box-agent" x="670" y="130" width="80" height="44" rx="8"/><text class="t" x="710" y="157" text-anchor="middle">presenter</text>
+  </g>
+  <path class="arrow" d="M380,84 L380,126" marker-end="url(#ah2)"/>
+  <text class="ts" x="390" y="110">briefs (parallel only for independent work)</text>
+  <rect class="box" x="100" y="216" width="560" height="48" rx="10"/>
+  <text class="t" x="380" y="238" text-anchor="middle">idea folder: plan.md · research-*.md · code-findings.md · queries/ · sizing.md</text>
+  <text class="ts" x="380" y="255" text-anchor="middle">change-summary.md · decks/ · review.md · STATUS.md · local/ (git-ignored)</text>
+  <path class="arrow" d="M380,176 L380,212" marker-end="url(#ah2)"/>
+  <rect class="box-gate" x="250" y="284" width="260" height="38" rx="10"/>
+  <text class="t" x="380" y="308" text-anchor="middle">reviewer: PASS or BLOCK</text>
+  <path class="arrow" d="M380,266 L380,282" marker-end="url(#ah2)"/>
+  <text class="ts" x="520" y="306">BLOCK → one revision, then you</text>
+</svg>
+<figcaption>Code changes go to one builder unless the plan splits them into non-overlapping files (at most 3); research angles run in parallel. The reviewer runs on every plan, before every deck and before every G2.</figcaption>
+</figure>
+
+<h3>Agents</h3>
+<div class="table"><table>
+<tr><th>Agent</th><th>Tools</th><th>Writes</th><th>Notes</th></tr>
+<tr><td>business-researcher</td><td>read, web, write</td><td><code>research-business.md</code></td><td>business case, psychology, other companies' examples, execution assumptions listed separately</td></tr>
+<tr><td>tech-researcher</td><td>read, web, write</td><td><code>research-technical.md</code></td><td>papers, designs, trade-offs, a POC proposal</td></tr>
+<tr><td>code-investigator</td><td>read, read-only shell</td><td><code>code-findings.md</code> (saved by the chief)</td><td>locations, code vs rulebook, per-case verdicts</td></tr>
+<tr><td>data-analyst</td><td>read, write (no shell)</td><td><code>queries/</code>, <code>sizing.md</code></td><td>drafts only; you run everything</td></tr>
+<tr><td>builder</td><td>read, edit, shell</td><td>code, <code>change-summary.md</code></td><td>Sonnet, Opus for hard steps; commits to <code>exp/*</code> and <code>feature/*</code> only; never pushes</td></tr>
+<tr><td>verifier</td><td>read, shell</td><td><code>verify.md</code> (saved by the chief)</td><td>runs local tests, reports failures only; fixes nothing; runs before the reviewer</td></tr>
+<tr><td>claim-checker</td><td>read, web fetch</td><td><code>claims-check.md</code> (saved by the chief)</td><td>opens each cited link and checks it supports the claim; the reviewer blocks on bad ones</td></tr>
+<tr><td>presenter</td><td>read, write, export</td><td><code>decks/</code></td><td>numbers only from <code>sizing.md</code>; wording follows evidence</td></tr>
+<tr><td>reviewer</td><td>read, read-only shell</td><td><code>review.md</code> (saved by the chief)</td><td>PASS or BLOCK on plans, decks and code; always Opus; runs project extra checks</td></tr>
+</table></div>
+
+<h3>Evidence levels</h3>
+<p>Every claim in research, plans and decks carries one:</p>
+<div class="table"><table>
+<tr><th>Level</th><th>Means</th><th>How it's worded</th></tr>
+<tr><td><strong>Verified</strong></td><td>Our code or data, with location or query</td><td>Stated plainly</td></tr>
+<tr><td><strong>Sourced</strong></td><td>External, with a link</td><td>"Evidence suggests…", with the source</td></tr>
+<tr><td><strong>Inferred</strong></td><td>Reasoning from the above</td><td>Hedged: "likely", "we expect"</td></tr>
+<tr><td><strong>Assumed</strong></td><td>No evidence</td><td>Only on the assumptions slide</td></tr>
+</table></div>
+<p>Business-execution assumptions (channels, timing, who contacts the customer, what happens after a promotion) always get their own section in G1 and their own slide in every deck. The reviewer blocks any deck that hides one.</p>
+
+<h3>STATUS.md</h3>
+<pre><code>---
+id: cart-reminder
+title: Cart Reminder
+project: acme-analytics
+kind: company
+stage: experiment     # backlog | pitch | experiment | ship | document | done | shelved
+round: 2
+waiting_on: user      # user | marketing | agents
+gate:                 # G1 | G-data | G2 | G3 | meeting while stopped at it
+next_step: Run branch exp/cart-reminder-r2 and share results
+branch: exp/cart-reminder-r2
+last_update: 2026-10-21
+---
+## Decisions · ## Feedback log · ## Assumptions · ## Open questions · ## Artifacts</code></pre>
+<p>Any markdown file under the ideas folder with <code>waiting_on</code> in its frontmatter is an idea. That's how <code>/ideas</code> finds them, including flat research notes.</p>
+
+<h3>The no-push hook</h3>
+<p>The plugin ships a check that runs before every shell command Claude makes. It blocks <code>git push</code>, <code>gh pr create/merge/…</code> and PR API calls when the target folder matches the project's <code>push_forbidden</code> globs. It checks the current folder, <code>cd &lt;dir&gt; &amp;&amp; …</code> and <code>git -C &lt;dir&gt;</code>. Everything else passes untouched, and projects without the setting aren't affected.</p>
+<div class="table"><table>
+<tr><th>Command (in acme-analytics)</th><th>Result</th></tr>
+<tr><td><code>git push</code> inside <code>projects/x/service-x</code></td><td>Blocked</td></tr>
+<tr><td><code>cd projects/x/service-x &amp;&amp; git push</code></td><td>Blocked</td></tr>
+<tr><td><code>gh pr create</code> inside a clone</td><td>Blocked</td></tr>
+<tr><td><code>git commit</code>, <code>git status</code>, <code>gh pr view</code> inside a clone</td><td>Allowed</td></tr>
+<tr><td><code>git push</code> at the acme-analytics root (notes repo)</td><td>Allowed by the hook; agents still push only when you ask</td></tr>
+</table></div>
+<div class="callout">The hook reads the command text, so a push hidden inside a script or alias would get past it. The prompts forbid pushing too; the hook is a second line of defence, not the only one.</div>
+
+<h3>The activity hook and the dashboard</h3>
+<p>STATUS is only written at steps, so it can't say what's running right now. A second hook (<code>hooks/activity.py</code>) runs on session, prompt, tool, subagent, notification and stop events and keeps one small file per session in <code>~/.config/imp/activity/</code>: the idea it's on, its state (<code>working</code>, <code>needs_permission</code>, <code>waiting_reply</code>, <code>ended</code>) and its running agents. A session is linked to an idea when it touches a file in the idea's folder or hands out a brief headed <code>Brief: &lt;role&gt; for &lt;id&gt;</code>. The hook never prints, never blocks, and only rewrites the file when something changed or every 10 seconds. Each hook command exits 0 when its script is missing, so a checkout without the hook file can't block your tool calls. <code>/imp:dashboard</code> reads these files plus every STATUS; a session silent for 10 minutes counts as ended, and files older than a day are deleted. STATUS also has a <code>gate</code> field, set while an idea is stopped at a gate and cleared once you pass it, so the page can say which gate is waiting.</p>
+<p>Above the panels, a small animated banner shows the overall mood: <em>waiting on you</em> beats <em>working</em>, which beats <em>idle</em>. Pick its character in the top bar (fish, train or ants; the choice is kept in the browser). The same character plays every mood: the fish school across while agents work, blow <code>?</code> bubbles when something waits on you, and drift when all is quiet; the train stops at a red signal labelled with the most urgent gate. It pauses in a hidden tab and stays still if your system asks for reduced motion. The anthill is drawn as tiny pixel blocks rather than block characters, because browsers draw block characters at uneven sizes and offsets. The banner is a centred band half the page wide (at least 480px), and each sequence diagram sits on a dark background of the same width that grows when a stage has more participants. Every table uses the same fixed columns, with long text cut off and shown in full on hover. Under each row, a sequence diagram shows who hands what to whom in that idea's stage (you, the chief-of-staff and the agents it uses): finished steps are dim, the current one is amber with a moving dot, the next ones are dashed, and a running agent glows. It's open for ideas that wait on you or are in progress, and behind "show sequence" for idle ones; what you open or close stays that way across refreshes.</p>
+<p>The page is a dark grid of panels (it switches to a light theme when your system uses one). The top row holds big-number tiles: <em>Waiting on you</em> (amber), <em>In progress</em> (blue), <em>Idle</em> (grey), <em>Agents running</em> (green) and <em>Done</em> when "show finished" is ticked. Each group is a table panel whose first column is a coloured pill: red for a permission prompt, amber for a gate or your reply, blue for working. Waiting and in-progress rows also show a gate track, <code>G1 → G-data → G2 → G3</code>, with the gate the idea is stopped at filled in, or the next one outlined. The last panel is a state timeline for the past 60 minutes: one bar per session, blue while working, red while a permission prompt waits and amber while it waits for your reply. For that, each activity file also keeps <code>changes</code>, the last 50 state changes as <code>[time, state]</code> pairs. Every 5 seconds a few lines of inline script fetch the page again and swap the panels in, so nothing flickers; the top bar shows when it last refreshed. Everything is inline, so it works offline.</p>
+
+<!-- 8 -->
+<h2 id="extend">Project settings: <code>.imp/project.md</code></h2>
+<p>Frontmatter keys are read by the scripts. The prose sections underneath (Ideas layout, Knowledge, Code, Data execution, Deck, Meeting, Reviewer extra checks) are read by the chief-of-staff and passed to agents in their briefs.</p>
+<div class="table"><table>
+<tr><th>Slot</th><th>Default (personal)</th><th>acme-analytics</th></tr>
+<tr><td><code>kind</code></td><td>personal</td><td>company</td></tr>
+<tr><td><code>ideas_root</code></td><td><code>ideas</code> (one folder per idea)</td><td><code>ideas</code>: inbox → active → archive, with <code>ideas/INDEX.md</code> kept in sync</td></tr>
+<tr><td><code>integration_branch</code></td><td>main</td><td>develop (you merge <code>feature/&lt;id&gt;</code> into develop, then PR develop → main)</td></tr>
+<tr><td><code>push_forbidden</code></td><td>(none)</td><td><code>projects/*/service-*</code></td></tr>
+<tr><td><code>meeting</code></td><td>self</td><td>weekly review meeting</td></tr>
+<tr><td><code>deck</code></td><td>html-slides</td><td>pdf-slides (Acme brand theme)</td></tr>
+<tr><td><code>agent_overrides</code></td><td>(none)</td><td>e.g. <code>presenter=acme-deck-builder</code></td></tr>
+</table></div>
+<h3>Replacing a whole agent for one project</h3>
+<pre><code># acme-analytics/.claude/agents/acme-deck-builder.md   ← your agent
+# acme-analytics/.imp/project.md
+agent_overrides: presenter=acme-deck-builder</code></pre>
+<p>Every presenter dispatch in that project then goes to <code>acme-deck-builder</code>. It's explicit, so it doesn't depend on which name wins in Claude Code's lookup order.</p>
+
+<!-- 9 -->
+<h2 id="add">Adding agents and workflows</h2>
+<p>Ask one question: <strong>would another project use it too?</strong></p>
+<div class="table"><table>
+<tr><th></th><th>Useful everywhere → in imp</th><th>Only this project → in the project</th></tr>
+<tr><td>Agent</td><td><code>agents/&lt;name&gt;.md</code></td><td><code>.claude/agents/&lt;name&gt;.md</code></td></tr>
+<tr><td>Workflow</td><td><code>skills/chief-of-staff/references/&lt;name&gt;.md</code> plus a row in <code>routing.md</code></td><td><code>.imp/workflows/&lt;name&gt;.md</code> (picked up automatically)</td></tr>
+<tr><td>Command</td><td><code>commands/&lt;name&gt;.md</code></td><td><code>.claude/commands/&lt;name&gt;.md</code></td></tr>
+<tr><td>Ship it</td><td>raise <code>version</code> in <code>.claude-plugin/plugin.json</code>, then run <code>claude plugin marketplace update imp</code> and <code>claude plugin update imp@imp</code></td><td>commit the project</td></tr>
+</table></div>
+<h3>Workflow file format</h3>
+<pre><code>---
+name: campaign-postmortem
+use_when: marketing asks why a campaign under- or over-performed
+entry: standalone        # or a lifecycle stage: pitch | experiment | ship | document
+agents: data-analyst, business-researcher, acme-campaign-analyst, presenter, reviewer
+command: postmortem      # optional
+---
+1. data-analyst drafts response-rate queries by segment and channel (G-data)
+2. acme-campaign-analyst compares against the campaign brief
+3. business-researcher: likely causes, with evidence levels
+4. presenter: a 6-slide post-mortem deck, assumptions slide included</code></pre>
+<p>Every workflow runs through the chief-of-staff, so a new one gets the gates, the evidence rules and the no-push hook automatically. If a project workflow turns out to be useful everywhere, move its file into imp's <code>references/</code>; it's the same format.</p>
+
+<footer>
+  imp 1.0.0 · Source: <a href="https://github.com/prompath/imp">prompath/imp</a>
+</footer>
+</div>
+<script>
+(function () {
+  var root = document.documentElement, btn = document.getElementById("themeToggle");
+  try { var saved = localStorage.getItem("imp-theme"); if (saved) root.setAttribute("data-theme", saved); } catch (e) {}
+  btn.addEventListener("click", function () {
+    var dark = root.getAttribute("data-theme") === "dark" ||
+      (!root.getAttribute("data-theme") && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    var next = dark ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("imp-theme", next); } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>
