@@ -94,7 +94,7 @@ def reduce(state: dict, event: dict, now: float) -> dict:
         s["state"] = "working"
         if agent_id and agent_type:
             s["agents"].setdefault(agent_id, agent_type)
-        if name in ("PreToolUse", "PostToolUse"):
+        if name in ("PreToolUse", "PostToolUse") and not agent_id:  # a subagent's reads must not relink the session
             idea = idea_from_tool(event.get("tool_name") or "", event.get("tool_input") or {},
                                   s.get("ideas_dir") or "", s.get("cwd") or "")
             if idea:

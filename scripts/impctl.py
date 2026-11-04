@@ -2,7 +2,8 @@
 """imp helpers: frontmatter, project registry, idea listing and ID matching.
 
 Stdlib only. Used by the chief-of-staff skill through the CLI, by hooks/no_push.py and
-hooks/activity.py, and by `impctl.py dashboard` (a local page of every idea, live).
+hooks/activity.py, and by `impctl.py dashboard` (a local server on 127.0.0.1 only: a page of every idea,
+live, and /rooms, a pixel campus of who works where).
 """
 import argparse
 import html
@@ -440,7 +441,7 @@ PAGE = """<!doctype html><html><head><meta charset="utf-8">
 --muted:#6a737d;--head:#f0f1f3;--red:#d4374a;--amber:#e07b00;--blue:#3871dc;--green:#3d9a37;--grey:#8a9099}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:13px system-ui,sans-serif}
 .top{display:flex;flex-wrap:wrap;gap:16px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--panel)}
-.top b{font-size:15px}.top span,.top label{color:var(--muted)}#ts{font-family:ui-monospace,monospace;color:var(--text)}
+.top b{font-size:15px}.top span,.top label{color:var(--muted)}.top a{color:var(--blue)}#ts{font-family:ui-monospace,monospace;color:var(--text)}
 #panels{display:grid;gap:8px;padding:8px}.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:3px;min-width:0}
 .panel h3{margin:0;padding:6px 10px;font-size:12px;font-weight:500;color:var(--muted);border-bottom:1px solid var(--border);background:var(--head)}
@@ -482,7 +483,7 @@ details summary{cursor:pointer;color:var(--muted);font-size:12px;padding:3px 0}
 @keyframes run{to{transform:translateX(var(--d))}}
 @media (prefers-reduced-motion:reduce){.seq .dot,.seq .node.live circle{animation:none}}
 </style></head><body><div class="top"><b>imp ideas</b><span>last refreshed <span id="ts">{ts}</span></span>
-<span>every 5s</span><label>character <select id="char"><option>fish</option><option>train</option>
+<span>every 5s</span><a href="/rooms">Rooms</a><label>character <select id="char"><option>fish</option><option>train</option>
 <option>ants</option></select></label><form><label><input type="checkbox" name="done" value="1"{checked} onchange="this.form.submit()"> show finished</label></form></div>
 <pre id="banner" aria-hidden="true"></pre>
 <div id="panels">{panels}</div>
@@ -775,21 +776,89 @@ def render(rows: list, show_done: bool, now: float, sessions=None) -> str:
     return page.replace("{checked}", " checked" if show_done else "").replace("{panels}", "".join(parts))
 
 
+STAGE_ROOM = {"pitch": "meeting", "experiment": "lab", "ship": "workshop", "document": "library"}
+
+
+def rooms_state(rows: list, sessions: list, now: float) -> dict:
+    """The API contract of /api/rooms: one character per visible idea, one per live subagent.
+
+    Rows apply in the order of the plan's room table; the first match wins. Output has no absolute paths."""
+    chars = []
+
+    def add(id_, kind, role, room, activity, project, idea="", title="", note=""):
+        chars.append({"id": id_, "kind": kind, "role": role, "room": room, "activity": activity,
+                      "project": project, "idea": idea, "title": title, "note": note})
+
+    def add_agents(key, live, room, project, idea="", title=""):
+        types = [t for s in live for _, t in sorted((s.get("agents") or {}).items())]
+        for n, t in enumerate(types, 1):
+            add(f"{key}#{n}", "agent", t.split(":")[-1], room, "work", project, idea, title)
+
+    linked = {id(s) for r in rows for s in r[3]}  # includes sessions on hidden ideas: those stay hidden
+    for group, _, idea, mine in rows:
+        stage = idea.get("stage") or ""
+        if stage in ("done", "shelved"):
+            continue
+        live = [s for s in mine if _live(s, now)]
+        states = {s.get("state") for s in live}
+        gate = GATES.get(idea.get("gate") or "", idea.get("gate") or "")
+        at_gate = bool(gate) or idea.get("waiting_on") == "user"
+        key = f"{idea['project']}/{idea.get('id') or idea.get('_path', '')}"
+        if stage == "backlog":
+            room, activity, note = "pool", "idle", ""
+        elif "needs_permission" in states:
+            room, activity, note = "lounge", "wait", "permission"
+        elif "working" not in states and (at_gate if live else group == "waiting"):
+            room, activity, note = "lounge", "wait", gate or "waiting on you"
+        elif live:
+            room, activity, note = STAGE_ROOM.get(stage, "office"), "work" if "working" in states else "reply", ""
+        else:
+            room, activity, note = "lounge", "idle", ""
+        add(key, "lead", "chief", room, activity, idea["project"], idea.get("id") or "", idea.get("title") or "", note)
+        add_agents(key, live, STAGE_ROOM.get(stage, "office"), idea["project"], idea.get("id") or "", idea.get("title") or "")
+    for i, s in enumerate(sessions):
+        if not _live(s, now) or id(s) in linked:
+            continue
+        project = Path(s.get("cwd") or "").name
+        perm = s.get("state") == "needs_permission"
+        add(f"s{i}", "lead", "chief", "lounge" if perm else "office",
+            "wait" if perm else "work" if s.get("state") == "working" else "reply", project, note="permission" if perm else "")
+        add_agents(f"s{i}", [s], "office", project)
+    return {"ts": int(now), "characters": chars}
+
+
+ROOMS_PAGE = Path(__file__).with_name("rooms.html")
+
+
+def route(path: str, host: str, port: int) -> tuple:
+    """(status, headers, body) for one GET. Only 127.0.0.1:<port> and localhost:<port> are served (DNS rebinding)."""
+    from urllib.parse import parse_qs, urlparse
+    url = urlparse(path)
+    html_type = "text/html; charset=utf-8"
+    if host not in (f"127.0.0.1:{port}", f"localhost:{port}"):
+        return 403, {"Content-Type": "text/plain"}, b"forbidden host"
+    if url.path == "/rooms":  # the one static file, by exact match: no path from the request reaches the disk
+        return 200, {"Content-Type": html_type}, ROOMS_PAGE.read_bytes()
+    if url.path not in ("/", "/api/rooms"):
+        return 404, {"Content-Type": "text/plain"}, b"not found"
+    now = time.time()
+    sessions = load_sessions(now)
+    rows = dashboard_rows(now, sessions)
+    if url.path == "/api/rooms":
+        return 200, {"Content-Type": "application/json", "X-Content-Type-Options": "nosniff"}, \
+            json.dumps(rooms_state(rows, sessions, now)).encode()
+    return 200, {"Content-Type": html_type}, render(rows, parse_qs(url.query).get("done") == ["1"], now, sessions).encode()
+
+
 def serve(port: int):
     from http.server import BaseHTTPRequestHandler, HTTPServer
-    from urllib.parse import parse_qs, urlparse
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
-            url = urlparse(self.path)
-            if url.path != "/":
-                self.send_error(404)
-                return
-            now = time.time()
-            sessions = load_sessions(now)
-            body = render(dashboard_rows(now, sessions), parse_qs(url.query).get("done") == ["1"], now, sessions).encode()
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+            status, headers, body = route(self.path, self.headers.get("Host", ""), port)
+            self.send_response(status)
+            for k, v in headers.items():
+                self.send_header(k, v)
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
@@ -797,7 +866,7 @@ def serve(port: int):
         def log_message(self, *args):
             pass
 
-    print(f"imp dashboard: http://127.0.0.1:{port}/", flush=True)
+    print(f"imp dashboard: http://127.0.0.1:{port}/  rooms: http://127.0.0.1:{port}/rooms", flush=True)
     HTTPServer(("127.0.0.1", port), Handler).serve_forever()
 
 

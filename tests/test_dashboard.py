@@ -76,6 +76,13 @@ class TestReducer(unittest.TestCase):
         self.assertEqual(s["cwd"], "/p")
         self.assertEqual(run(bash, state=s)["idea"], IDEAS + "/returns")
 
+    def test_subagent_reads_do_not_relink_the_session(self):
+        read = lambda **kw: ev("PreToolUse", tool_name="Read", tool_input={"file_path": IDEAS + "/other/plan.md"}, **kw)
+        main = run(ev("SessionStart"), ev("PreToolUse", tool_name="Read", tool_input={"file_path": IDEAS + "/mine/plan.md"}))
+        s = run(read(agent_id="a1", agent_type="imp:tech-researcher"), state=main)
+        self.assertEqual((s["idea"], s["agents"]), (IDEAS + "/mine", {"a1": "imp:tech-researcher"}))
+        self.assertEqual(run(read(), state=main)["idea"], IDEAS + "/other")  # the main session still relinks
+
     def test_registered_for_every_event(self):
         hooks = json.loads((ROOT / "hooks" / "hooks.json").read_text())["hooks"]
         for name in ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "SubagentStart",
@@ -148,6 +155,9 @@ class TestClassify(unittest.TestCase):
         self.assertEqual(c(idea(stage="shelved"), [sess("working")], NOW)[0], "progress")
 
 
+HOST = "127.0.0.1:8765"
+
+
 class TestDashboard(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -189,6 +199,139 @@ class TestDashboard(unittest.TestCase):
         done = impctl.render(rows, True, NOW)
         self.assertIn("Done (1)", done)
         self.assertIn('value="1" checked', done)
+
+    def get(self, path, host=HOST):
+        return impctl.route(path, host, 8765)
+
+    def test_api_rooms_shape_headers_and_no_paths(self):
+        status, headers, body = self.get("/api/rooms")
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Content-Type"], "application/json")
+        self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
+        self.assertNotIn("Access-Control-Allow-Origin", headers)
+        data = json.loads(body)
+        self.assertEqual(set(data), {"ts", "characters"})
+        keys = {"id", "kind", "role", "room", "activity", "project", "idea", "title", "note"}
+        self.assertEqual([(c["id"], c["room"], c["activity"], c["role"]) for c in data["characters"]],
+                         [("proj/evil", "office", "work", "chief"), ("proj/evil#1", "office", "work", "builder")])
+        self.assertTrue(all(set(c) == keys for c in data["characters"]))
+        self.assertNotIn(self.tmp.name, body.decode())
+        self.assertNotIn(os.path.realpath(self.tmp.name), body.decode())
+
+    def test_pages(self):
+        status, headers, body = self.get("/rooms?demo=1")
+        self.assertEqual((status, body), (200, (ROOT / "scripts" / "rooms.html").read_bytes()))
+        self.assertTrue(headers["Content-Type"].startswith("text/html"))
+        self.assertIn(b"imp ideas", self.get("/?done=1")[2])
+        self.assertIn(b'<a href="/rooms">Rooms</a>', self.get("/")[2])
+
+    def test_unknown_paths_and_traversal_are_404(self):
+        for path in ["/x", "/rooms/", "/rooms.html", "/api", "/api/rooms/x", "/scripts/impctl.py", "/rooms/../impctl.py",
+                     "/../README.md", "/%2e%2e/README.md", "/rooms%2f..%2fimpctl.py", "//etc/passwd", "/rooms\\..\\x"]:
+            self.assertEqual(self.get(path)[0], 404, path)
+
+    def test_host_allow_list_covers_every_path(self):
+        for path in ["/", "/rooms", "/api/rooms", "/x"]:
+            for host in ["evil.example", "evil.example:8765", "127.0.0.1", "127.0.0.1:80", "localhost", "", "[::1]:8765",
+                         "127.0.0.1:8765.evil.example", "127.0.0.1:8765, evil"]:
+                self.assertEqual(self.get(path, host)[0], 403, (path, host))
+            self.assertEqual(self.get(path, "localhost:8765")[0], 404 if path == "/x" else 200, path)
+
+
+def row(i, *mine, **kw):
+    i = dict(idea(**kw), project="p", **i)
+    return (impctl.classify(i, list(mine), NOW)[0], "", i, list(mine))
+
+
+def rooms(rows, sessions=()):
+    out = impctl.rooms_state(rows, list(sessions), NOW)["characters"]
+    return {c["id"]: (c["room"], c["activity"], c["note"]) for c in out}
+
+
+class TestRooms(unittest.TestCase):
+    """The room table of the plan, row by row; the first matching row wins."""
+
+    def test_1_done_and_shelved_are_hidden(self):
+        w = sess("working", a="imp:builder")
+        rows = [row({"id": "d"}, w, stage="done"), row({"id": "s"}, w, stage="shelved"), row({"id": "n"}, stage="done")]
+        self.assertEqual(rooms(rows, [w]), {})  # linked sessions of hidden ideas don't turn up as unlinked
+
+    def test_2_backlog_sunbathes_live_or_not(self):
+        live = sess("waiting_reply")
+        rows = [row({"id": "a"}, stage="backlog"), row({"id": "b"}, live, stage="backlog", gate="G1", waiting_on="user")]
+        self.assertEqual(rooms(rows), {"p/a": ("pool", "idle", ""), "p/b": ("pool", "idle", "")})
+
+    def test_3_permission_and_gates_go_to_the_kitchen(self):
+        rows = [row({"id": "perm"}, sess("needs_permission")),
+                row({"id": "gate"}, sess("waiting_reply"), gate="G2"),
+                row({"id": "user"}, waiting_on="user", gate="G1"),
+                row({"id": "user2"}, sess("waiting_reply"), waiting_on="user"),
+                row({"id": "busy"}, sess("working"), gate="G2", stage="ship")]
+        self.assertEqual(rooms(rows), {
+            "p/perm": ("lounge", "wait", "permission"), "p/gate": ("lounge", "wait", "G2 Ready to push"),
+            "p/user": ("lounge", "wait", "G1 Plan"), "p/user2": ("lounge", "wait", "waiting on you"),
+            "p/busy": ("workshop", "work", "")})  # live work keeps the character in its room
+
+    def test_4_stage_picks_the_room_and_a_plain_reply_stays(self):
+        rows = [row({"id": st}, sess("working"), stage=st) for st in ("pitch", "experiment", "ship", "document")]
+        rows.append(row({"id": "chat"}, sess("waiting_reply"), stage="ship"))
+        self.assertEqual(rooms(rows), {
+            "p/pitch": ("meeting", "work", ""), "p/experiment": ("lab", "work", ""),
+            "p/ship": ("workshop", "work", ""), "p/document": ("library", "work", ""),
+            "p/chat": ("workshop", "reply", "")})
+
+    def test_5_blank_stage_and_unlinked_sessions_go_to_the_office(self):
+        lone = dict(sess("working", a="imp:builder"), cwd="/home/me/code/side-project/")
+        perm = dict(sess("needs_permission"), cwd="/x/y")
+        old = sess("working", age=601)
+        rows = [row({"id": "blank"}, sess("working"), stage=""), row({"id": "chat"}, sess("waiting_reply"), stage="")]
+        got = impctl.rooms_state(rows, [lone, perm, old], NOW)["characters"]
+        self.assertEqual({c["id"]: (c["room"], c["activity"], c["project"]) for c in got}, {
+            "p/blank": ("office", "work", "p"), "p/chat": ("office", "reply", "p"),
+            "s0": ("office", "work", "side-project"), "s0#1": ("office", "work", "side-project"),
+            "s1": ("lounge", "wait", "y")})
+
+    def test_6_not_live_sits_on_the_couch(self):
+        rows = [row({"id": "none"}), row({"id": "dead"}, sess("working", age=601)), row({"id": "ended"}, sess("ended")),
+                row({"id": "stale"}, waiting_on="user", last_update="2027-01-08")]
+        self.assertEqual(set(rooms(rows).values()), {("lounge", "idle", "")})
+        self.assertEqual(len(rooms(rows)), 4)
+
+    def test_agents_stay_in_the_stage_room_or_the_office(self):
+        b = sess("needs_permission", a1="imp:builder", a2="general-purpose")
+        rows = [row({"id": "x"}, b, stage="experiment"), row({"id": "bk"}, sess("working", z="imp:reviewer"), stage="backlog"),
+                row({"id": "dead"}, sess("working", age=601, q="imp:builder"))]
+        got = {c["id"]: (c["kind"], c["role"], c["room"]) for c in impctl.rooms_state(rows, [], NOW)["characters"]}
+        self.assertEqual(got, {
+            "p/x": ("lead", "chief", "lounge"), "p/x#1": ("agent", "builder", "lab"), "p/x#2": ("agent", "general-purpose", "lab"),
+            "p/bk": ("lead", "chief", "pool"), "p/bk#1": ("agent", "reviewer", "office"), "p/dead": ("lead", "chief", "lounge")})
+
+
+class TestRoomsPage(unittest.TestCase):
+    page = (ROOT / "scripts" / "rooms.html").read_text()
+
+    def test_static_scans(self):
+        for bad in ["innerHTML", "outerHTML", "insertAdjacentHTML", "document.write"]:
+            self.assertNotIn(bad, self.page, bad)
+        self.assertEqual(re.findall("[\u2580-\u259f]", self.page), [])  # sprites are pixels, not block glyphs
+        self.assertIn("prefers-reduced-motion", self.page)
+        self.assertRegex(self.page, r'matchMedia\("[^"]*prefers-reduced-motion[^"]*"\)')
+        self.assertIn('motion.addEventListener("change"', self.page)
+        self.assertRegex(self.page, r"<button[^>]*>Pause</button>")
+
+    def test_every_door_is_reachable(self):
+        if not shutil.which("node"):
+            self.skipTest("node not installed")
+        check = """
+        const t = require("fs").readFileSync(process.argv[1], "utf8");
+        const pure = t.split("<script>")[1].split("</script>")[0].split("// ---- end pure ----")[0];
+        const m = require("vm").runInNewContext(pure + ";({DOORS, CAMPUS_DOOR, bfs})", {});
+        if (!m.DOORS.length || !m.CAMPUS_DOOR) throw new Error("no doors");
+        for (const d of m.DOORS)
+          if (!m.bfs(m.CAMPUS_DOOR.x, m.CAMPUS_DOOR.y, d.x, d.y)) throw new Error("unreachable door " + JSON.stringify(d));
+        """
+        r = subprocess.run(["node", "-e", check, str(ROOT / "scripts" / "rooms.html")], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
 
 
 class TestPanels(unittest.TestCase):
