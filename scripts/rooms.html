@@ -308,6 +308,24 @@ function placeTags(people, blocked, cw, ch, gap, drift, prev) {
   }
   return out;
 }
+// what placeTags found, as drawn: a tag hides at once when its slot turns illegal, but shows again, or in a new slot or
+// label, only once placeTags has kept it there for wait ms in a row, so a walker's tag does not blink on and off. since
+// maps id to the slot it waits on and when that began. A hot tag, or wait 0 for a still frame, shows at once. Returns the
+// drawn map and the ms until the next waiting tag is due (Infinity if none).
+function holdTags(tags, since, now, wait, hot) {
+  const out = new Map();
+  let wake = Infinity;
+  for (const id of [...since.keys()]) if (!tags.get(id)) since.delete(id);
+  for (const [id, b] of tags) {
+    if (!b) { out.set(id, null); continue; }
+    const k = b.s + "/" + b.li;
+    if (!since.has(id) || since.get(id).k !== k) since.set(id, {k, t: now});
+    const left = wait - (now - since.get(id).t), show = left <= 0 || hot.has(id);
+    out.set(id, show ? b : null);
+    if (!show) wake = Math.min(wake, left);
+  }
+  return [out, wake];
+}
 
 // ---- sprites: palette-letter grids built from rects, then outlined; "." is see-through ----
 // e eyes; h/H hair, s/S skin, c/C shirt (project colour), p/P trousers, f/F shoes come from the character;
@@ -646,6 +664,7 @@ function demoState(n, ts) {
   const actors = new Map(), sprites = new Map();
   let reduced = motion.matches, paused = false, scale = 1, px = 1, raf = 0, timer = 0, lastTs = 0, tick = 0;
   let highlight = "", hoverId = "", demoStep = 0, loaded = false, inflight = false, rosterKey = "", overflow = new Map(), lastTags = new Map();
+  let tagSince = new Map(), lastHeld = new Map(), holdTimer = 0;  // holdTags' state, and the redraw that shows a waiting tag
   let labelBoxes = [], labelFont = "", zoomed = false, statusText = "", perfText = "", dprQuery = null, tu = 1;
   const base = document.createElement("canvas");
   base.width = LW * S;
@@ -2128,10 +2147,24 @@ function demoState(n, ts) {
     return {x: tx * T + T / 2 - s.ax + s.body.x, y: ty * T + T - s.h + 1 + s.body.y, w: s.body.w, h: s.body.h};
   }
   function tileOf(a) { return a.path.length ? a.path[0] : [Math.round(a.x), Math.round(a.y)]; }
+  // everyone but a, where they are, where they are going and at their spot: the tiles they hold, and their body boxes there
+  function others(a) {
+    const avoid = new Set(), boxes = [];
+    for (const o of actors.values()) {
+      if (o === a || o.spot < 0 && !o.leaving) continue;
+      const ob = place(o).body, end = o.path[o.path.length - 1], at = [[o.x, o.y]].concat(end ? [end] : [], o.spot >= 0 ? [[SPOTS[o.spot].x, SPOTS[o.spot].y]] : []);
+      for (const [x, y] of at) {
+        avoid.add(Math.round(y) * MAP_W + Math.round(x));
+        boxes.push({x: ob.x + (x - o.x) * T, y: ob.y + (y - o.y) * T, w: ob.w, h: ob.h});
+      }
+    }
+    return {avoid, boxes};
+  }
+  // walk round the others' tiles (bfs never blocks the goal itself), or straight through them when there is no way round
   function goTo(a, gx, gy) {
     if (still()) { a.x = gx; a.y = gy; a.path = []; return; }
     const [sx, sy] = tileOf(a);
-    a.path = bfs(sx, sy, gx, gy) || [[gx, gy]];
+    a.path = bfs(sx, sy, gx, gy, others(a).avoid) || bfs(sx, sy, gx, gy) || [[gx, gy]];
   }
   function home(a) { return a.spot >= 0 ? SPOTS[a.spot] : null; }
 
@@ -2198,17 +2231,8 @@ function demoState(n, ts) {
         // the chief walks and talks around its room between rests
         if (a.spot >= 0 && wanders(a) && now > a.wanderAt) {
           const h = home(a), atHome = a.x === h.x && a.y === h.y, r = ROOMS[a.d.room];
-          // everyone else, where they are, where they are going and at their spot: the chief rests clear of their bodies
-          // and walks round the tiles they hold
-          const avoid = new Set(), boxes = [], meets = (b, o) => o.x < b.x + b.w && b.x < o.x + o.w && o.y < b.y + b.h && b.y < o.y + o.h;
-          for (const o of actors.values()) {
-            if (o === a || o.spot < 0 && !o.leaving) continue;
-            const ob = place(o).body, end = o.path[o.path.length - 1], at = [[o.x, o.y]].concat(end ? [end] : [], o.spot >= 0 ? [[SPOTS[o.spot].x, SPOTS[o.spot].y]] : []);
-            for (const [x, y] of at) {
-              avoid.add(Math.round(y) * MAP_W + Math.round(x));
-              boxes.push({x: ob.x + (x - o.x) * T, y: ob.y + (y - o.y) * T, w: ob.w, h: ob.h});
-            }
-          }
+          // the chief rests clear of everyone else's bodies and walks round the tiles they hold
+          const {avoid, boxes} = others(a), meets = (b, o) => o.x < b.x + b.w && b.x < o.x + o.w && o.y < b.y + b.h && b.y < o.y + o.h;
           let gx = h.x, gy = h.y;
           if (atHome) for (let i = 0; i < 12; i++) {
             const tx = r.x + Math.floor(Math.random() * r.w), ty = r.y + Math.floor(Math.random() * r.h);
@@ -2404,14 +2428,19 @@ function demoState(n, ts) {
         labels: (short === full ? [full] : [full, short]).map(label => ({label, w: tagWidth(label)}))};
     }).concat(placed.filter(([a]) => a.leaving).map(([a]) => ({id: a.id, rank: 3, body: bodies.get(a.id), labels: []})));
     const tags = placeTags(people, hard.concat(walls), canvas.width, canvas.height, 2 * Math.max(1, Math.round(tu)), T / 2 * px, lastTags);
-    // demo: count slot or label changes from the last frame, which hysteresis keeps to the ones forced by a new obstacle
-    if (demo) canvas.dataset.flips = +(canvas.dataset.flips || 0) + [...tags].filter(([id, b]) => b && lastTags.get(id) &&
-      (lastTags.get(id).s !== b.s || lastTags.get(id).li !== b.li)).length;
     lastTags = tags;
+    // a still frame shows every legal tag at once; otherwise a tag waits 400 ms in a slot before it shows, and a redraw is due then
+    const [held, wake] = holdTags(tags, tagSince, performance.now(), still() ? 0 : 400, new Set([highlight, hoverId]));
+    clearTimeout(holdTimer);
+    holdTimer = wake < Infinity ? setTimeout(draw, wake + 5) : 0;
+    // demo: count drawn tag changes from the last frame, shown or hidden and slot or label
+    const key = b => b ? b.s + "/" + b.li : "";
+    if (demo) canvas.dataset.flips = +(canvas.dataset.flips || 0) + [...held].filter(([id, b]) => lastHeld.has(id) && key(lastHeld.get(id)) !== key(b)).length;
+    lastHeld = held;
     let drawn = 0, hover = [], over = 0, astray = 0;
     const far = (x, y, o) => Math.hypot(Math.max(o.x - x, 0, x - o.x - o.w), Math.max(o.y - y, 0, y - o.y - o.h));
     for (const [a] of shown) {
-      const b = tags.get(a.id), hot = a.id === highlight || a.id === hoverId;
+      const b = held.get(a.id), hot = a.id === highlight || a.id === hoverId;
       if (!b) { hover.push(a.id); continue; }
       drawTag(b, b.label, a.look.pal.c, hot);
       put(b);

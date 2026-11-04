@@ -484,6 +484,24 @@ class TestRoomsPage(unittest.TestCase):
         self.assertEqual((got["two"]["y"], got["two"]["label"]), (400, "s"))
         self.assertEqual((got["hot"]["x"], got["hot"]["y"], got["hot"]["w"]), (0, 162, 300))
 
+    def test_a_tag_shows_only_after_its_slot_has_been_legal_for_a_while(self):
+        got = self.pure("""
+        const since = new Map(), up = {s: 0, li: 0}, down = {s: 2, li: 0}, on = (t, m, hot) => {
+          const [out, wake] = holdTags(new Map(m), since, t, 400, new Set(hot || []));
+          return [[...out].map(([id, b]) => id + ":" + (b ? b.s : "-")).join(" "), wake];
+        };
+        // a waits in its slot, shows at 400 ms, hides at once, moves and waits again; b is hot and shows at once
+        const run = [on(0, [["a", up], ["b", null]]), on(399, [["a", up]]), on(400, [["a", up]]), on(500, [["a", null]]),
+          on(600, [["a", up]]), on(1000, [["a", down], ["b", up]], ["b"]), on(1400, [["a", down]])];
+        // a still frame (wait 0) shows every legal tag, a new one too
+        const still = holdTags(new Map([["c", up], ["a", down]]), since, 1401, 0, new Set())[0];
+        return {run, still: [...still.keys()].filter(id => still.get(id)), left: [...since.keys()]};
+        """)
+        self.assertEqual(got["run"], [["a:- b:-", 400], ["a:-", 1], ["a:0", None], ["a:-", None], ["a:-", 400],
+                                      ["a:- b:0", 400], ["a:2", None]])  # None: Infinity in JSON, nothing waits
+        self.assertEqual(got["still"], ["c", "a"])
+        self.assertEqual(got["left"], ["a", "c"])  # b left the input map, so its wait is forgotten
+
     def test_wait_text_does_not_double(self):
         got = self.pure("""
         const w = note => stateText({activity: "wait", note, room: "lounge"});
