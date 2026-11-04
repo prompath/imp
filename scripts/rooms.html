@@ -46,30 +46,31 @@ const T = 32;
 // Seats, walkable only as a path's end: c couch, b beanbag, l lounger (j is its backrest).
 // Props: P plant, i lamp, U water cooler, C filing cabinet, D desk, T meeting table, R reading table, S bookshelf,
 // h armchair, O gas cylinders, H fume hood, G glass cabinet, L lab bench, Z sink, B workbench, J drill press, X crate, F fridge,
-// K counter, M coffee machine, I island, Y coffee table, V TV, A arcade, @ umbrella, & tree, % bush, ~ water.
+// K counter, M coffee machine, I island, Y coffee table, V TV, A arcade, @ umbrella, & tree, % bush, ~ water,
+// n sideboard, g lumber stack, q sawhorses with a half-built cabinet.
 // Meeting room and library are walled; office, lab, workshop and lounge are open zones on one floor; the pool is outside.
 const MAP = [
-  "#NN#WWW#N##NN#NN####NN#NN##,&,,,,&,,",
-  "#P..*.*.P#................#,,,,%,,,&",
+  "#NN#WWW#N##NN#NN####NN#NN##,,,,,,,,,",
+  "#P..*.*.P#................#,,&,%,,&,",
   "#........#.P.......H.*.*G.#&,,,,,,,,",
-  "#.*TTTT*.#.DDDDDD..H.LLL..#,,,,,,,,&",
+  "#.*TTTT*.#.DDDDDD..H.LLL..#,,,,,&,,,",
   "#.*TTTT*.#..*.*.*...*LLL*.#P.......P",
-  "#..*..*..#............*...#jl.~~~.jl",
+  "#n.*..*.n#............*...#jl.~~~.jl",
   "#........#.DDDDDD..LL..OG.#...~~~...",
   "#Phih...P#.C*+*.*..Z.*+.P.#jl.~~~.jl",
   "######++##P..............P#...~~~...",
-  "#P........................+.@.~~~..@",
+  "#P........................+.@.~~~.@.",
   "E.........................+...~~~...",
   "#U.........QQQQQ..FKMKKZK.#jl.~~~.jl",
   "######++##..*.*.J..k.k.k..#...~~~...",
   "#.*...*..#.BBBB.X...IIII..#jl.~~~.jl",
   "#S.......#......+..k....k+#P...+...P",
-  "#S.*RRR*.#..*..*X.i.....PA#,,,,:,,,,",
-  "#S..RRR..#.BBB.BB.ccccc...#&,,,,:,,%",
-  "#S..*.*..#........c_____b.#,,%,,:,,,",
+  "#S.*RRR*.#..*..*Xi......PA#,,,,:,,,,",
+  "#S..RRR..#.BBB.BB.ccccc...#&,,,,:,%,",
+  "#S..*.*..#.....qq.c_____b.#,,%,,:,,,",
   "#S.......#.X.*....c_YY__b.#,,,,,:,&,",
   "#S.hi.hiP#.XXBB.P.c_____..#&,,,,:,,,",
-  "#P......P#........P.VVV..P#,,%,,,,,&",
+  "#P......P#.ggg....P.VVV..P#,,%,,,,&,",
   "###########################,&,,&,,%,",
 ];
 const MAP_W = MAP[0].length, MAP_H = MAP.length;
@@ -368,6 +369,9 @@ const HI_ARM = {
     back: [["c", 48, 49, 7, 11], ["C", 51, 49, 4, 11], ["C", 48, 58, 7, 2]], type: [["c", 48, 48, 7, 10], ["C", 51, 48, 4, 10], ["C", 48, 56, 7, 2]]},
 };
 HI_ARM.L.back = [["c", 9, 49, 7, 11], ["x", 10, 50, 2, 9], ["C", 9, 58, 7, 2]];
+// seated, the forearms reach forward and the hands rest on the knees
+HI_ARM.L.lap = [["c", 9, 49, 7, 11], ["x", 10, 50, 2, 9], ["C", 9, 58, 7, 2], ["c", 13, 62, 7, 7], ["C", 13, 67, 7, 1], ["s", 19, 72, 7, 5], ["S", 19, 76, 7, 1]];
+HI_ARM.R.lap = [["c", 48, 49, 7, 11], ["C", 51, 49, 4, 11], ["C", 48, 58, 7, 2], ["c", 44, 62, 7, 7], ["C", 44, 67, 7, 1], ["s", 38, 72, 7, 5], ["S", 38, 76, 7, 1]];
 const HI_SHOES = (l, r) => [["f", 17, l, 14, 5], ["f", 33, r, 14, 5], ["F", 18, l, 6, 1], ["F", 34, r, 6, 1]];
 const HI_LEGS = [
   [["p", 18, 71, 28, 5], ["p", 19, 76, 12, 11], ["p", 33, 76, 12, 11], ["P", 38, 71, 8, 5], ["P", 27, 76, 4, 11], ["P", 41, 76, 4, 11],
@@ -388,21 +392,50 @@ const HI_SIDE = {
     [["p", 23, 71, 18, 5], ["P", 33, 75, 10, 11], ["f", 34, 86, 13, 5], ["p", 20, 75, 10, 10], ["z", 22, 76, 2, 8],
       ["f", 14, 85, 14, 5], ["F", 16, 85, 7, 1]]],
 };
-// seated legs: thighs toward the viewer, or forward in side view; the sprite is drawn 4 art px lower (oy)
-const HI_SIT = [["p", 17, 70, 30, 8], ["P", 38, 70, 9, 8], ["z", 20, 71, 6, 3], ["P", 31, 72, 2, 6], ["P", 17, 77, 30, 1],
-  ["p", 19, 78, 11, 8], ["p", 34, 78, 11, 8], ["P", 26, 78, 4, 8], ["P", 41, 78, 4, 8]].concat(HI_SHOES(86, 86));
+// seated legs: a lap of thighs coming toward the viewer, lit on top, knees over the seat's front edge,
+// then short shins in the knees' shadow and the shoes; in side view the thighs run forward
+const HI_SIT = [["p", 17, 70, 30, 12], ["z", 18, 71, 12, 3], ["z", 34, 71, 12, 3], ["P", 31, 71, 2, 11], ["P", 41, 74, 6, 8],
+  ["z", 21, 77, 6, 2], ["z", 36, 77, 6, 2], ["P", 17, 80, 30, 2],
+  ["P", 20, 82, 10, 6], ["P", 34, 82, 10, 6], ["p", 21, 82, 3, 5], ["p", 35, 82, 3, 5]].concat(HI_SHOES(88, 88));
 const HI_SIDE_SIT = [["p", 22, 68, 28, 8], ["P", 22, 74, 28, 2], ["z", 26, 69, 14, 1], ["p", 41, 74, 9, 12], ["P", 41, 74, 2, 12],
   ["f", 41, 86, 13, 5], ["F", 45, 86, 6, 1]];
 const HI_SIDE_REST = [["c", 28, 49, 8, 10], ["C", 28, 49, 2, 10], ["c", 31, 57, 10, 5], ["C", 31, 60, 10, 2], ["s", 40, 59, 6, 5], ["S", 40, 63, 6, 1]];
 const HI_SIDE_REACH = [["c", 28, 49, 8, 9], ["C", 28, 49, 2, 9], ["c", 32, 55, 14, 5], ["C", 32, 58, 14, 2], ["s", 45, 54, 6, 6], ["S", 45, 59, 6, 1]];
-// swimwear: the shirt, trousers and shoes become skin, and trunks in the project colour go on top
-const SWIM = {c: "s", C: "S", x: "a", X: "A", p: "s", P: "S", z: "a", Z: "A", f: "s", F: "a", d: "S", y: "S"};
-const TRUNKS = [["c", 17, 66, 30, 9], ["C", 17, 73, 30, 2], ["x", 19, 67, 4, 5], ["C", 31, 70, 2, 5], ["c", 18, 75, 13, 2], ["c", 33, 75, 13, 2]];
-const SHADES = [["k", 22, 31, 8, 4], ["k", 35, 31, 8, 4], ["k", 30, 32, 5, 1], ["l", 23, 31, 2, 1], ["l", 36, 31, 2, 1]];
+// lying on a lounger, seen from above, in the 128 x 64 art px of its two tiles: the head on the backrest at the left,
+// face up with sunglasses, arms along the sides, trunks in the project colour, two legs to the foot end
+const LIE_BODY = [
+  ["S", 32, 25, 6, 6],  // the neck
+  ["s", 37, 15, 6, 26], ["s", 36, 16, 8, 24], ["a", 37, 15, 5, 1], ["S", 36, 38, 8, 2],
+  ["s", 40, 20, 26, 17], ["a", 40, 20, 24, 1], ["S", 40, 34, 26, 3], ["S", 42, 28, 10, 1], ["S", 58, 27, 2, 2], ["S", 45, 22, 1, 4],
+  ["s", 40, 15, 23, 4], ["a", 40, 15, 23, 1], ["s", 63, 14, 6, 5], ["S", 66, 14, 3, 5],
+  ["s", 40, 38, 23, 4], ["S", 40, 41, 23, 1], ["s", 63, 38, 6, 5], ["S", 66, 38, 3, 5],
+  ["c", 64, 20, 15, 16], ["C", 64, 20, 2, 16], ["x", 67, 21, 8, 2], ["C", 64, 32, 15, 4], ["w", 67, 26, 1, 3], ["C", 73, 28, 6, 1],
+  ["s", 79, 20, 18, 8], ["s", 97, 21, 13, 6], ["a", 80, 20, 16, 1], ["S", 79, 26, 31, 1], ["S", 91, 22, 2, 3],
+  ["s", 79, 30, 18, 8], ["s", 97, 31, 13, 6], ["a", 80, 30, 16, 1], ["S", 79, 36, 31, 2], ["S", 91, 32, 2, 3],
+  ["s", 110, 19, 6, 9], ["a", 114, 20, 2, 7], ["s", 110, 29, 6, 9], ["a", 114, 30, 2, 7],
+  ["h", 13, 9, 18, 3], ["h", 11, 11, 22, 4], ["h", 10, 14, 24, 5], ["h", 9, 17, 3, 10], ["h", 32, 17, 3, 10],
+  ["j", 15, 10, 6, 2], ["j", 13, 12, 3, 3], ["H", 28, 12, 5, 6], ["H", 32, 20, 3, 7],
+  ["s", 12, 19, 20, 10], ["s", 13, 29, 18, 3], ["s", 15, 32, 14, 2], ["S", 29, 21, 3, 9], ["S", 16, 33, 12, 1],
+  ["h", 12, 17, 20, 2], ["H", 12, 19, 20, 1], ["s", 9, 23, 3, 4], ["s", 32, 23, 3, 4],
+  ["k", 13, 21, 8, 4], ["k", 23, 21, 8, 4], ["k", 21, 22, 2, 1], ["l", 14, 21, 2, 1], ["l", 24, 21, 2, 1],
+  ["S", 21, 26, 2, 2], ["q", 13, 26, 3, 2], ["q", 28, 26, 3, 2], ["m", 19, 29, 6, 1],
+];
+const LIE_HAIR = {long: [["h", 6, 17, 4, 18], ["H", 6, 28, 4, 7], ["h", 34, 17, 4, 12]], bun: [["h", 16, 5, 12, 5], ["H", 16, 8, 12, 2], ["j", 18, 6, 4, 1]],
+  curly: [["h", 8, 9, 6, 6], ["h", 30, 9, 6, 6], ["h", 18, 6, 8, 4], ["j", 20, 7, 3, 1]]};
+// a towel in the trouser colour under the body, lit along the top, with two stripes at the foot end
+const LIE_TOWEL = [["p", 36, 15, 82, 28], ["z", 36, 15, 82, 1], ["P", 36, 41, 82, 2], ["z", 106, 15, 2, 28], ["z", 110, 15, 2, 28]];
+// the body and the towel are outlined apart, so a 1 art px line keeps the body off the towel and the towel off the cushion
+function lieRows(style) {
+  const towel = grid(128, 64), body = grid(128, 64);
+  paint(towel, LIE_TOWEL, 0, 0);
+  outline(towel);
+  paint(body, LIE_BODY.concat(own(LIE_HAIR, style) ? LIE_HAIR[style] : []), 0, 0);
+  outline(body);
+  return body.map((row, y) => row.map((ch, x) => ch === "." ? towel[y][x] : ch).join(""));
+}
 function hiPerson(dir, f, o) {
   if (dir === "r") return HI_HEAD.r.concat(HI_SIDE.torso, o.sit ? HI_SIDE_SIT : HI_SIDE.legs[f], o.arm || HI_SIDE.arm[f]);
-  const body = HI_HEAD[dir].concat(HI_TORSO[dir], o.sit ? (dir === "d" ? HI_SIT : []) : HI_LEGS[f], HI_ARM.L[o.armL || "down"], HI_ARM.R[o.armR || "down"]);
-  return o.swim ? body.map(r => [SWIM[r[0]] || r[0]].concat(r.slice(1))) : body;
+  return HI_HEAD[dir].concat(HI_TORSO[dir], o.sit ? (dir === "d" ? HI_SIT : []) : HI_LEGS[f], HI_ARM.L[o.armL || "down"], HI_ARM.R[o.armR || "down"]);
 }
 // accessories by seed, in final art px: glasses, headphones or a lanyard with a badge
 const ACC = {
@@ -469,32 +502,26 @@ const HI_POSES = {
   desk: f => ({dir: "u", sit: true, armL: "back", armR: f ? "type" : "back"}),
   // seated side on at a table, facing it; frame 1 reaches onto the table
   side: f => ({dir: "r", sit: true, oy: 4, arm: f ? HI_SIDE_REACH : HI_SIDE_REST}),
-  couch: (f, dir) => dir === "r" ? {dir, sit: true, oy: 4, arm: HI_SIDE_REST} : {sit: true, oy: 4},
+  couch: (f, dir) => dir === "r" ? {dir, sit: true, oy: 4, arm: HI_SIDE_REST} : {sit: true, armL: "lap", armR: "lap"},
   games: (f, dir) => dir === "r" ? {dir, sit: true, oy: 4, arm: HI_SIDE_REACH, items: [["d", 46, 55, 10, 6], ["G", 46, 55, 10, 1], ["r", 52, 57, 2, 2], f ? ["l", 48, 58, 2, 1] : ["g", 48, 58, 2, 1]]}
-    : {sit: true, oy: 4, armL: "front", armR: "front", items: GAMEPAD.concat(f ? [["l", 31, 60, 2, 1]] : [])},
+    : {sit: true, armL: "front", armR: "front", items: GAMEPAD.concat(f ? [["l", 31, 60, 2, 1]] : [])},
   coffee: f => ({armR: "front", items: MUG_HI.concat(f ? [["v", 41, 40, 1, 4], ["v", 44, 37, 1, 3], ["v", 42, 34, 1, 3]]
     : [["v", 40, 41, 1, 4], ["v", 43, 38, 1, 4], ["v", 41, 36, 1, 2]])}),
-  sunbathe: () => ({swim: true, lie: true, items: TRUNKS.concat(SHADES)}),
+  sunbathe: () => ({lie: true}),
 };
 
-// a quarter turn anticlockwise: the top row becomes the left column
-function rotate(rows) {
-  const w = rows[0].length;
-  return Array.from({length: w}, (_, r) => rows.map(row => row[w - 1 - r]).join(""));
-}
 // a pose frame as palette rows at art density; ax is the art column that stands on the tile centre
 function spriteRows(pose, frame, dir, style, acc) {
   const p = HI_POSES[pose](frame, dir), d = p.dir || "d", ox = (p.ox || 0) * S, oy = p.oy || 0, gr = grid((p.w || 32) * S, 48 * S);
+  // lying across two lounger tiles, head on the backrest; the seat tile is the right one
+  if (p.lie) return {rows: lieRows(style), ax: 48 * S, lie: true};
   paint(gr, hiPerson(d, p.frame || 0, p), ox, oy);
   paint(gr, own(HI_HAIR, style) ? HI_HAIR[style][d] : [], ox, oy);
-  const extra = own(ACC, acc) && !(acc === "lanyard" && (p.swim || p.armL === "front")) ? ACC[acc][d] : null;
+  const extra = own(ACC, acc) && !(acc === "lanyard" && p.armL === "front") ? ACC[acc][d] : null;
   paint(gr, extra || [], ox, oy);
   paint(gr, p.items || [], 0, oy);
   outline(gr);
-  const rows = gr.map(r => r.join(""));
-  if (!p.lie) return {rows, ax: ox + 16 * S};
-  // lying across two lounger tiles, head on the backrest; the seat tile is the right one
-  return {rows: rotate(rows).map(r => ".".repeat(16) + r + ".".repeat(16)), ax: 48 * S, lie: true};
+  return {rows: gr.map(r => r.join("")), ax: ox + 16 * S};
 }
 const SKIN = ["#f6d2b0", "#e8b88f", "#c98c5f", "#9a6440", "#6b432b"];
 const HAIRS = ["#3a2c27", "#6b4426", "#b5682e", "#e3bc5e", "#9a9ca6", "#c04f45"];
@@ -587,9 +614,12 @@ function demoState(n, ts) {
   const backdrop = document.createElement("canvas");
   const OVER = {};  // per chair kind (D, T, R): the lower chair, drawn again over the person who sits in it
   const FORE = [];  // tall props, cut to the part above their tile, drawn again over anyone behind them
-  // desks and benches in world px, with the 8 px their screens reach above: tags keep off them
-  const DESKS = [];
-  MAP.forEach((row, y) => [...row].forEach((ch, x) => { if (ch === "D" || ch === "L") DESKS.push({x: x * T, y: y * T - 8, w: T, h: T + 8}); }));
+  // desks, benches, counters, the island and wall faces in world px, with the 8 px their tops reach above: tags keep off them
+  const AVOID = [];
+  MAP.forEach((row, y) => [...row].forEach((ch, x) => {
+    if ("DLBKMZI".includes(ch)) AVOID.push({x: x * T, y: y * T - 8, w: T, h: T + 8});
+    else if (hasFace(x, y)) AVOID.push({x: x * T, y: y * T + 6, w: T, h: T - 6});
+  }));
 
   function still() { return reduced || paused || document.hidden; }
 
@@ -701,11 +731,11 @@ function demoState(n, ts) {
   }
   // meeting room carpet: zigzag rows, phased on the whole floor so tiles join
   function chevron(a, x) {
-    const c = "#6470a6", t = ramp(c);
+    const c = "#6470a6";
     a(c, 0, 0, 64, 64);
     for (let j = 0; j < 64; j++) {
       const X = x * 64 + j, v = Math.abs(X % 24 - 12) >> 1;
-      for (let i = 0; i < 64; i += 16) { a(t[1], j, i + v, 1, 3); a(t[3], j, i + v + 3, 1, 1); if (X % 6 === 0) a(t[0], j, i + v + 10, 1, 1); }
+      for (let i = 0; i < 64; i += 16) { a("rgba(40,44,96,.22)", j, i + v, 1, 3); a("rgba(255,255,255,.1)", j, i + v + 3, 1, 1); if (X % 6 === 0) a("rgba(40,44,96,.25)", j, i + v + 10, 1, 1); }
     }
   }
   // library parquet: blocks of four strips, turning a quarter on every other block
@@ -754,23 +784,39 @@ function demoState(n, ts) {
       for (let k = 0; k < 4; k++) a(t[1], ox + 3 + (s >>> k * 4) % 26, oy + 3 + (s >>> k * 4 + 2) % 26, 1, 1);
     }
   }
-  // water over a tiled pool floor, with ripples, a stone coping and its shadow, and a ladder
+  // water over a tiled pool floor: faint tile joints, caustic light, a deep band in the shade of the north and west walls,
+  // a stone coping with a lit lip and its drop shadow, and a ladder with dark rails that reads at every scale
   function water(a, x, y) {
-    const wet = (dx, dy) => tileAt(x + dx, y + dy) === "~", c = "#3a9ad6", t = ramp(c), cp = "#f1ece1", ct = ramp(cp), dim = "rgba(20,40,90,.3)";
+    const wet = (dx, dy) => tileAt(x + dx, y + dy) === "~", c = "#3a9ad6", t = ramp(c), cp = "#f1ece1", ct = ramp(cp), deep = "rgba(16,46,110,.38)";
     a(c, 0, 0, 64, 64);
-    for (let i = 0; i < 64; i += 16) { a(t[1], 0, i + 15, 64, 1); a(t[1], i + 15, 0, 1, 64); }
-    if (!wet(-1, 0) || !wet(1, 0)) a("rgba(255,255,255,.08)", 0, 0, 64, 64); else a(t[1], 28, 0, 8, 64);  // shallower at the sides, a lane line in the middle
-    for (let i = 0; i < 6; i++) {
-      const s = hashStr("wv" + x + ":" + y + ":" + i), wx = (s & 63) - 4, wy = (s >>> 6) % 58 + 3;
-      a("#7fcdf0", wx, wy, 7, 1); a("#7fcdf0", wx + 7, wy - 1, 5, 1); a(t[3], wx + 2, wy - 1, 3, 1); if (i % 3 === 0) a("#e6f8ff", wx + 9, wy - 2, 1, 1);
+    for (let i = 0; i < 64; i += 16) { a("rgba(20,70,140,.16)", 0, i + 15, 64, 1); a("rgba(20,70,140,.16)", i + 15, 0, 1, 64); }
+    if (wet(-1, 0) && wet(1, 0)) a("rgba(24,64,150,.35)", 28, 0, 8, 64);  // the lane line in the middle
+    for (let i = 0; i < 2; i++) {  // caustics: small bright rings of light on the pool floor
+      const s = hashStr("cs" + x + ":" + y + ":" + i), cx = 4 + (s & 15) + i * 28, cy = 6 + (s >>> 6) % 46, L = i % 2 ? "#8fd8f6" : "#a9e4fb";
+      a(L, cx + 2, cy, 5, 1); a(L, cx, cy + 1, 2, 1); a(L, cx + 7, cy + 1, 2, 1); a(L, cx - 1, cy + 2, 1, 2); a(L, cx + 9, cy + 2, 1, 2);
+      a(L, cx, cy + 4, 3, 1); a(L, cx + 6, cy + 4, 3, 1); a(L, cx + 3, cy + 5, 3, 1);
     }
-    if (!wet(0, -1)) { a(dim, 0, 8, 64, 5); a(cp, 0, 0, 64, 8); a(ct[3], 0, 0, 64, 1); a(ct[1], 0, 7, 64, 1); }
-    if (!wet(-1, 0)) { a(dim, 8, 0, 4, 64); a(cp, 0, 0, 8, 64); a(ct[3], 0, 0, 1, 64); a(ct[1], 7, 0, 1, 64); }
+    for (let i = 0; i < 4; i++) {
+      const s = hashStr("wv" + x + ":" + y + ":" + i), wx = (s & 63) - 4, wy = (s >>> 6) % 58 + 3;
+      a("#7fcdf0", wx, wy, 7, 1); a(t[3], wx + 7, wy - 1, 4, 1); if (i % 2 === 0) a("#e6f8ff", wx + 9, wy - 2, 1, 1);
+    }
+    if (!wet(0, -1)) { a(deep, 0, 0, 64, 18); a(deep, 0, 0, 64, 12); }
+    if (!wet(-1, 0)) { a(deep, 0, 0, 18, 64); a(deep, 0, 0, 12, 64); }
+    if (!wet(1, 0)) a("rgba(255,255,255,.12)", 52, 0, 12, 64);  // the lit far walls
+    if (!wet(0, 1)) a("rgba(255,255,255,.12)", 0, 52, 64, 12);
+    const lip = (x0, y0, w, h, across) => {  // a coping run, its rounded lip lit, its shadow on the water
+      a(cp, x0, y0, w, h);
+      if (across) { a(ct[3], x0, y0 + h - 2, w, 1); a(ct[1], x0, y0 + h - 1, w, 1); a("rgba(16,40,90,.45)", x0, y0 + h, w, 3); }
+      else { a(ct[3], x0 + w - 2, y0, 1, h); a(ct[1], x0 + w - 1, y0, 1, h); a("rgba(16,40,90,.45)", x0 + w, y0, 3, h); }
+    };
+    if (!wet(0, -1)) lip(0, 0, 64, 8, true);
+    if (!wet(-1, 0)) lip(0, 0, 8, 64, false);
     if (!wet(1, 0)) { a(cp, 56, 0, 8, 64); a(ct[1], 56, 0, 1, 64); a(ct[3], 57, 0, 1, 64); }
     if (!wet(0, 1)) { a(cp, 0, 56, 64, 8); a(ct[3], 0, 56, 64, 1); a(ct[1], 0, 63, 64, 1); }
-    if (!wet(0, -1) && wet(-1, 0) && !wet(1, 0)) {  // a ladder at the top right corner
-      for (const lx of [34, 46]) { a(ct[0], lx - 1, -6, 4, 32); a("#d9dde3", lx, -5, 2, 30); a("#ffffff", lx, -5, 1, 30); }
-      for (let k = 10; k < 26; k += 6) { a("#c4c8d0", 36, k, 10, 2); a(dim, 36, k + 2, 10, 1); }
+    if (!wet(0, -1) && wet(-1, 0) && !wet(1, 0)) {  // a ladder at the top right corner: rungs, then outlined rails
+      a("rgba(16,40,90,.35)", 36, 6, 14, 30);
+      for (let k = 8; k < 34; k += 8) { a("#2b3a4a", 34, k - 1, 16, 5); a("#d9dde3", 35, k, 14, 3); a("#ffffff", 35, k, 14, 1); }
+      for (const lx of [32, 46]) { a("#2b3a4a", lx - 1, -10, 6, 46); a("#e9edf2", lx, -9, 4, 44); a("#ffffff", lx, -9, 1, 44); a("#9aa3ad", lx + 3, -9, 1, 44); }
     }
   }
   // lawn: mown patches, tufts in four greens, clover and the odd clump of flowers
@@ -1465,13 +1511,14 @@ function demoState(n, ts) {
     let w = 1, n = 1;
     while (tileAt(x + w, y) === "T") w++;
     while (tileAt(x, y + n) === "T") n++;
-    const W = w * 64, H = n * 64, top = "#b07a48", t = ramp(top), fc = ramp("#6e4a2c");
+    // the near edge reaches into the row below, so the chairs on that side meet the table
+    const W = w * 64, H = n * 64 + 26, top = "#b07a48", t = ramp(top), fc = ramp("#6e4a2c");
     a.shadow(10, H - 16, W - 16, 12);
     a(fc[0], 14, H - 24, 6, 16); a(fc[0], W - 20, H - 24, 6, 16);
     a.block(top, "#6e4a2c", 6, 8, W - 12, H - 34, 12);
     for (let i = 0; i < 9; i++) { const s = hashStr("mt" + i); a(i % 3 ? t[1] : t[3], 12 + s % (W - 70), 13 + i * 10, 30 + (s >>> 8) % 40, 1); }
     a("rgba(255,255,255,.14)", W * 0.55, 12, W * 0.25, 3);
-    const my = (H - 26) >> 1;
+    const my = (H - 52) >> 1;
     a("#3f5a74", 40, my - 8, W - 80, 16); a(ramp("#3f5a74")[3], 40, my - 8, W - 80, 1);
     a.drop(W / 2 - 10, my + 6, 20); a.box("#2b2f3a", W / 2 - 10, my - 6, 20, 12); a("#5d6b7d", W / 2 - 6, my - 3, 12, 2); a("#7fe0a0", W / 2 - 1, my + 2, 2, 1);
     const cx = W / 2 + 34;
@@ -1710,7 +1757,7 @@ function demoState(n, ts) {
     a.drop(70, 32, 20); a.box("#e9e4da", 70, 24, 20, 8); a.leaves([[72, 16, 8, 9], [78, 14, 9, 10]], "#62b257");
     a.box("#2b2f3a", 96, 24, 4, 12); a("#e2463e", 97, 25, 2, 1); a.drop(104, 30, 16); a.box("#2b2f3a", 104, 20, 16, 9); a("#e2463e", 115, 22, 2, 2); a("#5db35a", 112, 24, 2, 2); a("#8b919d", 107, 23, 3, 1);
   }
-  // the TV seen from the sofa's side, so from behind: a back panel lit round its edge, on a console with speakers
+  // the TV on a console with speakers, its lit screen turned to the room (a game on it)
   function tvConsole(a, x, y) {
     if (tileAt(x - 1, y) === "V") return;
     let n = 1;
@@ -1719,11 +1766,16 @@ function demoState(n, ts) {
     a.shadow(6, 52, W - 8, 10);
     a.block("#7a5232", "#5e3c24", 4, 22, W - 8, 14, 22);
     for (let i = 0; i < 3; i++) { const cx = 10 + i * (W - 20) / 3; a(f[1], cx, 38, (W - 20) / 3 - 4, 16); for (let d = 2; d < (W - 20) / 3 - 6; d += 3) a(f[0], cx + d, 40, 1, 12); }
-    a("rgba(140,200,255,.22)", 18, -38, W - 36, 6); a("rgba(140,200,255,.35)", 22, -33, W - 44, 3);
+    a("rgba(140,200,255,.18)", 18, -36, W - 36, 54);
     a.box(v[1], W / 2 - 16, 18, 32, 8);
-    a.box(tv, 24, -30, W - 48, 46); a(v[3], 24, -30, W - 48, 1); a.box(v[1], W / 2 - 34, -18, 68, 26);
-    for (let i = 0; i < 7; i++) a(v[0], W / 2 - 24 + i * 7, -12, 3, 10);
-    a("#7fc4f0", 24, -31, W - 48, 1); a("#1d1f26", W / 2 + 20, 8, 2, 22);
+    const sx = 28, sy = -26, sw = W - 56, sh = 38;
+    a.box(tv, 24, -30, W - 48, 46); a(v[3], 24, -30, W - 48, 1);
+    a("#2f6fc0", sx, sy, sw, 14); a("#5a9ee6", sx, sy + 14, sw, 8); a("#8fd0f0", sx, sy + 22, sw, 4); a("#5db35a", sx, sy + 26, sw, sh - 26);
+    for (let i = 0; i < sw; i += 12) { a("#3f8a46", sx + i, sy + 26, 6, 2); a("#c49258", sx + i + 4, sy + 32, 8, 2); }
+    a("#fbfaf5", sx + 10, sy + 4, 14, 3); a("#fbfaf5", sx + 14, sy + 2, 8, 2); a("#f6d04b", sx + sw - 18, sy + 3, 8, 8);
+    a("#e2463e", sx + 30, sy + 20, 6, 6); a("#2b2f3a", sx + 31, sy + 26, 4, 3); a("#f4c79a", sx + 31, sy + 18, 4, 3);
+    a("#fbfaf5", sx + 4, sy + sh - 6, 22, 3); a("#e2463e", sx + 5, sy + sh - 5, 14, 1);
+    a("rgba(255,255,255,.18)", sx + sw - 12, sy, 3, sh);
     for (const sx of [6, W - 20]) { a.box("#3a3f4c", sx, -14, 14, 38); a(ramp("#3a3f4c")[3], sx, -14, 14, 1); a("#2b2f3a", sx + 4, -6, 6, 6); a("#2b2f3a", sx + 4, 8, 6, 6); }
     a.box("#ecebe6", W / 2 - 50, 26, 22, 6); a("#7fe0ff", W / 2 - 46, 28, 3, 1);
   }
@@ -1761,6 +1813,53 @@ function demoState(n, ts) {
     a.block("#f6f4ee", "#d9d2c3", 6, 2, 34, 42, 4); for (let i = 8; i < 38; i += 8) a(stripe, i, 2, 4, 42); a(ramp(stripe)[3], 6, 2, 34, 1);
     a.box("#fbfaf5", 10, 12, 16, 24); a("#e9e4da", 10, 32, 16, 2);
     a.box("#f2c14e", 104, 6, 18, 8); a(ramp("#f2c14e")[1], 104, 10, 18, 1);
+  }
+  // a sideboard by the meeting room wall: coffee, cups and a jug on the left one, books and a plant on the right
+  function sideboard(a, x) {
+    const wood = "#7a5232", w = ramp(wood);
+    a.shadow(6, 50, 54, 10);
+    a.block("#9a6a42", wood, 6, 18, 52, 10, 26);
+    a(w[1], 31, 30, 2, 22); a.box("#d9b77e", 20, 38, 6, 2); a.box("#d9b77e", 38, 38, 6, 2); a(w[0], 8, 54, 4, 4); a(w[0], 52, 54, 4, 4);
+    if (x < 5) {
+      a.drop(10, 26, 12); a.box("#2b2f3a", 11, 4, 10, 22); a("#5d6470", 12, 6, 8, 2); a.box("#c4c8d0", 13, 1, 6, 3);
+      for (const cx of [26, 35]) { a.drop(cx, 26, 7); a.box("#fbfaf5", cx, 20, 7, 6); a("#5b3820", cx + 1, 21, 5, 1); }
+      a.drop(44, 26, 10); a(GLASS_EDGE, 44, 12, 10, 14); a(GLASS_IN, 45, 13, 8, 12); a("#9fd6f0", 45, 18, 8, 7); a("#ffffff", 46, 14, 1, 9);
+      a("#f4f0e6", 24, 14, 6, 3);
+    } else {
+      for (let i = 0; i < 5; i++) { const c = SPINES[(i * 3 + 2) % 9]; a.box(c, 10 + i * 5, 10 - i % 2 * 2, 4, 16 + i % 2 * 2); }
+      a.leaves([[36, 0, 10, 12], [43, -4, 10, 14]], "#4f9a4a"); a.drop(38, 26, 14); a.box("#e9e4da", 38, 16, 14, 10);
+    }
+  }
+  // a low stack of boards on bearers by the workshop wall, drawn whole from its left tile
+  function lumber(a, x, y) {
+    if (tileAt(x - 1, y) === "g") return;
+    let n = 1;
+    while (tileAt(x + n, y) === "g") n++;
+    const W = n * 64, woods = ["#d9b77e", "#c99a62", "#e0c08a", "#b8875a"];
+    a.shadow(4, 46, W - 8, 12);
+    for (const bx of [10, W / 2 - 4, W - 18]) a.box("#5f636c", bx, 46, 8, 10);
+    for (let i = 0; i < 4; i++) {
+      const c = woods[i], t = ramp(c), y0 = 40 - i * 7, x0 = 4 + (i * 13) % 20, w = W - 8 - (i * 17) % 30;
+      a.block(c, t[1], x0, y0, w, 4, 4);
+      for (let k = x0 + 12; k < x0 + w - 6; k += 23 + i) a(t[1], k, y0 + 1, 6, 1);
+      a(t[0], x0, y0 + 4, 2, 4); a("#e8cf9e", x0 + w - 3, y0 + 4, 2, 4);
+    }
+  }
+  // two sawhorses holding a half-built cabinet: a frame, one side panel on, a clamp and offcuts on the floor
+  function sawhorses(a, x, y) {
+    if (tileAt(x - 1, y) === "q") return;
+    const W = 128, leg = "#b8875a", lg = ramp(leg), ply = "#e0c08a", pt = ramp(ply);
+    a.shadow(8, 50, W - 16, 10);
+    for (const sx of [18, W - 34]) {
+      a(lg[0], sx, 30, 4, 28); a(lg[0], sx + 12, 30, 4, 28); a(leg, sx + 1, 30, 2, 27); a(leg, sx + 13, 30, 2, 27);
+      a.box(leg, sx - 4, 26, 24, 5); a(lg[3], sx - 4, 26, 24, 1);
+    }
+    a.block(pt[3], ply, 28, 20, 72, 6, 4);  // the base panel on the trestles
+    a.box(ply, 28, 4, 5, 18); a.box(ply, 95, 4, 5, 18); a.box(pt[3], 28, 0, 72, 5);  // the frame
+    a.box("#c99a62", 33, 5, 30, 15); a(pt[1], 35, 12, 26, 1);  // one side on
+    a.box("#f2a03c", 64, 6, 10, 4); a.box("#9aa3ad", 68, 10, 3, 9);  // a clamp
+    a.drop(80, 18, 10); a.box("#2b2f3a", 80, 12, 10, 6); a("#e2463e", 81, 13, 3, 2);  // a drill driver
+    a.box("#d9b77e", 6, 54, 18, 4); a.box("#c99a62", 108, 52, 14, 4); a("#e8cf9e", 30, 58, 3, 1); a("#e8cf9e", 96, 57, 4, 1);
   }
   // a patio umbrella: a soft shadow on the deck, a pole and an eight-gore canopy with a scalloped edge
   function umbrella(a) {
@@ -1864,6 +1963,9 @@ function demoState(n, ts) {
       case "@": return umbrella(a);
       case "&": return tree(a, h);
       case "%": return bush(a, h);
+      case "n": return sideboard(a, x);
+      case "g": return lumber(a, x, y);
+      case "q": return sawhorses(a, x, y);
     }
   }
 
@@ -1904,7 +2006,7 @@ function demoState(n, ts) {
     // when one device px per art px is wider than the window, show the world at k=1, each 2x2 of art averaged;
     // a scene that is only too tall keeps a=1, and #wrap scrolls, as it does below k=1
     let k = wide(S) ? a * S : 1;
-    const zk = k < S ? S : k * 2;
+    const fit = k, zk = k < S ? S : k * 2;
     zoomBtn.disabled = !small(zk);
     zoomBtn.title = small(zk) ? "Show the art pixels twice as large; scroll to pan" : "Zoom would pass the 16M px canvas limit";
     if (zoomBtn.disabled) zoomed = false;
@@ -1912,7 +2014,9 @@ function demoState(n, ts) {
     if (zoomed) k = zk;
     px = k;
     scale = k / dpr;  // CSS px per world px; px / scale is the DPR, so text stays at device resolution
-    tu = Math.min(dpr, k);  // device px per CSS px of text: text shrinks with the scene when the scene can't grow (125%, 150%)
+    // device px per CSS px of text: text shrinks with the scene when the scene can't grow (125%, 150%),
+    // and Zoom magnifies it with the art, so every tag and bubble keeps its place
+    tu = Math.min(dpr, fit) * k / fit;
     canvas.width = LW * k;
     canvas.height = LH * k;
     canvas.style.width = LW * k / dpr + "px";
@@ -2049,7 +2153,7 @@ function demoState(n, ts) {
           let gx = h.x, gy = h.y;
           if (atHome) for (let i = 0; i < 12; i++) {
             const tx = r.x + Math.floor(Math.random() * r.w), ty = r.y + Math.floor(Math.random() * r.h);
-            if (tileAt(tx, ty) === "." && tileAt(tx, ty + 1) !== "D" && Math.abs(tx - h.x) + Math.abs(ty - h.y) <= 4) { gx = tx; gy = ty; break; }
+            if (tileAt(tx, ty) === "." && tileAt(tx, ty + 1) !== "D" && tileAt(tx, ty - 1) !== "T" && Math.abs(tx - h.x) + Math.abs(ty - h.y) <= 4) { gx = tx; gy = ty; break; }
           }
           a.wanderAt = now + 1500 + Math.random() * 3500;
           if (gx !== a.x || gy !== a.y) goTo(a, gx, gy);
@@ -2112,12 +2216,14 @@ function demoState(n, ts) {
   function fits(b) { return b.x >= 0 && b.y >= 0 && b.x + b.w <= canvas.width && b.y + b.h <= canvas.height; }
   // the first candidate box that stays on the canvas and clear of everything taken
   function pick(cands, taken) { return cands.find(b => fits(b) && !hits(b, taken)); }
-  // a small dark pill centred above the head; if that spot is taken it stacks upward, then tries under the feet
-  function tagBoxes(cx, top, bottom, label) {
+  // a small dark pill centred above the head, one tag height higher (no further, or it reads as a neighbour's),
+  // under the feet, then beside the body at world y side; all in device px
+  function tagBoxes(cx, top, bottom, label, side) {
     text(11, 600);
     const u = tu, w = Math.ceil(ctx.measureText(label).width + 22 * u), hh = Math.round(16 * u);
-    const X = Math.round(Math.max(0, Math.min(canvas.width - w, cx * px - w / 2))), Y = Math.round(top * px - hh - 3 * u);
-    return [Y, Y - hh - 2 * u, Y - 2 * hh - 4 * u, Math.round(bottom * px + 2 * u)].map(y => ({x: X, y: Math.round(y), w, h: hh}));
+    const X = Math.max(0, Math.min(canvas.width - w, cx * px - w / 2)), Y = top * px - hh - 3 * u, box = (x, y) => ({x: Math.round(x), y: Math.round(y), w, h: hh});
+    return {above: box(X, Y), up: box(X, Y - hh - 2 * u), under: box(X, bottom * px + 2 * u),
+      right: box((cx + 11) * px, side * px), left: box((cx - 11) * px - w, side * px)};
   }
   function drawTag(b, label, chip, hot) {
     const u = tu;
@@ -2197,16 +2303,17 @@ function demoState(n, ts) {
     // nothing drawn below may cover a zone label or another tag or bubble
     const shown = placed.filter(([a]) => !a.leaving);
     // tags and bubbles keep off every face and shoulders (a box 16 world px wide, from the top of the hair down 30),
-    // and off the desks and benches with their screens, the richest art in the room
-    const taken = labelBoxes.concat(DESKS.map(b => ({x: b.x * px, y: b.y * px, w: b.w * px, h: b.h * px})), shown.filter(([, p]) => !p.s.lie).map(([a, p]) =>
+    // and off the desks, benches, counters and wall faces, the richest art in the room; hard holds only labels, tags and bubbles
+    const hard = labelBoxes.slice(), taken = labelBoxes.concat(AVOID.map(b => ({x: b.x * px, y: b.y * px, w: b.w * px, h: b.h * px})), shown.filter(([, p]) => !p.s.lie).map(([a, p]) =>
       ({x: Math.round((a.x * T + T / 2 - 8) * px), y: Math.round(p.top * px), w: 16 * px, h: 30 * px})));
+    const put = b => { taken.push(b); hard.push(b); };
     // shortcut: a room shows only as many characters as it has spots and then a "+k" sign, add spots when rooms overflow often
     for (const [g, k] of overflow) {
       const s = SPOTS.filter(sp => spotGroup(sp) === g);
       if (!s.length) continue;
       const x = Math.max(...s.map(sp => sp.x)), y = Math.min(...s.map(sp => sp.y));
-      const b = pick(tagBoxes(x * T + T / 2, y * T + 6, y * T + T, "+" + k), taken);
-      if (b) { drawTag(b, "+" + k, "", true); taken.push(b); }
+      const t = tagBoxes(x * T + T / 2, y * T + 6, y * T + T, "+" + k, y * T), b = pick([t.above, t.up, t.under], taken);
+      if (b) { drawTag(b, "+" + k, "", true); put(b); }
     }
     for (const [a, p] of shown) {
       const cx = a.x * T + T / 2, wait = a.d.activity === "wait", reply = a.d.activity === "reply";
@@ -2215,25 +2322,42 @@ function demoState(n, ts) {
       // a bubble must stay readable: when the crowd leaves no clear spot, it may cover tags but never a label
       const b = pick(cands, taken) || cands.find(c => fits(c) && !hits(c, labelBoxes)) || cands[0];
       drawBubble(b, wait ? "!" : "?", note, wait ? "#e07b00" : "#3871dc");
-      taken.push(b);
+      put(b);
     }
-    // a name tag on everyone: idea and project on a lead, the role on an agent; one with no clear spot shows on hover or roster focus
+    // a name tag on everyone: idea and project on a lead, the role on an agent; a crowd shortens it, and when no spot is clear
+    // it may cover art and faces, never a label, tag or bubble
     const order = (a) => a.id === highlight || a.id === hoverId ? 0 : a.d.kind === "lead" ? 1 : 2;
+    let tagged = 0, forced = 0;
     for (const [a, p] of shown.slice().sort((m, n) => order(m[0]) - order(n[0]))) {
-      const hot = a.id === highlight || a.id === hoverId;
-      const label = tagText(a.d, hot);
-      // someone seated is tagged under the chair, centred or shifted to clear a neighbour; never above, where the desk is
-      const tb = tagBoxes(a.x * T + T / 2, p.top, p.y + p.h, label), u = tb[3];
-      const cands = p.sit ? [u, Object.assign({}, u, {x: u.x - (u.w >> 1)}), Object.assign({}, u, {x: u.x + (u.w >> 1)})] : tb;
-      const b = pick(cands, taken) || (hot ? cands[0] : null);
-      if (!b) continue;
-      drawTag(b, label, a.look.pal.c, hot);
-      taken.push(b);
+      const hot = a.id === highlight || a.id === hoverId, full = tagText(a.d, hot);
+      const short = cut(a.d.kind === "agent" ? a.d.role : a.d.idea || a.d.project || "?", 10);
+      // a lounger's middle is its left tile's right edge; someone seated is tagged under the chair, never above, where the desk is
+      const cx = p.s.lie ? a.x * T : a.x * T + T / 2, cands = [];
+      for (const label of short === full ? [full] : [full, short]) {
+        const t = tagBoxes(cx, p.top, p.y + p.h, label, p.sit ? p.y + p.h - 18 : p.top + 10), shift = d => Object.assign({}, t.under, {x: t.under.x + d});
+        const below = [t.under, shift(-(t.under.w >> 1)), shift(t.under.w >> 1)];
+        for (const b of p.sit ? below.concat(t.right, t.left) : [t.above, t.up].concat(below, t.right, t.left))
+          cands.push(Object.assign(b, {label}));
+      }
+      let b = pick(cands, taken);
+      if (!b) {  // the clear spot that covers the least art and fewest faces
+        const cover = c => taken.reduce((n, o) => n + Math.max(0, Math.min(c.x + c.w, o.x + o.w) - Math.max(c.x, o.x)) * Math.max(0, Math.min(c.y + c.h, o.y + o.h) - Math.max(c.y, o.y)), 0);
+        forced++;
+        b = cands.filter(c => fits(c) && !hits(c, hard)).sort((m, n) => cover(m) - cover(n))[0] || cands[0];
+      }
+      drawTag(b, b.label, a.look.pal.c, hot);
+      put(b);
+      tagged++;
+    }
+    // demo self-check: every visible character has a tag (forced ones may sit on art)
+    if (demo) {
+      canvas.dataset.tags = tagged + "/" + shown.length + " forced " + forced;
+      if (tagged !== shown.length) console.error("rooms: " + tagged + " tags for " + shown.length + " characters");
     }
     for (const [a, p] of shown) {
       if (!wanders(a)) continue;  // the chief's talk dots are decoration: only where there is room
       const b = pick(bubbleBoxes(a.x * T + T / 2, p.top, "", 1), taken);
-      if (b) { drawBubble(b, "", "", "#2a2233", still() ? 3 : 1 + tick % 3); taken.push(b); }
+      if (b) { drawBubble(b, "", "", "#2a2233", still() ? 3 : 1 + tick % 3); put(b); }
     }
     if (perf && walking()) {
       drawTimes.push(performance.now() - t0);
@@ -2421,6 +2545,7 @@ function demoState(n, ts) {
     const waiting = hid.filter(c => c.activity === "wait").length;
     // a wait hidden by the filter is still counted, so it never vanishes silently
     $("roster-title").textContent = "Who is where" + (hid.length ? " (" + hid.length + " hidden by the filter, " + waiting + " waiting on you)" : "");
+    $("nobody").textContent = hid.length && !kept.length ? "Everyone is hidden by the filter." : "Nobody is in yet.";
     apply({ts: last.ts, characters: kept});
   }
 
