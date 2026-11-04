@@ -6,6 +6,7 @@ hooks/activity.py, and by `impctl.py dashboard` (a local server on 127.0.0.1 onl
 live, and /rooms, a pixel campus of who works where).
 """
 import argparse
+import hashlib
 import html
 import json
 import os
@@ -219,6 +220,7 @@ def load_sessions(now: float) -> list:
         if now - (s.get("last_seen") or 0) > 86400:
             f.unlink(missing_ok=True)
             continue
+        s["_sid"] = f.stem  # becomes a hash in the rooms API, so the page never sees the file name
         sessions.append(s)
     return sessions
 
@@ -776,6 +778,11 @@ def render(rows: list, show_done: bool, now: float, sessions=None) -> str:
     return page.replace("{checked}", " checked" if show_done else "").replace("{panels}", "".join(parts))
 
 
+def _h8(text) -> str:
+    """Eight hex digits of sha256: a stable id that carries no file name or agent id."""
+    return hashlib.sha256(str(text).encode()).hexdigest()[:8]
+
+
 STAGE_ROOM = {"pitch": "meeting", "experiment": "lab", "ship": "workshop", "document": "library"}
 
 
@@ -790,9 +797,8 @@ def rooms_state(rows: list, sessions: list, now: float) -> dict:
                       "project": project, "idea": idea, "title": title, "note": note})
 
     def add_agents(key, live, room, project, idea="", title=""):
-        types = [t for s in live for _, t in sorted((s.get("agents") or {}).items())]
-        for n, t in enumerate(types, 1):
-            add(f"{key}#{n}", "agent", t.split(":")[-1], room, "work", project, idea, title)
+        for aid, t in [a for s in live for a in sorted((s.get("agents") or {}).items())]:
+            add(f"{key}#{_h8(aid)}", "agent", t.split(":")[-1], room, "work", project, idea, title)
 
     linked = {id(s) for r in rows for s in r[3]}  # includes sessions on hidden ideas: those stay hidden
     for group, _, idea, mine in rows:
@@ -809,7 +815,7 @@ def rooms_state(rows: list, sessions: list, now: float) -> dict:
         elif "needs_permission" in states:
             room, activity, note = "lounge", "wait", "permission"
         elif "working" not in states and (at_gate if live else group == "waiting"):
-            room, activity, note = "lounge", "wait", gate or "waiting on you"
+            room, activity, note = "lounge", "wait", gate
         elif live:
             room, activity, note = STAGE_ROOM.get(stage, "office"), "work" if "working" in states else "reply", ""
         else:
@@ -821,9 +827,10 @@ def rooms_state(rows: list, sessions: list, now: float) -> dict:
             continue
         project = Path(s.get("cwd") or "").name
         perm = s.get("state") == "needs_permission"
-        add(f"s{i}", "lead", "chief", "lounge" if perm else "office",
+        sid = f"s{_h8(s['_sid'])}" if s.get("_sid") else f"s{i}"  # no file name: the index
+        add(sid, "lead", "chief", "lounge" if perm else "office",
             "wait" if perm else "work" if s.get("state") == "working" else "reply", project, note="permission" if perm else "")
-        add_agents(f"s{i}", [s], "office", project)
+        add_agents(sid, [s], "office", project)
     return {"ts": int(now), "characters": chars}
 
 

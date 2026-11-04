@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import os
@@ -127,6 +128,10 @@ class TestReducer(unittest.TestCase):
                 del os.environ["IMP_ACTIVITY"]
 
 
+def h8(text):
+    return hashlib.sha256(text.encode()).hexdigest()[:8]
+
+
 def idea(**kw):
     return dict({"id": "x", "stage": "experiment", "waiting_on": "agents", "last_update": TODAY}, **kw)
 
@@ -215,7 +220,7 @@ class TestDashboard(unittest.TestCase):
         self.assertEqual(set(data), {"ts", "characters"})
         keys = {"id", "kind", "role", "room", "activity", "project", "idea", "title", "note"}
         self.assertEqual([(c["id"], c["room"], c["activity"], c["role"]) for c in data["characters"]],
-                         [("proj/evil", "office", "work", "chief"), ("proj/evil#1", "office", "work", "builder")])
+                         [("proj/evil", "office", "work", "chief"), ("proj/evil#" + h8("a"), "office", "work", "builder")])
         self.assertTrue(all(set(c) == keys for c in data["characters"]))
         self.assertNotIn(self.tmp.name, body.decode())
         self.assertNotIn(os.path.realpath(self.tmp.name), body.decode())
@@ -271,7 +276,7 @@ class TestRooms(unittest.TestCase):
                 row({"id": "busy"}, sess("working"), gate="G2", stage="ship")]
         self.assertEqual(rooms(rows), {
             "p/perm": ("lounge", "wait", "permission"), "p/gate": ("lounge", "wait", "G2 Ready to push"),
-            "p/user": ("lounge", "wait", "G1 Plan"), "p/user2": ("lounge", "wait", "waiting on you"),
+            "p/user": ("lounge", "wait", "G1 Plan"), "p/user2": ("lounge", "wait", ""),
             "p/busy": ("workshop", "work", "")})  # live work keeps the character in its room
 
     def test_4_stage_picks_the_room_and_a_plain_reply_stays(self):
@@ -290,8 +295,18 @@ class TestRooms(unittest.TestCase):
         got = impctl.rooms_state(rows, [lone, perm, old], NOW)["characters"]
         self.assertEqual({c["id"]: (c["room"], c["activity"], c["project"]) for c in got}, {
             "p/blank": ("office", "work", "p"), "p/chat": ("office", "reply", "p"),
-            "s0": ("office", "work", "side-project"), "s0#1": ("office", "work", "side-project"),
-            "s1": ("lounge", "wait", "y")})
+            "s0": ("office", "work", "side-project"), "s0#" + h8("a"): ("office", "work", "side-project"),
+            "s1": ("lounge", "wait", "y")})  # no _sid, as in these fixtures: the index
+
+    def test_ids_are_hashes_and_stable(self):
+        a = dict(sess("working", z="imp:builder", y="imp:reviewer"), cwd="/x/p", _sid="session-file")
+        b = dict(sess("working"), cwd="/x/q", _sid="other")
+        ids = lambda *ss: [c["id"] for c in impctl.rooms_state([], list(ss), NOW)["characters"]]
+        got = ids(b, a)
+        self.assertEqual(got, ["s" + h8("other"), "s" + h8("session-file"), f"s{h8('session-file')}#{h8('y')}",
+                               f"s{h8('session-file')}#{h8('z')}"])
+        self.assertEqual(ids(a), got[1:])  # another session going away moves nobody's id
+        self.assertFalse(any("session-file" in i for i in got))
 
     def test_6_not_live_sits_on_the_couch(self):
         rows = [row({"id": "none"}), row({"id": "dead"}, sess("working", age=601)), row({"id": "ended"}, sess("ended")),
@@ -305,8 +320,9 @@ class TestRooms(unittest.TestCase):
                 row({"id": "dead"}, sess("working", age=601, q="imp:builder"))]
         got = {c["id"]: (c["kind"], c["role"], c["room"]) for c in impctl.rooms_state(rows, [], NOW)["characters"]}
         self.assertEqual(got, {
-            "p/x": ("lead", "chief", "lounge"), "p/x#1": ("agent", "builder", "lab"), "p/x#2": ("agent", "general-purpose", "lab"),
-            "p/bk": ("lead", "chief", "pool"), "p/bk#1": ("agent", "reviewer", "office"), "p/dead": ("lead", "chief", "lounge")})
+            "p/x": ("lead", "chief", "lounge"), f"p/x#{h8('a1')}": ("agent", "builder", "lab"),
+            f"p/x#{h8('a2')}": ("agent", "general-purpose", "lab"), "p/bk": ("lead", "chief", "pool"),
+            f"p/bk#{h8('z')}": ("agent", "reviewer", "office"), "p/dead": ("lead", "chief", "lounge")})
 
 
 class TestRoomsPage(unittest.TestCase):
@@ -321,6 +337,16 @@ class TestRoomsPage(unittest.TestCase):
         self.assertIn('motion.addEventListener("change"', self.page)
         self.assertRegex(self.page, r"<button[^>]*>Pause</button>")
 
+    def test_whole_script_parses(self):  # the IIFE never runs in the node tests; a redeclared name would still be caught here
+        if not shutil.which("node"):
+            self.skipTest("node not installed")
+        check = """
+        const t = require("fs").readFileSync(process.argv[1], "utf8");
+        new (require("vm").Script)(t.split("<script>")[1].split("</script>")[0]);
+        """
+        r = subprocess.run(["node", "-e", check, str(ROOT / "scripts" / "rooms.html")], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+
     def test_every_door_is_reachable(self):
         if not shutil.which("node"):
             self.skipTest("node not installed")
@@ -334,6 +360,99 @@ class TestRoomsPage(unittest.TestCase):
         """
         r = subprocess.run(["node", "-e", check, str(ROOT / "scripts" / "rooms.html")], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
+
+    def pure(self, body):
+        """Run JS against the DOM-free part of the page (an empty context: any DOM or window use throws) and return its JSON."""
+        if not shutil.which("node"):
+            self.skipTest("node not installed")
+        check = """
+        const t = require("fs").readFileSync(process.argv[1], "utf8");
+        const pure = t.split("<script>")[1].split("</script>")[0].split("// ---- end pure ----")[0];
+        const out = require("vm").runInNewContext(pure + ";(() => {" + process.argv[2] + "})()", {});
+        console.log(JSON.stringify(out));
+        """
+        r = subprocess.run(["node", "-e", check, str(ROOT / "scripts" / "rooms.html"), body], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return json.loads(r.stdout)
+
+    def test_keep_filters_by_idea_key(self):
+        got = self.pure("""
+        const c = (id, activity) => ({id, activity: activity || "work"});
+        const chars = [c("p/a"), c("p/a#0123abcd"), c("p/b"), c("q#1/x"), c("q#1/x#deadbeef"), c("p/ideas/old.md"),
+          c("p/ideas/old.md#00000001"), c("s1a2b3c4d"), c("s1a2b3c4d#00000001")];
+        const ids = (on, unlinked, all) => keep(chars, {all: !!all, on: new Set(on), unlinked}).map(x => x.id);
+        return {all: ids([], false, true).length, none: ids([], false), a: ids(["p/a"], false), un: ids([], true),
+          hash: ids(["q#1/x"], false), path: ids(["p/ideas/old.md"], false), same: keep(chars, {all: true}) === chars,
+          keys: ["p/a#0123abcd", "q#1/x#deadbeef", "s1a2b3c4d#00000001", "p/a#xyz"].map(ideaKey)};
+        """)
+        self.assertEqual(got["all"], 9)
+        self.assertEqual(got["none"], [])
+        self.assertEqual(got["a"], ["p/a", "p/a#0123abcd"])
+        self.assertEqual(got["un"], ["s1a2b3c4d", "s1a2b3c4d#00000001"])
+        self.assertEqual(got["hash"], ["q#1/x", "q#1/x#deadbeef"])  # a # in the project name is not an agent suffix
+        self.assertEqual(got["path"], ["p/ideas/old.md", "p/ideas/old.md#00000001"])  # an idea with no id is keyed by its path
+        self.assertTrue(got["same"])
+        self.assertEqual(got["keys"], ["p/a", "q#1/x", "s1a2b3c4d", "p/a#xyz"])
+
+    def test_saved_choice_is_validated(self):
+        got = self.pure("""
+        const ok = parsePick('{"all":false,"on":["p/a"],"unlinked":true}');
+        const bad = [null, "", "{", "[]", "null", '{"all":1,"on":[],"unlinked":true}', '{"all":true,"on":{"p/a":1},"unlinked":true}',
+          '{"all":true,"on":[1],"unlinked":true}', JSON.stringify({all: false, on: ["x".repeat(201)], unlinked: true}),
+          JSON.stringify({all: false, on: Array.from({length: 501}, (_, i) => "k/" + i), unlinked: true}),
+          '{"all":true,"on":["constructor"],"unlinked":"yes"}'].map(s => parsePick(s));
+        return {ok: [ok.all, [...ok.on], ok.unlinked], bad};
+        """)
+        self.assertEqual(got["ok"], [False, ["p/a"], True])
+        self.assertEqual(got["bad"], [None] * 11)
+
+    def test_kitchen_gives_spots_by_priority(self):
+        got = self.pure("""
+        const kitchen = SPOTS.filter(s => spotGroup(s) === "lounge:k").length;
+        const wait = (id, note) => ({id, activity: "wait", note, room: "lounge"});
+        const want = c => ({id: c.id, group: charGroup(c), pri: priority(c)});
+        const old = Array.from({length: kitchen}, (_, i) => wait("g" + i, i < 2 ? "" : "G1 Plan"));
+        const first = assignSpots(old.map(want), new Map());
+        const next = old.concat([wait("zz", "permission"), wait("zy", "G2 Review")]);
+        const after = assignSpots(next.map(want), first);
+        const lost = next.filter(c => after.get(c.id) < 0).map(c => c.id);
+        return {kitchen, pri: [priority(wait("a", "permission")), priority(wait("a", "G1")), priority(wait("a", "")),
+          priority({activity: "work", note: ""})], lost, perm: after.get("zz") >= 0, gate: after.get("zy") >= 0,
+          first: [...first.values()].every(v => v >= 0), distinct: new Set([...after.values()].filter(v => v >= 0)).size};
+        """)
+        self.assertGreaterEqual(got["kitchen"], 5)
+        self.assertEqual(got["pri"], [0, 1, 2, 3])
+        self.assertTrue(got["first"] and got["perm"] and got["gate"])
+        self.assertEqual(got["lost"], ["g0", "g1"])  # the two plain waits walk to the overflow, the gates keep their spots
+        self.assertEqual(got["distinct"], got["kitchen"])
+
+    def test_cut_and_the_hot_agent_tag(self):
+        got = self.pure("""
+        const agent = {kind: "agent", role: "builder", idea: "agent-rooms"}, lead = {kind: "lead", role: "chief", idea: "a-long-idea-name-here", project: "imp"};
+        return [cut("abc", 3), cut("abcd", 3), cut("", 3), tagText(agent, false), tagText(agent, true), tagText({kind: "agent", role: "x", idea: ""}, true),
+          tagText({kind: "agent", role: "r".repeat(30), idea: "i".repeat(30)}, true), tagText(lead, false), tagText({kind: "lead", idea: "", project: ""}, false)];
+        """)
+        self.assertEqual(got[:3], ["abc", "ab\u2026", ""])
+        self.assertEqual(got[3:6], ["builder", "builder \u00b7 agent-rooms", "x"])
+        self.assertEqual(got[6], "r" * 19 + "\u2026 \u00b7 " + "i" * 17 + "\u2026")
+        self.assertEqual(got[7:], ["a-long-idea-name-\u2026 \u00b7 imp", "?"])
+
+    def test_wait_text_does_not_double(self):
+        got = self.pure("""
+        const w = note => stateText({activity: "wait", note, room: "lounge"});
+        return [w("G1 Plan"), w(""), w("permission")];
+        """)
+        self.assertEqual(got, ["waiting on you: G1 Plan", "waiting on you", "waiting on you: permission"])
+
+    def test_s2_helpers_stay_dom_free(self):  # the empty context above throws on any DOM or window use at load
+        got = self.pure("""
+        const hex = /^#[0-9a-f]{6}$/;
+        return {s: S, ramps: ["#336699", "#c0c0c0", "#e2463e"].map(h => ramp(h).length === 4 && ramp(h).every(x => hex.test(x))),
+          hsl: hslHex(120, 0.5, 0.5)};
+        """)
+        self.assertEqual(got["s"], 2)
+        self.assertEqual(got["ramps"], [True] * 3)
+        self.assertRegex(got["hsl"], r"^#[0-9a-f]{6}$")
 
 
 class TestPanels(unittest.TestCase):
