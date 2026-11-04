@@ -107,8 +107,9 @@ MAP.forEach((row, y) => [...row].forEach((ch, x) => {
 const CAMPUS_DOOR = DOORS.find(d => d.campus);
 function passable(x, y) { return WALK.includes(tileAt(x, y)); }
 
-// 4-connected BFS; the goal may be a seat, so nobody walks across a couch on the way elsewhere
-function bfs(sx, sy, gx, gy) {
+// 4-connected BFS; the goal may be a seat, so nobody walks across a couch on the way elsewhere; avoid, if given, is a
+// set of tile indices (y * MAP_W + x) to keep off as well
+function bfs(sx, sy, gx, gy, avoid) {
   const start = sy * MAP_W + sx, goal = gy * MAP_W + gx, prev = new Map([[start, -1]]), queue = [start];
   for (let i = 0; i < queue.length; i++) {
     const cur = queue[i];
@@ -121,7 +122,7 @@ function bfs(sx, sy, gx, gy) {
     for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
       const nx = cx + dx, ny = cy + dy, n = ny * MAP_W + nx;
       if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H || prev.has(n)) continue;
-      if (n !== goal && !passable(nx, ny)) continue;
+      if (n !== goal && (!passable(nx, ny) || avoid && avoid.has(n))) continue;
       prev.set(n, cur);
       queue.push(n);
     }
@@ -279,23 +280,29 @@ function rowCells(c) { return [c.role, c.project || "-", c.idea || "-", roomText
 // sprite's box, head to feet with its props, and ys the tops of its slots (above the head, under the feet). A tag sits
 // centred on cx, at most drift px sideways, on the cw x ch canvas, clear of blocked, of the tags placed before it and of
 // every body, and nearer its owner's body than anyone else's. Lower rank picks first. A tag with no slot is null: it shows
-// only on hover. A hot one (hovered or focused) still takes the first slot clear of blocked boxes and tags, even over a body.
-function placeTags(people, blocked, cw, ch, gap, drift) {
+// only on hover. A hot one (hovered or focused) still takes the first slot clear of blocked boxes and tags, even over a body,
+// or failing that a centred box clamped onto the canvas. A person with no labels is a body only: it blocks, gets no entry.
+// prev, the last frame's result, holds a tag to its slot, label and drift while they stay legal, so a walker's tag does not flicker.
+function placeTags(people, blocked, cw, ch, gap, drift, prev) {
   const hit = (b, o, m) => o.x < b.x + b.w + m && b.x < o.x + o.w + m && o.y < b.y + b.h + m && b.y < o.y + o.h + m;
   const far = (x, y, o) => Math.hypot(Math.max(o.x - x, 0, x - o.x - o.w), Math.max(o.y - y, 0, y - o.y - o.h));
   const taken = blocked.slice(), out = new Map();
   for (const p of people.slice().sort((m, n) => m.rank - n.rank)) {
-    const cands = [];
-    for (const {label, w} of p.labels) for (const y of p.ys) for (const d of [0, -drift / 2, drift / 2, -drift, drift]) {
+    if (!p.labels.length) continue;
+    const cands = [], was = prev && prev.get(p.id);
+    p.labels.forEach(({label, w}, li) => p.ys.forEach((y, s) => [0, -drift / 2, drift / 2, -drift, drift].forEach(d => {
       const x = Math.max(0, Math.min(cw - w, p.cx - w / 2 + d));
-      if (Math.abs(x + w / 2 - p.cx) <= drift) cands.push({x: Math.round(x), y: Math.round(y), w, h: p.hh, label});
-    }
+      if (Math.abs(x + w / 2 - p.cx) <= drift) cands.push({x: Math.round(x), y: Math.round(y), w, h: p.hh, label, li, s, d});
+    })));
+    if (was) cands.sort((m, n) => (m.li !== was.li) - (n.li !== was.li) || (m.s !== was.s) - (n.s !== was.s) || (m.d !== was.d) - (n.d !== was.d));
     const clear = b => b.x >= 0 && b.y >= 0 && b.x + b.w <= cw && b.y + b.h <= ch && !taken.some(o => hit(b, o, gap));
     const mine = b => {
       const x = b.x + b.w / 2, y = b.y + b.h / 2, d = far(x, y, p.body);
       return people.every(q => !hit(b, q.body, 0) && (q === p || far(x, y, q.body) > d));
     };
-    const b = cands.find(c => clear(c) && mine(c)) || (p.hot ? cands.find(clear) || cands[0] : null);
+    const {label, w} = p.labels[0], edge = {x: Math.round(Math.max(0, Math.min(cw - w, p.cx - w / 2))),
+      y: Math.round(Math.max(0, Math.min(ch - p.hh, p.ys[0]))), w, h: p.hh, label, li: 0, s: 0, d: 0};
+    const b = cands.find(c => clear(c) && mine(c)) || (p.hot ? cands.find(clear) || cands[0] || edge : null);
     out.set(p.id, b || null);
     if (b) taken.push(b);
   }
@@ -638,7 +645,7 @@ function demoState(n, ts) {
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
   const actors = new Map(), sprites = new Map();
   let reduced = motion.matches, paused = false, scale = 1, px = 1, raf = 0, timer = 0, lastTs = 0, tick = 0;
-  let highlight = "", hoverId = "", demoStep = 0, loaded = false, inflight = false, rosterKey = "", overflow = new Map();
+  let highlight = "", hoverId = "", demoStep = 0, loaded = false, inflight = false, rosterKey = "", overflow = new Map(), lastTags = new Map();
   let labelBoxes = [], labelFont = "", zoomed = false, statusText = "", perfText = "", dprQuery = null, tu = 1;
   const base = document.createElement("canvas");
   base.width = LW * S;
@@ -2115,6 +2122,11 @@ function demoState(n, ts) {
     const body = {x: (flip ? s.c.width - s.x1 : s.x0) / S, y: s.y0 / S, w: (s.x1 - s.x0) / S, h: (s.y1 - s.y0) / S};
     return {c: s.c, ax: (flip ? s.c.width - s.ax : s.ax) / S, flip, lie: s.lie, top: s.top / S, w: s.c.width / S, h: s.c.height / S, body};
   }
+  // a's body standing at rest on tile (tx, ty), in world px, as place() puts it
+  function bodyAt(a, tx, ty) {
+    const s = sprite(a, poseFor(a.d), 0, "d");
+    return {x: tx * T + T / 2 - s.ax + s.body.x, y: ty * T + T - s.h + 1 + s.body.y, w: s.body.w, h: s.body.h};
+  }
   function tileOf(a) { return a.path.length ? a.path[0] : [Math.round(a.x), Math.round(a.y)]; }
   function goTo(a, gx, gy) {
     if (still()) { a.x = gx; a.y = gy; a.path = []; return; }
@@ -2186,13 +2198,27 @@ function demoState(n, ts) {
         // the chief walks and talks around its room between rests
         if (a.spot >= 0 && wanders(a) && now > a.wanderAt) {
           const h = home(a), atHome = a.x === h.x && a.y === h.y, r = ROOMS[a.d.room];
+          // everyone else, where they are, where they are going and at their spot: the chief rests clear of their bodies
+          // and walks round the tiles they hold
+          const avoid = new Set(), boxes = [], meets = (b, o) => o.x < b.x + b.w && b.x < o.x + o.w && o.y < b.y + b.h && b.y < o.y + o.h;
+          for (const o of actors.values()) {
+            if (o === a || o.spot < 0 && !o.leaving) continue;
+            const ob = place(o).body, end = o.path[o.path.length - 1], at = [[o.x, o.y]].concat(end ? [end] : [], o.spot >= 0 ? [[SPOTS[o.spot].x, SPOTS[o.spot].y]] : []);
+            for (const [x, y] of at) {
+              avoid.add(Math.round(y) * MAP_W + Math.round(x));
+              boxes.push({x: ob.x + (x - o.x) * T, y: ob.y + (y - o.y) * T, w: ob.w, h: ob.h});
+            }
+          }
           let gx = h.x, gy = h.y;
           if (atHome) for (let i = 0; i < 12; i++) {
             const tx = r.x + Math.floor(Math.random() * r.w), ty = r.y + Math.floor(Math.random() * r.h);
-            if (tileAt(tx, ty) === "." && tileAt(tx, ty + 1) !== "D" && tileAt(tx, ty - 1) !== "T" && Math.abs(tx - h.x) + Math.abs(ty - h.y) <= 4) { gx = tx; gy = ty; break; }
+            if (tileAt(tx, ty) === "." && tileAt(tx, ty + 1) !== "D" && tileAt(tx, ty - 1) !== "T" && Math.abs(tx - h.x) + Math.abs(ty - h.y) <= 4 &&
+              !boxes.some(o => meets(bodyAt(a, tx, ty), o))) { gx = tx; gy = ty; break; }
           }
           a.wanderAt = now + 1500 + Math.random() * 3500;
-          if (gx !== a.x || gy !== a.y) goTo(a, gx, gy);
+          // no way round the others: stand still and try again at the next rest
+          const path = (gx !== a.x || gy !== a.y) && !still() && bfs(a.x, a.y, gx, gy, avoid);
+          if (path) a.path = path;
         }
         continue;
       }
@@ -2341,6 +2367,9 @@ function demoState(n, ts) {
     drawLabels();
     // nothing drawn below may cover a zone label or another tag or bubble
     const shown = placed.filter(([a]) => !a.leaving);
+    // every drawn sprite's body in device px, a departing walker's too: no tag may cover one
+    const bodies = new Map(placed.map(([a, p]) => [a.id, {x: Math.round(p.body.x * px), y: Math.round(p.body.y * px),
+      w: Math.round(p.body.w * px), h: Math.round(p.body.h * px)}]));
     // bubbles keep off every face and shoulders (a box 16 world px wide, from the top of the hair down 30), and bubbles
     // and tags off the desks, benches, counters and wall faces, the richest art in the room; hard holds only labels, tags and bubbles
     const walls = AVOID.map(b => ({x: b.x * px, y: b.y * px, w: b.w * px, h: b.h * px}));
@@ -2352,7 +2381,7 @@ function demoState(n, ts) {
       const s = SPOTS.filter(sp => spotGroup(sp) === g);
       if (!s.length) continue;
       const x = Math.max(...s.map(sp => sp.x)), y = Math.min(...s.map(sp => sp.y));
-      const t = tagBoxes(x * T + T / 2, y * T + 6, y * T + T, "+" + k), b = pick([t.above, t.up, t.under], taken);
+      const t = tagBoxes(x * T + T / 2, y * T + 6, y * T + T, "+" + k), b = pick([t.above, t.up, t.under], taken.concat([...bodies.values()]));
       if (b) { drawTag(b, "+" + k, "", true); put(b); }
     }
     for (const [a, p] of shown) {
@@ -2366,8 +2395,6 @@ function demoState(n, ts) {
     }
     // a name tag on its owner: idea and project on a lead, the role on an agent; a crowd shortens it, and where no slot
     // keeps off every body and stays nearest its owner, the tag shows only on hover or roster focus (placeTags)
-    const bodies = new Map(shown.map(([a, p]) => [a.id, {x: Math.round(p.body.x * px), y: Math.round(p.body.y * px),
-      w: Math.round(p.body.w * px), h: Math.round(p.body.h * px)}]));
     const people = shown.map(([a, p]) => {
       const hot = a.id === highlight || a.id === hoverId, full = tagText(a.d, hot), t = tagYs(p.top, p.y + p.h);
       const short = cut(a.d.kind === "agent" ? a.d.role : a.d.idea || a.d.project || "?", 10);
@@ -2375,22 +2402,39 @@ function demoState(n, ts) {
       return {id: a.id, rank: hot ? 0 : a.d.kind === "lead" ? 1 : 2, hot, cx: Math.round((p.s.lie ? a.x * T : a.x * T + T / 2) * px),
         ys: p.sit ? [t.under] : [t.above, t.up, t.under], body: bodies.get(a.id), hh: t.hh,
         labels: (short === full ? [full] : [full, short]).map(label => ({label, w: tagWidth(label)}))};
-    });
-    const tags = placeTags(people, hard.concat(walls), canvas.width, canvas.height, 2 * Math.max(1, Math.round(tu)), T / 2 * px);
-    let drawn = 0, hover = [], over = 0;
+    }).concat(placed.filter(([a]) => a.leaving).map(([a]) => ({id: a.id, rank: 3, body: bodies.get(a.id), labels: []})));
+    const tags = placeTags(people, hard.concat(walls), canvas.width, canvas.height, 2 * Math.max(1, Math.round(tu)), T / 2 * px, lastTags);
+    // demo: count slot or label changes from the last frame, which hysteresis keeps to the ones forced by a new obstacle
+    if (demo) canvas.dataset.flips = +(canvas.dataset.flips || 0) + [...tags].filter(([id, b]) => b && lastTags.get(id) &&
+      (lastTags.get(id).s !== b.s || lastTags.get(id).li !== b.li)).length;
+    lastTags = tags;
+    let drawn = 0, hover = [], over = 0, astray = 0;
+    const far = (x, y, o) => Math.hypot(Math.max(o.x - x, 0, x - o.x - o.w), Math.max(o.y - y, 0, y - o.y - o.h));
     for (const [a] of shown) {
       const b = tags.get(a.id), hot = a.id === highlight || a.id === hoverId;
       if (!b) { hover.push(a.id); continue; }
       drawTag(b, b.label, a.look.pal.c, hot);
       put(b);
       drawn++;
-      if (!hot) for (const o of bodies.values()) if (o.x < b.x + b.w && b.x < o.x + o.w && o.y < b.y + b.h && b.y < o.y + o.h) over++;
+      if (hot) continue;
+      const x = b.x + b.w / 2, y = b.y + b.h / 2, mine = far(x, y, bodies.get(a.id));
+      for (const [id, o] of bodies) {
+        if (o.x < b.x + b.w && b.x < o.x + o.w && o.y < b.y + b.h && b.y < o.y + o.h) over++;
+        if (id !== a.id && far(x, y, o) <= mine) astray++;
+      }
     }
-    // demo self-check: drawn and hover-only tags add up to the people shown, and no drawn tag covers a body
+    // demo self-check, recounted here from the placement's output: one entry per person shown and none for anyone else,
+    // no drawn tag on any drawn sprite's body (departing walkers too) and each one strictly nearest its owner
     if (demo) {
-      canvas.dataset.tags = drawn + " drawn " + hover.length + " hover-only of " + shown.length + ", " + over + " on bodies";
+      const whole = tags.size === shown.length && shown.every(([a]) => tags.has(a.id));
+      canvas.dataset.tags = drawn + " drawn " + hover.length + " hover-only of " + shown.length + " (" + placed.length + " drawn sprites), " +
+        over + " on bodies, " + astray + " astray" + (whole ? "" : ", entries wrong");
       canvas.dataset.hoverOnly = hover.join(" ");
-      if (drawn + hover.length !== shown.length || over) console.error("rooms: tags " + canvas.dataset.tags);
+      // and a wandering chief at rest never stands in another sprite's body
+      const meets = (b, o) => o.x < b.x + b.w && b.x < o.x + o.w && o.y < b.y + b.h && b.y < o.y + o.h;
+      canvas.dataset.stacked = placed.filter(([a]) => wanders(a) && !a.path.length).flatMap(([a]) =>
+        placed.filter(([o]) => o !== a && meets(bodies.get(a.id), bodies.get(o.id))).map(([o]) => a.id + "/" + o.id + (o.path.length ? ":walking" : ""))).join(" ");
+      if (!whole || over || astray) console.error("rooms: tags " + canvas.dataset.tags);
     }
     for (const [a, p] of shown) {
       if (!wanders(a)) continue;  // the chief's talk dots are decoration: only where there is room

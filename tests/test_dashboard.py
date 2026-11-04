@@ -466,6 +466,24 @@ class TestRoomsPage(unittest.TestCase):
         self.assertIsNone(got["e"])  # kept on the canvas it would drift 110 px off its owner
         self.assertEqual(got["size"], 5)
 
+    def test_a_body_with_no_tag_blocks_and_tags_hold_their_slot(self):
+        got = self.pure("""
+        const man = (id, cx, y, extra) => Object.assign({id, rank: 2, hot: false, cx, hh: 32, body: {x: cx - 20, y, w: 40, h: 96},
+          ys: [y - 38, y - 74, y + 100], labels: [{label: id, w: 80}, {label: "s", w: 40}]}, extra);
+        // w, a departing walker just above a, is a body with no labels: it fills both slots over a's head, so a goes under its feet
+        const one = placeTags([man("a", 200, 200), man("w", 200, 100, {labels: []})], [], 1000, 600, 4, 32);
+        // a held the slot under its feet and the short label last frame: it keeps both while they are still legal
+        const two = placeTags([man("a", 200, 300)], [], 1000, 600, 4, 32, new Map([["a", {s: 2, li: 1, d: 0}]]));
+        // hot at the edge: every slot drifts too far, so a clamped centred box is drawn
+        const hot = placeTags([man("h", 2, 200, {hot: true, labels: [{label: "h", w: 300}]})], [], 1000, 600, 4, 32);
+        return {aY: one.get("a") && one.get("a").y, w: one.has("w"), size: one.size, two: two.get("a"), hot: hot.get("h")};
+        """)
+        self.assertEqual(got["aY"], 300)
+        self.assertFalse(got["w"])
+        self.assertEqual(got["size"], 1)
+        self.assertEqual((got["two"]["y"], got["two"]["label"]), (400, "s"))
+        self.assertEqual((got["hot"]["x"], got["hot"]["y"], got["hot"]["w"]), (0, 162, 300))
+
     def test_wait_text_does_not_double(self):
         got = self.pure("""
         const w = note => stateText({activity: "wait", note, room: "lounge"});
