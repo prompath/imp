@@ -9,6 +9,7 @@ import tempfile
 import time
 import unittest
 from contextlib import redirect_stdout
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -204,7 +205,8 @@ class TestDashboard(unittest.TestCase):
         return impctl.route(path, host, 8765)
 
     def test_api_rooms_shape_headers_and_no_paths(self):
-        status, headers, body = self.get("/api/rooms")
+        with mock.patch.object(impctl.time, "time", return_value=NOW):  # route() reads the clock
+            status, headers, body = self.get("/api/rooms")
         self.assertEqual(status, 200)
         self.assertEqual(headers["Content-Type"], "application/json")
         self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
