@@ -32,50 +32,55 @@ tbody tr:focus{outline:2px solid var(--amber);outline-offset:-2px}
 <script>
 "use strict";
 // The part up to the end-pure marker touches no DOM or window, so a node test can slice it out and run it.
-const T = 16;
-// One letter per tile. Walls: # plain, W whiteboard, N window, Q pegboard, = kitchen cabinets.
-// Floor: . room floor, + door, E campus door, , grass, _ rug. Work spots: * stage rooms, k kitchen.
+const T = 32;
+// One letter per tile. Walls: # plain, W whiteboard, N window, Q pegboard. A wall shows its face to the floor below it.
+// Floor: . floor, + doorway or zone entry, E campus door, , grass, : stone path, _ rug. Work spots: * stage rooms, k kitchen.
 // Seats, walkable only as a path's end: c couch, b beanbag, l lounger (j is its backrest).
-// Props: P plant, T table, R reading table, H fume hood, Z sink, G glass cabinet, L lab bench, B workbench,
-// J drill press, X crate, S bookshelf, i lamp, h armchair, D desk, C filing cabinet, U water cooler, F fridge,
-// K counter, M coffee machine, O stove, I island, Y coffee table, V TV, A arcade, @ umbrella, & palm, % hedge, ~ water.
+// Props: P plant, i lamp, U water cooler, C filing cabinet, D desk, T meeting table, R reading table, S bookshelf,
+// h armchair, H fume hood, G glass cabinet, L lab bench, Z sink, B workbench, J drill press, X crate, F fridge,
+// K counter, M coffee machine, I island, Y coffee table, V TV, A arcade, @ umbrella, & tree, % bush, ~ water.
+// Meeting room and library are walled; office, lab, workshop and lounge are open zones on one floor; the pool is outside.
 const MAP = [
-  "###WWWWW####NN###NN##QQQQ##NN#############",
-  "#P..*.*..P#HH..Z..GG#BBBB..JXX#SSSS..SSSS#",
-  "#.........#.*..*..*.#.*.*.*..X#.*.*..*.*.#",
-  "#..*.*.*..#.LLL.LLL.#.........#..........#",
-  "#.*TTTTT*.#.*.*.*.*.#.*.*.*.*.#S.RRRRRR.S#",
-  "#.*TTTTT*.#.........#..BB.BB..#S.*.*.*..S#",
-  "#..*.*.*..#.*.*.*.*.#.*.*.*.*.#S........S#",
-  "#P.......P#.LLL.LLL.#XX.......#Sih....hiS#",
-  "#####+#########+#########+#########+######",
-  "E........................................#",
-  "#.........P...................P..........#",
-  "##NN#+#NN##=====+===##NN+NN########+######",
-  "#CC.....UP#FKMKK.OKKA.......P#&,,,,.,,,,&%",
-  "#.*..*..*.#.k.k...k..........#jl.jl.jl.jl%",
-  "#.DD.DD.DD#...........ccccc..#...........%",
-  "#.........#.IIII.TT.b_______b#.~~~~~~~~~.%",
-  "#.*..*..*.#.k.k..k...__YYY__.#.~~~~~~~~~.%",
-  "#.DD.DD.DD#.........b_______b#.~~~~~~~~~.%",
-  "#.........#..TTT.....__VVV__.#...........%",
-  "#P.*...*.P#..................#jl.jl@jl.jl%",
-  "#.........#P.......P....A...P#,,,,,,,,,,,%",
-  "##############################%%%%%%%%%%%%",
+  "#NN#WWW#N##NN#NN####NN#NN##,&,,,,&,,",
+  "#P..*.*.P#................#,,,,%,,,&",
+  "#........#..*.*.*..H.*.*G.#&,,,,,,,,",
+  "#.*TTTT*.#.DDDDDD..H.LLL..#,,,,,,,,&",
+  "#.*TTTT*.#..........*LLL*.#.........",
+  "#..*..*..#..*.*.*.....*...#jl.~~~.jl",
+  "#........#.DDDDDD.........#...~~~...",
+  "#P......P#.C.+..P..Z.*+.P.#jl.~~~.jl",
+  "######++##P..............P#...~~~...",
+  "#P........................+.@.~~~..@",
+  "E.........................+...~~~...",
+  "#U.........QQQQQ..FKMKKZK.#jl.~~~.jl",
+  "######++##..*.*.J..k.k.k..#...~~~...",
+  "#.*...*..#.BBBB.X...IIII..#jl.~~~.jl",
+  "#S.......#......+..k....k+#....+....",
+  "#S.*RRR*.#..*..*X.i.....PA#,,,,:,,,,",
+  "#S..RRR..#.BBB.BB.ccccc...#&,,,,:,,%",
+  "#S..*.*..#........c_____b.#,,%,,:,,,",
+  "#S.......#.X.*....c_YY__b.#,,,,,:,&,",
+  "#S.h..h.P#.XX...P.c_____..#&,,,,:,,,",
+  "#P.i..i.P#........P.VVV..P#,,%,,,,,&",
+  "###########################,&,,&,,%,",
 ];
 const MAP_W = MAP[0].length, MAP_H = MAP.length;
 const ROOMS = {
-  meeting: {name: "Meeting room", x: 1, y: 1, w: 9, h: 7},
-  lab: {name: "Lab", x: 11, y: 1, w: 9, h: 7},
-  workshop: {name: "Workshop", x: 21, y: 1, w: 9, h: 7},
-  library: {name: "Library", x: 31, y: 1, w: 10, h: 7},
-  office: {name: "Office", x: 1, y: 12, w: 9, h: 9},
-  lounge: {name: "Kitchen-living room", x: 11, y: 12, w: 18, h: 9},
-  pool: {name: "Pool", x: 30, y: 12, w: 11, h: 9},
+  meeting: {name: "Meeting room", x: 1, y: 1, w: 8, h: 7},
+  lab: {name: "Lab", x: 19, y: 2, w: 6, h: 6},
+  workshop: {name: "Workshop", x: 11, y: 12, w: 6, h: 9},
+  library: {name: "Library", x: 1, y: 13, w: 8, h: 8},
+  office: {name: "Office", x: 11, y: 2, w: 6, h: 6},
+  lounge: {name: "Kitchen-living room", x: 18, y: 11, w: 8, h: 10},
+  pool: {name: "Pool", x: 27, y: 4, w: 9, h: 11},
 };
 const ROOM_KEYS = Object.keys(ROOMS);
-const KITCHEN_END = 19;  // lounge columns up to here are the kitchen side
-const WALK = ".+E*k,_", SEATS = "cbl", WALLS = "#WNQ=";
+const KITCHEN_END = 14;  // lounge rows up to here are the kitchen side
+const OPEN_ZONES = ["office", "lab", "workshop", "lounge"];  // drawn as a floor patch, with no walls
+// zone names float on the floor: [text, centre x, centre y] in tiles
+const LABELS = [["Meeting room", 5, 9.5], ["Library", 5, 11.5], ["Office", 14, 1.5], ["Lab", 22, 1.5],
+  ["Workshop", 14, 10.5], ["Kitchen", 22, 10.5], ["Living room", 23, 15.5], ["Pool", 31.5, 3.5]];
+const WALK = ".+E*k,_:", SEATS = "cbl", WALLS = "#WNQ";
 
 function tileAt(x, y) { return (MAP[y] || "")[x] || "#"; }
 function roomAt(x, y) {
@@ -197,155 +202,132 @@ function stateText(c) {
 }
 function rowCells(c) { return [c.role, c.project || "-", c.idea || "-", roomText(c), stateText(c)]; }
 
-// ---- sprites: one character per palette letter, "." is see-through ----
-// o outline, e eyes; h/H hair, s/S skin, c/C shirt (project colour), p/P trousers come from the character
+// ---- sprites: palette-letter grids built from rects, then outlined; "." is see-through ----
+// e eyes; h/H hair, s/S skin, c/C shirt (project colour), p/P trousers come from the character; v is steam (no outline)
 const PAL = {
-  o: "#241c2c", e: "#1c1824", w: "#f7f5ee", g: "#c4c8d0", G: "#8b919d", d: "#4c5160", k: "#1d1f26",
-  b: "#c08a52", B: "#7d5332", r: "#e2463e", R: "#9a2c2c", y: "#f6d04b", Y: "#cf982b", l: "#a3dcff",
-  L: "#3c7bd1", n: "#5db35a", N: "#347a3b", u: "#f1e9d2", f: "#3a2c28",
+  o: "#2a2233", e: "#231d2b", w: "#fbfaf5", u: "#efe6cf", g: "#c4c8d0", G: "#8b919d", d: "#4c5160", k: "#1d1f26",
+  b: "#c08a52", B: "#7d5332", r: "#e2463e", R: "#9a2c2c", y: "#f6d04b", l: "#a3dcff", L: "#3c7bd1", n: "#5db35a",
+  f: "#3a2c28", m: "#9c4a3c", q: "#f0a5a0", v: "#e6e9ee",
 };
+function grid(w, h) { return Array.from({length: h}, () => Array(w).fill(".")); }
+// rects are [letter, x, y, w, h], shifted by (ox, oy)
+function paint(gr, rects, ox, oy) {
+  for (const [k, x, y, w = 1, h = 1] of rects)
+    for (let j = y + oy; j < y + oy + h; j++) for (let i = x + ox; i < x + ox + w; i++)
+      if (gr[j] && i >= 0 && i < gr[j].length) gr[j][i] = k;
+}
+// a one-pixel dark outline around everything drawn, so sprites read on any floor
+function outline(gr) {
+  const solid = (x, y) => gr[y] !== undefined && gr[y][x] !== undefined && gr[y][x] !== "." && gr[y][x] !== "v";
+  const edge = [];
+  gr.forEach((row, y) => row.forEach((ch, x) => {
+    if (ch === "." && (solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1))) edge.push([x, y]);
+  }));
+  for (const [x, y] of edge) gr[y][x] = "o";
+}
 const HEAD = {
-  d: [
-    "................",
-    "................",
-    "................",
-    "................",
-    ".....oooooo.....",
-    "....ohhhhhho....",
-    "...ohhhhhhhho...",
-    "...oHhhhhhhHo...",
-    "...ohhsssshho...",
-    "...ossessesso...",
-    "...ossessesso...",
-    "...oSssssssSo...",
-    "....oossssoo....",
-  ],
-  u: [
-    "................",
-    "................",
-    "................",
-    "................",
-    ".....oooooo.....",
-    "....ohhhhhho....",
-    "...ohhhhhhhho...",
-    "...ohhhhhhhho...",
-    "...ohhhhhhhho...",
-    "...ohhhhhhhho...",
-    "...oHhhhhhhHo...",
-    "...oHHhhhhHHo...",
-    "....ooSSSSoo....",
-  ],
-  r: [
-    "................",
-    "................",
-    "................",
-    "................",
-    ".....oooooo.....",
-    "....ohhhhhho....",
-    "...ohhhhhhhho...",
-    "...ohhhhhhhho...",
-    "...ohhhhhssso...",
-    "...ohhhhssseso..",
-    "...ohhhSssssso..",
-    "...oHhhssssso...",
-    "....ooSsssoo....",
-  ],
-};
-const TORSO = ["....occcccco....", "...oCccccccCo...", "...oCccccccCo...", "...osCccccCso...", "....oppppppo...."];
-const SIDE = [".....occcco.....", "....occcccco....", "....occCccco....", "....occsccco....", ".....oppppo....."];
-const SIT = ["....occcccco....", "...oCccccccCo...", "...osCccccCso...", "...oppppppppo...", "...oPppppppPo...", "....opo..opo....", "....ofo..ofo...."];
-const BODY = {
-  d0: TORSO.concat(["....opPooPpo....", "....offooffo...."]),
-  d1: TORSO.concat(["....offooPpo....", "........offo...."]),
-  d2: TORSO.concat(["....opPooffo....", "....offo........"]),
-  u0: TORSO.concat(["....opPooPpo....", "....offooffo...."]),
-  u1: TORSO.concat(["....offooPpo....", "........offo...."]),
-  u2: TORSO.concat(["....opPooffo....", "....offo........"]),
-  r0: SIDE.concat([".....oPppo......", ".....offffo....."]),
-  r1: SIDE.concat(["....oppoopPo....", "...offo..offo..."]),
-  r2: SIDE.concat(["....oPpoopPo....", "...offo..offo..."]),
+  d: [["h", 11, 8, 10, 1], ["h", 10, 9, 12, 1], ["h", 9, 10, 14, 4], ["H", 21, 10, 1, 4], ["s", 10, 14, 12, 8],
+    ["h", 10, 14, 3, 1], ["h", 17, 14, 5, 1], ["h", 9, 14, 1, 5], ["H", 22, 14, 1, 5], ["e", 12, 16, 2, 3], ["e", 18, 16, 2, 3],
+    ["w", 12, 16], ["w", 18, 16], ["q", 11, 19, 2, 1], ["q", 19, 19, 2, 1], ["m", 15, 20, 2, 1], ["S", 10, 21, 12, 1], ["S", 14, 22, 4, 1]],
+  u: [["h", 11, 8, 10, 1], ["h", 10, 9, 12, 1], ["h", 9, 10, 14, 11], ["H", 21, 10, 1, 8], ["H", 9, 18, 14, 3], ["S", 14, 21, 4, 2]],
+  r: [["h", 11, 8, 10, 1], ["h", 10, 9, 12, 1], ["h", 9, 10, 14, 4], ["s", 13, 14, 10, 8], ["h", 9, 14, 5, 6], ["H", 9, 18, 4, 2],
+    ["h", 13, 14, 3, 1], ["s", 12, 16, 2, 2], ["S", 12, 17], ["e", 19, 16, 2, 3], ["w", 19, 16], ["s", 23, 17, 1, 2],
+    ["q", 18, 19, 2, 1], ["m", 20, 20, 2, 1], ["S", 14, 21, 8, 1], ["S", 15, 22, 4, 1]],
 };
 const HAIR = {
-  long: {
-    d: [[3, 9, ["oh......ho", "oh......ho", "oh......ho", "oh......ho", "oh......ho", "oo......oo"]]],
-    u: [[3, 12, ["ohhhhhhhho", ".ohhhhhho.", "..oooooo.."]]],
-    r: [[3, 11, ["oHh", "ohh", "oho", ".oo"]]],
-  },
-  bun: {
-    d: [[6, 2, ["oooo"]], [5, 3, ["ohhhho"]]],
-    u: [[6, 2, ["oooo"]], [5, 3, ["ohhhho"]]],
-    r: [[2, 5, ["oo", "ohh", "oo"]]],
-  },
+  long: {d: [["h", 9, 14, 2, 10], ["h", 21, 14, 2, 10], ["H", 22, 14, 1, 10]], u: [["h", 9, 20, 14, 4], ["H", 9, 22, 14, 2]],
+    r: [["h", 9, 14, 4, 10], ["H", 9, 22, 4, 2]]},
+  bun: {d: [["h", 13, 4, 6, 4], ["H", 13, 7, 6, 1]], u: [["h", 13, 4, 6, 4], ["H", 13, 7, 6, 1]], r: [["h", 6, 7, 5, 5], ["H", 6, 10, 5, 2]]},
+  curly: {d: [["h", 9, 7, 3, 2], ["h", 14, 6, 4, 2], ["h", 20, 7, 3, 2], ["h", 8, 12, 1, 4], ["h", 23, 12, 1, 4]],
+    u: [["h", 9, 7, 3, 2], ["h", 14, 6, 4, 2], ["h", 20, 7, 3, 2], ["h", 8, 12, 1, 6], ["h", 23, 12, 1, 6]],
+    r: [["h", 9, 7, 3, 2], ["h", 14, 6, 4, 2], ["h", 8, 12, 1, 6]]},
 };
-const BENCH = ["obbbbbbbbbbbbo", "obbbbGGgbbbbbo", "oBBBBBBBBBBBBo", "oBBYBBBBBBYBBo", "oooooooooooooo"];
-const DESK = ["obbbbbbbbbbbbo", "oBBBBBBBBBBBBo", "oooooooooooooo"];
-const SWIM = ["....occcccco....", "...osccccccso...", "...osSssssSso...", "...osCccccCso...", "....osssssso....", "....osSooSso....", "....oSsooSso...."];
-function front(body, items, sit) {
-  return {head: "d", body: body || BODY.d0, items: items || [], sit: !!sit};
+const TORSO = [["c", 10, 23, 12, 10], ["C", 10, 23, 1, 10], ["C", 21, 23, 1, 10], ["C", 10, 31, 12, 1], ["d", 10, 33, 12, 1]];
+const COLLAR = [["C", 13, 23, 6, 1], ["s", 15, 23, 2, 2], ["y", 15, 33, 2, 1], ["C", 15, 27, 1, 4]];
+const SWIM = [["s", 10, 23, 12, 10], ["S", 10, 23, 1, 10], ["S", 21, 23, 1, 10], ["S", 13, 27, 6, 1], ["c", 10, 33, 12, 4], ["C", 10, 36, 12, 1],
+  ["s", 11, 37, 4, 6], ["s", 17, 37, 4, 6], ["S", 14, 37, 1, 6], ["s", 10, 43, 5, 2], ["s", 17, 43, 5, 2]];
+const ARM = {
+  L: {down: [["c", 8, 24, 2, 5], ["C", 8, 24, 1, 5], ["s", 8, 29, 2, 3]], front: [["c", 8, 24, 2, 5], ["C", 8, 24, 1, 5]], none: []},
+  R: {down: [["c", 22, 24, 2, 5], ["C", 23, 24, 1, 5], ["s", 22, 29, 2, 3]], front: [["c", 22, 24, 2, 5], ["C", 23, 24, 1, 5]],
+    up: [["c", 23, 19, 2, 5], ["C", 24, 19, 1, 5], ["s", 23, 16, 2, 3]], none: []},
+};
+const LEGS = [
+  [["p", 11, 34, 4, 8], ["p", 17, 34, 4, 8], ["p", 15, 34, 2, 2], ["P", 14, 36, 1, 6], ["P", 20, 34, 1, 8], ["f", 10, 42, 5, 3], ["f", 17, 42, 5, 3]],
+  [["p", 11, 34, 4, 6], ["p", 17, 34, 4, 8], ["p", 15, 34, 2, 2], ["P", 20, 34, 1, 8], ["f", 10, 40, 5, 3], ["f", 17, 42, 5, 3]],
+  [["p", 11, 34, 4, 8], ["p", 17, 34, 4, 6], ["p", 15, 34, 2, 2], ["P", 14, 36, 1, 6], ["f", 10, 42, 5, 3], ["f", 17, 40, 5, 3]],
+];
+const SIT = [["p", 11, 34, 10, 4], ["P", 15, 35, 2, 3], ["p", 11, 38, 4, 3], ["p", 17, 38, 4, 3], ["f", 11, 41, 4, 2], ["f", 17, 41, 4, 2]];
+const SIDE = {
+  torso: [["c", 12, 23, 9, 10], ["C", 12, 23, 1, 10], ["C", 20, 23, 1, 10], ["d", 12, 33, 9, 1]],
+  arm: [[["c", 15, 24, 3, 6], ["C", 15, 24, 1, 6], ["s", 15, 30, 3, 2]], [["c", 16, 24, 3, 5], ["C", 16, 24, 1, 5], ["s", 18, 29, 3, 2]],
+    [["c", 13, 24, 3, 5], ["C", 13, 24, 1, 5], ["s", 11, 29, 3, 2]]],
+  legs: [[["p", 13, 34, 6, 8], ["P", 13, 34, 1, 8], ["f", 13, 42, 8, 3]],
+    [["p", 12, 34, 4, 7], ["P", 12, 34, 1, 7], ["p", 16, 34, 4, 7], ["f", 10, 41, 5, 3], ["f", 17, 41, 6, 3]],
+    [["p", 16, 34, 4, 7], ["P", 16, 34, 1, 7], ["p", 12, 34, 4, 7], ["f", 17, 41, 6, 3], ["f", 10, 41, 5, 3]]],
+};
+const BARE = r => [{c: "s", C: "S"}[r[0]] || r[0]].concat(r.slice(1));
+// the body of a generic human: dir d, u or r (left is drawn mirrored), frame 0-2
+function person(dir, f, o) {
+  if (dir === "r") return HEAD.r.concat(SIDE.torso, SIDE.arm[f], SIDE.legs[f]);
+  const arms = ARM.L[o.armL || "down"].concat(ARM.R[o.armR || "down"]);
+  return HEAD[dir].concat(o.swim ? SWIM : TORSO, dir === "d" && !o.swim ? COLLAR : [], o.swim ? arms.map(BARE) : arms,
+    o.swim ? [] : o.sit ? SIT : LEGS[f]);
 }
+const HAMMER_UP = [["c", 23, 19, 2, 5], ["s", 23, 16, 2, 3], ["B", 24, 7, 1, 9], ["G", 21, 5, 6, 3], ["g", 21, 5, 6, 1]];
+const HAMMER_DOWN = [["c", 22, 24, 2, 4], ["s", 21, 28, 3, 2], ["B", 18, 29, 8, 1], ["G", 25, 26, 3, 6], ["g", 25, 26, 1, 6]];
+const BOOK = [["R", 9, 27, 14, 7], ["u", 10, 27, 6, 6], ["u", 16, 27, 6, 6], ["B", 15, 27, 2, 7], ["G", 11, 29, 4, 1], ["G", 11, 31, 3, 1],
+  ["G", 17, 29, 4, 1], ["G", 17, 31, 3, 1], ["s", 8, 30, 2, 2], ["s", 22, 30, 2, 2]];
+const LENS_UP = [["c", 22, 24, 2, 3], ["s", 22, 22, 2, 3], ["B", 22, 19, 2, 4], ["G", 19, 12, 8, 8], ["l", 20, 13, 6, 6], ["w", 21, 14, 2, 2]];
+const LENS_DOWN = [["c", 22, 24, 2, 5], ["s", 22, 29, 2, 2], ["B", 23, 31, 2, 3], ["G", 20, 33, 8, 8], ["l", 21, 34, 6, 6], ["w", 22, 35, 2, 2]];
+const LAPTOP = [["d", 9, 25, 14, 8], ["G", 9, 25, 14, 1], ["w", 15, 28, 2, 2], ["g", 8, 33, 16, 2]];
+const CLIP = [["B", 9, 25, 10, 11], ["u", 10, 27, 8, 8], ["G", 12, 24, 4, 2], ["G", 11, 29, 6, 1], ["G", 11, 31, 5, 1], ["s", 8, 31, 2, 2]];
+const PAPER = [["u", 10, 27, 10, 8], ["g", 11, 29, 8, 1], ["g", 11, 31, 7, 1], ["g", 11, 33, 8, 1], ["s", 8, 31, 2, 2]];
+const EASEL = [["G", 3, 29, 1, 17], ["G", 17, 29, 1, 17], ["g", 1, 8, 20, 1], ["w", 1, 9, 20, 20], ["g", 1, 29, 20, 2],
+  ["L", 4, 12, 9, 1], ["L", 4, 15, 6, 1], ["r", 5, 19, 10, 1], ["r", 8, 22, 3, 1], ["n", 4, 25, 6, 1]];
+const MUG = [["s", 21, 28, 3, 2], ["w", 19, 25, 5, 6], ["g", 19, 25, 5, 1], ["B", 20, 26, 3, 1], ["w", 24, 26, 2, 3]];
+const PAD = [["d", 10, 29, 12, 4], ["g", 12, 30, 2, 1], ["r", 19, 30], ["y", 20, 31], ["s", 9, 30, 2, 2], ["s", 21, 30, 2, 2]];
+// a pose frame: body options plus held items; w and ox widen the canvas for the presenter's easel
 const POSES = {
-  walk: (f, dir) => ({head: dir, body: BODY[dir + f]}),
-  stand: () => front(),
-  talk: f => front(f ? BODY.d0 : TORSO.slice(0, 1).concat(["...oCccccccCoo..", "...oCcccccccCso.", "...osCccccco....", "....oppppppo....", "....opPooPpo....", "....offooffo...."]),
-    f ? [] : [[7, 11, "RR"]]),
-  hammer: f => front(null, [[1, 15, BENCH], [5, 15, "s"]].concat(f
-    ? [[11, 13, "cs"], [9, 14, "bb"], [7, 15, "dd"], [7, 13, "y"], [5, 13, "y.y"], [4, 14, "y"]]
-    : [[13, 7, ["ddd", "dGd", ".b.", ".b.", ".s.", "c.."]]])),
-  read: f => front(null, [[3, 14, f
-    ? ["s..wu...s", "RuGu.uuGR", "RuuuRuuuR", "RRRRRRRRR"]
-    : ["swwwRwwws", "RGGuRuGGR", "RuuuRuuuR", "RRRRRRRRR"]]]),
-  magnify: f => front(null, f
-    ? [[10, 10, [".GGG.", "GllwG", "GlllG", ".GGG."]], [11, 14, "B"], [11, 15, "s"]]
-    : [[10, 8, [".GGG.", "GlwlG", "GlllG", ".GGG."]], [12, 12, "B"], [12, 13, "s"]]),
-  laptop: f => front(null, [[5, 13, ["oooooo", "oGGGGo", "oGwGGo", "oGGGGo"]], [1, 17, DESK],
-    [3, 15, f ? "s......." : "s.......s"], [12, 16, f ? "s" : "."]]),
-  clipboard: f => front(null, [[4, 13, ["bbGGbb", "buuuub", "bGGGub", "buuuub", "bGGuub", "bbbbbb"]], [3, 15, "s"],
-    [10, 14, f ? ".L" : "L"], [11, 15, "s"]].concat(f ? [[6, 16, "n.n"], [7, 17, "n"]] : [])),
-  pen: f => front(null, [[4, 13, ["uuuuuu", "ugGgGu", "uuuuuu", "uGgGgu", "uuuuuu"]], [3, 15, "s"]].concat(f
-    ? [[10, 14, "rs"], [9, 15, "R"], [5, 16, "rrr"]]
-    : [[11, 11, ["r", "r", "R"]], [11, 14, "s"]])),
-  board: f => ({head: "d", body: BODY.d0, ox: 8, w: 24, ax: 16, items: [
-    [0, 4, ["oooooooooo", "owwwwwwwwo", "owLLwwwwwo", "owwwwwRwwo", "owwwRRRwwo", "owwRRRRRwo", "owwwwwwwwo", "oooooooooo", ".G......G.",
-      ".G......G.", ".G......G.", ".G......G.", ".G......G.", ".G......G.", "oG......Go", "oo......oo"]],
-    [10, 13, f ? ["sccc", "..oC"] : ["....", "sccc"]], [9, f ? 12 : 13, "L"]].concat(f ? [[3, 6, "LLL"]] : [])}),
-  coffee: f => front(null, [[11, 14, ["wkw.", "wwwg", "www."]], [10, 15, "s"], [3, 15, "s"],
-    [12, 11, f ? [".g", "g.", ".g"] : ["g.", ".g", "g."]]]),
-  couch: f => front(SIT, [[1, 6, ["oo..........oo", "oco........oco", ".oCo......oCo.", ".oCo......oCo.", "..oCo....oCo..",
-    "..oCo....oCo.."]]].concat(f ? [[6, 9, "s..s"], [6, 10, "o..o"]] : []), true),
-  games: f => front(SIT, [[4, f ? 13 : 14, ["sddddddds", ".dyddrd.."]]], true),
-  sunbathe: f => ({head: "d", body: SWIM, lie: 3, items: [[4, 9, f ? "kkwk.kkkk" : "kkkk.kkkk"]]}),
+  walk: (f, dir) => ({dir, frame: f}),
+  stand: () => ({}),
+  talk: f => f ? {} : {armR: "up"},
+  hammer: f => ({armR: "none", items: f ? HAMMER_DOWN : HAMMER_UP}),
+  read: f => ({armL: "front", armR: "front", items: f ? BOOK.concat([["u", 12, 25, 4, 2]]) : BOOK}),
+  magnify: f => ({armR: "none", items: f ? LENS_DOWN : LENS_UP}),
+  laptop: f => ({armL: "front", armR: "front", items: LAPTOP.concat(f
+    ? [["l", 9, 24, 14, 1], ["s", 12, 32, 3, 2], ["s", 17, 32, 3, 2]] : [["s", 10, 32, 3, 2], ["s", 19, 32, 3, 2]])}),
+  clipboard: f => ({armL: "front", armR: "front", items: CLIP.concat(f
+    ? [["L", 17, 29, 1, 4], ["s", 16, 32, 3, 2], ["n", 12, 33, 3, 1]] : [["L", 20, 27, 1, 4], ["s", 19, 30, 3, 2]])}),
+  pen: f => ({armL: "front", armR: "front", items: PAPER.concat(f
+    ? [["r", 18, 27, 1, 5], ["s", 17, 31, 3, 2], ["r", 11, 30, 5, 1], ["R", 11, 32, 3, 1]] : [["r", 21, 23, 1, 6], ["s", 20, 28, 3, 2]])}),
+  board: f => ({w: 56, ox: 24, armL: "none", items: EASEL.concat(f
+    ? [["c", 29, 21, 3, 3], ["s", 26, 19, 3, 3], ["L", 13, 18, 6, 1]] : [["c", 28, 24, 4, 2], ["s", 25, 24, 3, 2], ["k", 18, 24, 7, 1]])}),
+  coffee: f => ({armR: "front", items: MUG.concat(f ? [["v", 21, 20, 1, 2], ["v", 19, 22, 1, 1]] : [["v", 20, 21, 1, 2], ["v", 22, 19, 1, 2]])}),
+  couch: () => ({sit: true}),
+  games: f => ({sit: true, armL: "front", armR: "front", items: f ? PAD.concat([["l", 19, 31]]) : PAD}),
+  sunbathe: () => ({swim: true, lie: true, items: [["k", 11, 16, 10, 2]]}),
 };
 // a quarter turn anticlockwise: the top row becomes the left column
 function rotate(rows) {
   const w = rows[0].length;
   return Array.from({length: w}, (_, r) => rows.map(row => row[w - 1 - r]).join(""));
 }
-function blank(w, h) { return Array.from({length: h}, () => ".".repeat(w)); }
-function stamp(rows, x, y, part) {
-  [].concat(part).forEach((line, dy) => {
-    const row = rows[y + dy];
-    if (row === undefined) return;
-    const out = row.split("");
-    [...line].forEach((ch, dx) => { if (ch !== "." && x + dx >= 0 && x + dx < out.length) out[x + dx] = ch; });
-    rows[y + dy] = out.join("");
-  });
-}
 // a pose frame as palette rows; ax is the column that stands on the tile centre
 function spriteRows(pose, frame, dir, style) {
-  const p = POSES[pose](frame, dir), w = p.w || 16, rows = blank(w, p.h || 20), ox = p.ox || 0;
-  if (p.head) stamp(rows, ox, 0, HEAD[p.head]);
-  if (p.body) stamp(rows, ox, 13, p.body);
-  if (p.head && own(HAIR, style)) HAIR[style][p.head].forEach(([x, y, part]) => stamp(rows, ox + x, y, part));
-  (p.items || []).forEach(([x, y, part]) => stamp(rows, x, y, part));
-  if (p.lie === undefined) return {rows, ax: p.ax || w / 2};
-  const lying = blank(32, 16);  // two lounger tiles; the seat tile is the right one
-  stamp(lying, p.lie, 0, rotate(rows));
-  return {rows: lying, ax: 24};
+  const p = POSES[pose](frame, dir), d = p.dir || "d", ox = p.ox || 0, oy = p.sit ? 3 : 0, gr = grid(p.w || 32, 48);
+  paint(gr, person(d, p.frame || 0, p), ox, oy);
+  paint(gr, own(HAIR, style) ? HAIR[style][d] : [], ox, oy);
+  paint(gr, p.items || [], 0, oy);
+  outline(gr);
+  const rows = gr.map(r => r.join(""));
+  if (!p.lie) return {rows, ax: ox + 16};
+  // lying across two lounger tiles, head on the backrest; the seat tile is the right one
+  return {rows: rotate(rows).map(r => ".".repeat(10) + r + ".".repeat(6)), ax: 48, lie: true};
 }
 const SKIN = [["#f6d2b0", "#dfae8a"], ["#e8b88f", "#c99469"], ["#c98c5f", "#a66f47"], ["#9a6440", "#7a4d30"], ["#6b432b", "#53321f"]];
 const HAIRS = [["#2a211e", "#171210"], ["#5b3820", "#3e2615"], ["#a8602b", "#7d441c"], ["#e0b85c", "#b88f3c"], ["#8d8f99", "#6a6c75"], ["#b8473f", "#8a2f2a"]];
 const PANTS = [["#36456a", "#28334f"], ["#45484f", "#33353b"], ["#5d4a38", "#45362a"], ["#2f4a42", "#223630"]];
-const STYLES = ["short", "long", "bun", "short"];
+const STYLES = ["short", "long", "bun", "curly"];
 function looksFor(c) {
   const h = hashStr(c.id), sk = SKIN[h % 5], hr = HAIRS[(h >>> 4) % 6], pa = PANTS[(h >>> 8) % 4], sh = projectColour(c.project);
   return {key: c.project + "|" + h, style: STYLES[(h >>> 12) % 4],
@@ -406,12 +388,13 @@ function demoState(n, ts) {
 (function () {
   const $ = id => document.getElementById(id);
   const canvas = $("scene"), ctx = canvas.getContext("2d"), tip = $("tip"), roster = $("roster"), pauseBtn = $("pause");
-  const LW = MAP_W * T, LH = MAP_H * T, SPEED = 4;  // tiles per second
+  const LW = MAP_W * T, LH = MAP_H * T, SPEED = 3;  // tiles per second
   const demo = new URLSearchParams(location.search).get("demo") === "1";
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
   const actors = new Map(), sprites = new Map();
   let reduced = motion.matches, paused = false, scale = 1, px = 1, raf = 0, timer = 0, lastTs = 0, tick = 0;
   let highlight = "", hoverId = "", demoStep = 0, loaded = false, inflight = false, rosterKey = "", overflow = new Map();
+  let labelBoxes = [];
   const base = document.createElement("canvas");
   base.width = LW;
   base.height = LH;
@@ -419,308 +402,417 @@ function demoState(n, ts) {
 
   function still() { return reduced || paused || document.hidden; }
 
-  // ---- static art: floors and props, drawn once ----
+  // ---- static art: floors, walls and props, drawn once at one art pixel per logical pixel ----
+  const O = "#2a2233";  // the outline colour of every prop
   function drawStatic(g) {
     for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) drawFloor(g, x, y);
+    // row by row, so a tall prop overlaps the row behind it
     for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) drawThing(g, x, y);
   }
   function painter(g, x, y) {
-    return (c, dx, dy, w, h) => { g.fillStyle = c; g.fillRect(x * T + dx, y * T + dy, w || 1, h || 1); };
+    const r = (c, dx, dy, w, h) => { g.fillStyle = c; g.fillRect(x * T + dx, y * T + dy, w || 1, h || 1); };
+    r.box = (c, dx, dy, w, h) => { r(O, dx - 1, dy - 1, w + 2, h + 2); r(c, dx, dy, w, h); };
+    // leafy shapes: outline every part first, so the parts merge into one silhouette
+    r.blob = (parts, dark, mid, light) => {
+      for (const [a, b, w, h] of parts) r(O, a - 1, b - 1, w + 2, h + 2);
+      for (const [a, b, w, h] of parts) r(dark, a, b, w, h);
+      for (const [a, b, w, h] of parts) { r(mid, a + 1, b + 1, w - 4, h - 5); r(light, a + 3, b + 2, 3, 2); }
+    };
+    return r;
   }
   function tileHash(x, y) { return hashStr(x + "," + y); }
   function floorKind(x, y) {
-    const ch = tileAt(x, y);
-    if (",%&".includes(ch)) return "grass";
+    if (",&%:".includes(tileAt(x, y))) return "grass";
     let room = roomAt(x, y);
-    if (ch === "+") room = roomAt(x, y - 1) || roomAt(x, y + 1);
+    if (!room && tileAt(x, y) === "+") room = roomAt(x, y - 1) || roomAt(x, y + 1);  // a doorway takes its room's floor
     if (!room) return "hall";
-    if (room === "lounge") return x <= KITCHEN_END ? "kitchen" : "living";
+    if (room === "lounge") return y <= KITCHEN_END ? "kitchen" : "living";
     return room;
   }
+  function planks(r, h, base, line, light) {
+    r(base, 0, 0, 32, 32);
+    for (let i = 0; i < 4; i++) {
+      r(line, 0, i * 8 + 7, 32, 1);
+      r(line, (h >>> (i * 5)) % 32, i * 8, 1, 7);
+      r(light, (h >>> (i * 5 + 2)) % 24 + 2, i * 8 + 2 + i % 2 * 2, 5, 1);
+    }
+  }
+  const FLOORS = {
+    hall: (r, h) => planks(r, h, "#e8d5b5", "#d4be98", "#f1e3c9"),
+    living: (r, h) => planks(r, h, "#c9935f", "#b07d4d", "#d8a673"),
+    library: (r, h, x) => {
+      r("#8d5f3d", 0, 0, 32, 32);
+      for (let i = 0; i < 4; i++) { r("#77502f", i * 8 + 7, 0, 1, 32); r("#77502f", i * 8, (x * 13 + i * 11) % 32, 7, 1); r("#9c6c48", i * 8 + 2, (h >>> i * 4) % 26 + 3, 1, 4); }
+    },
+    meeting: r => {
+      r("#56699f", 0, 0, 32, 32);
+      for (let i = 0; i < 32; i += 8) for (let j = 0; j < 32; j += 8) { r("#6276ab", j + 3, i + 1, 2, 6); r("#6276ab", j + 1, i + 3, 6, 2); r("#4d5f93", j + 3, i + 3, 2, 2); }
+    },
+    office: (r, h, x, y) => {
+      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) r((i + j + x + y) % 2 ? "#8291a8" : "#8a99af", j * 16, i * 16, 16, 16);
+      for (let i = 0; i < 10; i++) r(i % 2 ? "#7a889f" : "#94a2b7", (h >>> i * 3) % 32, (h >>> i * 3 + 1) % 32);
+    },
+    lab: r => {
+      r("#eef2f4", 0, 0, 32, 32);
+      for (const v of [15, 31]) { r("#d3dbe0", 0, v, 32, 1); r("#d3dbe0", v, 0, 1, 32); }
+      r("#fafcfd", 1, 1, 4, 1); r("#fafcfd", 17, 17, 4, 1);
+    },
+    workshop: (r, h) => {
+      r("#b8b1a5", 0, 0, 32, 32);
+      for (let i = 0; i < 12; i++) r(i % 2 ? "#a9a296" : "#c6c0b5", (h >>> i * 2) % 32, (h >>> i * 2 + 5) % 32);
+      if (h % 9 === 0) { r("#9f988b", 8, 12, 9, 5); r("#9f988b", 10, 11, 5, 7); }
+    },
+    kitchen: (r, h, x, y) => {
+      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) r((i + j) % 2 ? "#d9c7a6" : "#f2e9d8", j * 16, i * 16, 16, 16);
+    },
+    pool: (r, h, x, y) => {
+      r("#e2d6bd", 0, 0, 32, 32);
+      for (let i = 0; i < 2; i++) { r("#cbbd9f", 0, i * 16 + 15, 32, 1); r("#cbbd9f", ((i + y) % 2) * 16 + 7, i * 16, 1, 15); }
+      r("#ece3d0", (h % 20) + 2, 3, 4, 1);
+    },
+    grass: (r, h) => {
+      r("#78b856", 0, 0, 32, 32);
+      for (let i = 0; i < 10; i++) r(i % 3 ? "#69a84a" : "#8cca69", (h >>> i * 3) % 31, (h >>> i * 3 + 1) % 29, 1, i % 3 ? 3 : 2);
+      if (h % 7 === 0) {
+        const fx = (h >>> 9) % 22 + 5, fy = (h >>> 14) % 22 + 5, c = ["#fbfaf5", "#f6d04b", "#f0a5c0"][(h >>> 3) % 3];
+        r(c, fx - 1, fy, 3, 1); r(c, fx, fy - 1, 1, 3); r("#e2a23a", fx, fy);
+      }
+    },
+  };
   function drawFloor(g, x, y) {
     const ch = tileAt(x, y), r = painter(g, x, y), h = tileHash(x, y);
     if (WALLS.includes(ch)) return;
-    if (ch === "~") return drawWater(g, x, y);
-    const kind = floorKind(x, y);
-    if (kind === "hall") {
-      r("#cdc6b8", 0, 0, 16, 16); r("#d9d3c7", 0, 0, 15, 1); r("#b7af9f", 0, 15, 16, 1); r("#b7af9f", 15, 0, 1, 16);
-    } else if (kind === "meeting") {
-      r("#3f5788", 0, 0, 16, 16);
-      for (let i = 0; i < 16; i += 4) for (let j = (i / 4) % 2 * 2; j < 16; j += 4) r("#4a6497", j, i);
-    } else if (kind === "lab") {
-      r("#e4eaed", 0, 0, 16, 16); r("#c9d3d8", 0, 7, 16, 1); r("#c9d3d8", 7, 0, 1, 16); r("#c9d3d8", 0, 15, 16, 1); r("#c9d3d8", 15, 0, 1, 16);
-    } else if (kind === "workshop") {
-      r("#a0998c", 0, 0, 16, 16);
-      for (let i = 0; i < 6; i++) r(i % 2 ? "#948d80" : "#ada79b", (h >>> (i * 4)) % 16, (h >>> (i * 4 + 2)) % 16);
-      if (h % 7 === 0) r("#8c8578", (h >>> 3) % 10 + 2, (h >>> 7) % 10 + 2, 3, 2);
-    } else if (kind === "library") {
-      r("#7b5233", 0, 0, 16, 16);
-      for (let i = 0; i < 4; i++) { r("#68442a", 0, i * 4 + 3, 16, 1); r("#68442a", ((y * 4 + i) * 7 + x * 5) % 16, i * 4, 1, 3); }
-    } else if (kind === "office") {
-      r("#5d7c84", 0, 0, 16, 16);
-      for (let i = 0; i < 16; i += 2) for (let j = (i / 2) % 2; j < 16; j += 4) r("#67868e", j, i);
-    } else if (kind === "kitchen") {
-      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) r((i + j) % 2 ? "#d4bf98" : "#efe4cc", j * 8, i * 8, 8, 8);
-    } else if (kind === "living") {
-      r("#b27a4a", 0, 0, 16, 16);
-      for (let i = 0; i < 4; i++) { r("#9c693d", 0, i * 4 + 3, 16, 1); r("#9c693d", ((y * 4 + i) * 9 + x * 3) % 16, i * 4, 1, 3); }
-      if ("_YV".includes(ch)) drawRug(r, x, y);
-    } else if (kind === "pool") {
-      r("#dcc9a0", 0, 0, 16, 16);
-      for (let i = 0; i < 4; i++) { r("#c8b48a", i * 4 + 3, 0, 1, 16); r("#c8b48a", i * 4, ((x * 4 + i) * 7 + y * 5) % 16, 3, 1); }
-    } else if (kind === "grass") {
-      r("#69a84d", 0, 0, 16, 16);
-      for (let i = 0; i < 8; i++) r(i % 3 ? "#5c9643" : "#82bf62", (h >>> (i * 3)) % 15, (h >>> (i * 3 + 1)) % 15, 1, 2);
+    if (ch === "~") return drawWater(r, x, y, h);
+    FLOORS[floorKind(x, y)](r, h, x, y);
+    if (ch === ":") { r("#a59f90", 5, 4, 14, 10); r("#cfc9bb", 6, 5, 12, 8); r("#a59f90", 14, 18, 14, 10); r("#cfc9bb", 15, 19, 12, 8); }
+    if ("_Y".includes(ch)) drawRug(r, x, y);
+    // an open zone is a floor patch with a soft edge, not a walled room
+    const room = roomAt(x, y);
+    if (OPEN_ZONES.includes(room)) {
+      const out = (dx, dy) => roomAt(x + dx, y + dy) !== room;
+      if (out(0, -1)) { r("rgba(60,45,30,.35)", 0, 0, 32, 2); r("rgba(255,255,255,.35)", 0, 2, 32, 1); }
+      if (out(0, 1)) r("rgba(60,45,30,.35)", 0, 30, 32, 2);
+      if (out(-1, 0)) { r("rgba(60,45,30,.35)", 0, 0, 2, 32); r("rgba(255,255,255,.35)", 2, 0, 1, 32); }
+      if (out(1, 0)) r("rgba(60,45,30,.35)", 30, 0, 2, 32);
     }
   }
   function drawRug(r, x, y) {
-    const rug = (dx, dy) => "_YV".includes(tileAt(x + dx, y + dy));
-    r("#a33f4f", 0, 0, 16, 16);
-    for (let i = 2; i < 16; i += 4) r("#b8566a", i, (i + y * 3) % 16, 2, 2);
-    if (!rug(0, -1)) { r("#e0c070", 0, 1, 16, 1); r("#7d2c3a", 0, 0, 16, 1); }
-    if (!rug(0, 1)) { r("#e0c070", 0, 14, 16, 1); r("#7d2c3a", 0, 15, 16, 1); }
-    if (!rug(-1, 0)) { r("#e0c070", 1, 0, 1, 16); r("#7d2c3a", 0, 0, 1, 16); }
-    if (!rug(1, 0)) { r("#e0c070", 14, 0, 1, 16); r("#7d2c3a", 15, 0, 1, 16); }
+    const rug = (dx, dy) => "_Y".includes(tileAt(x + dx, y + dy));
+    r("#4f7f86", 0, 0, 32, 32);
+    for (let i = 0; i < 32; i += 8) for (let j = 0; j < 32; j += 8) { r("#5d9098", j + 2, i + 3, 4, 2); r("#5d9098", j + 3, i + 2, 2, 4); }
+    if (!rug(0, -1)) { r("#2f5459", 0, 0, 32, 2); r("#e8d3a0", 0, 4, 32, 2); }
+    if (!rug(0, 1)) { r("#e8d3a0", 0, 26, 32, 2); r("#2f5459", 0, 30, 32, 2); }
+    if (!rug(-1, 0)) { r("#2f5459", 0, 0, 2, 32); r("#e8d3a0", 4, 0, 2, 32); }
+    if (!rug(1, 0)) { r("#e8d3a0", 26, 0, 2, 32); r("#2f5459", 30, 0, 2, 32); }
   }
-  function drawWater(g, x, y) {
-    const r = painter(g, x, y), h = tileHash(x, y), wet = (dx, dy) => tileAt(x + dx, y + dy) === "~";
-    r("#3a9ad3", 0, 0, 16, 16);
-    r("#5bb5e3", 0, 8, 16, 8);
-    for (let i = 0; i < 3; i++) r("#9adcf5", (h >>> (i * 5)) % 12, (h >>> (i * 5 + 2)) % 14 + 1, 3, 1);
-    if (!wet(0, -1)) { r("#eef0f1", 0, 0, 16, 3); r("#2b78ad", 0, 3, 16, 2); }
-    if (!wet(0, 1)) r("#eef0f1", 0, 14, 16, 2);
-    if (!wet(-1, 0)) { r("#eef0f1", 0, 0, 2, 16); r("#2b78ad", 2, 3, 1, 13); }
-    if (!wet(1, 0)) r("#eef0f1", 14, 0, 2, 16);
+  function drawWater(r, x, y, h) {
+    const wet = (dx, dy) => tileAt(x + dx, y + dy) === "~";
+    r("#3d9fd8", 0, 0, 32, 32);
+    for (let i = 0; i < 4; i++) { const wx = (h >>> i * 5) % 24, wy = (h >>> i * 5 + 2) % 28 + 2; r("#a6e1f7", wx, wy, 6, 1); r("#a6e1f7", wx + 2, wy - 1, 2, 1); }
+    if (!wet(0, -1)) { r("#2d7fb3", 0, 0, 32, 6); r("#f1efe9", 0, 0, 32, 4); r("#c9c3b5", 0, 4, 32, 1); }
+    if (!wet(0, 1)) { r("#f1efe9", 0, 28, 32, 4); r("#c9c3b5", 0, 31, 32, 1); }
+    if (!wet(-1, 0)) { r("#2d7fb3", 4, 0, 3, 32); r("#f1efe9", 0, 0, 4, 32); }
+    if (!wet(1, 0)) { r("#f1efe9", 28, 0, 4, 32); r("#c9c3b5", 31, 0, 1, 32); }
   }
-  const FACE = {meeting: "#8ea3c6", lab: "#d3e0e6", workshop: "#9a5c45", library: "#4d6a4b", office: "#cbbfa6",
-    lounge: "#e3c58f", pool: "#c78d6a", hall: "#a9a398"};
-  function drawWall(g, x, y, ch) {
-    const r = painter(g, x, y), below = tileAt(x, y + 1), same = dx => tileAt(x + dx, y) === ch;
-    r("#2e323d", 0, 0, 16, 16);
-    if (y + 1 >= MAP_H || WALLS.includes(below)) { r("#3a3f4c", 0, 0, 16, 1); return; }
-    const room = roomAt(x, y + 1) || "hall", face = FACE[room];
-    r(face, 0, 4, 16, 12); r("rgba(255,255,255,.22)", 0, 4, 16, 1); r("rgba(0,0,0,.28)", 0, 14, 16, 2);
-    if (room === "workshop" || room === "pool") for (let i = 0; i < 3; i++) {
-      r("rgba(0,0,0,.18)", 0, 7 + i * 3, 16, 1);
-      r("rgba(0,0,0,.18)", (i % 2) * 4 + 3, 8 + i * 3 - 3, 1, 3); r("rgba(0,0,0,.18)", (i % 2) * 4 + 11, 8 + i * 3 - 3, 1, 3);
-    }
-    if (room === "library") for (let i = 2; i < 16; i += 5) r("rgba(0,0,0,.2)", i, 5, 1, 9);
-    if (ch === "W") {
-      r("#9aa0a8", 0, 5, 16, 9); r("#f4f6f8", same(-1) ? 0 : 1, 6, 16 - (same(-1) ? 0 : 1) - (same(1) ? 0 : 1), 7);
-      if (!same(-1)) r("#9aa0a8", 0, 5, 1, 9);
-      const hh = tileHash(x, y);
-      r(hh % 2 ? "#3c7bd1" : "#e2463e", 3, 8, 6 + hh % 5, 1); r("#3c7bd1", 2, 10, 4 + (hh >>> 3) % 8, 1);
-      if (!same(1)) r("#d0d4da", 10, 13, 5, 1);
-    } else if (ch === "N") {
-      r("#eef0f1", 1, 5, 14, 9); r("#9ed3ef", 2, 6, 12, 7); r("#c6e8f8", 3, 7, 3, 2); r("#eef0f1", 7, 6, 1, 7); r("#d8dcdf", 1, 13, 14, 1);
+  // walls in 3/4 view: a dark cap, and a face where the floor below can see it
+  const FACE = {meeting: "#c9d3e8", library: "#6f5238", workshop: "#a8735a", hall: "#e9e2d2"};
+  function drawWall(r, x, y, ch, h) {
+    const wall = (dx, dy) => WALLS.includes(tileAt(x + dx, y + dy)) || x + dx < 0 || x + dx >= MAP_W || y + dy >= MAP_H;
+    const face = !wall(0, 1), capH = face ? 10 : 32;
+    r("#535a73", 0, 0, 32, capH);
+    if (!wall(-1, 0)) r("#3a3f52", 0, 0, 3, capH);
+    if (!wall(1, 0)) r("#3a3f52", 29, 0, 3, capH);
+    if (y === 0 || !wall(0, -1)) { r("#3a3f52", 0, 0, 32, 2); r("#68708c", 0, 2, 32, 1); }
+    if (!face) { if (!wall(0, 1)) r("#3a3f52", 0, 29, 32, 3); return; }
+    const room = roomAt(x, y + 1) || roomAt(x, y + 2) || "hall", same = dx => tileAt(x + dx, y) === ch;
+    r(FACE[room] || FACE.hall, 0, 10, 32, 22); r("rgba(255,255,255,.3)", 0, 10, 32, 1); r("rgba(0,0,0,.25)", 0, 29, 32, 3);
+    if (ch === "N") {
+      r(O, 4, 12, 24, 16); r("#f4f2ec", 5, 13, 22, 14); r("#8fd0ee", 7, 15, 18, 10); r("#b5e3f6", 7, 15, 18, 3);
+      r("#f4f2ec", 15, 15, 2, 10); r("#e6f6fc", 9, 21, 1, 3); r("#e6f6fc", 10, 18, 1, 3); r("#d8d2c4", 3, 27, 26, 2);
+    } else if (ch === "W") {
+      const a = same(-1) ? 0 : 3, b = same(1) ? 32 : 29;
+      r(O, a, 12, b - a, 15); r("#c4c8d0", a, 12, b - a, 15); r("#fbfbf9", a + (same(-1) ? 0 : 1), 13, b - a - (same(-1) ? 0 : 1) - (same(1) ? 0 : 1), 12);
+      r(h % 2 ? "#3c7bd1" : "#e2463e", 6, 16, 6 + h % 14, 1); r("#3c7bd1", 5, 19, 4 + (h >>> 3) % 16, 1); r("#5db35a", 8, 22, 3 + (h >>> 6) % 9, 1);
+      r("#8b919d", a, 26, b - a, 2);
     } else if (ch === "Q") {
-      r("#c39a63", 0, 5, 16, 9);
-      for (let i = 1; i < 16; i += 3) for (let j = 6; j < 14; j += 3) r("#a47e4d", i, j);
+      r(O, 0, 12, 32, 16); r("#c9a26b", 0, 13, 32, 14);
+      for (let i = 2; i < 32; i += 4) for (let j = 15; j < 27; j += 4) r("#a9824f", i, j);
       const k = x % 4;
-      if (k === 0) { r("#5f636c", 3, 6, 1, 6); r("#5f636c", 1, 6, 5, 2); }
-      if (k === 1) { r("#5f636c", 6, 6, 2, 7); r("#5f636c", 5, 6, 4, 2); }
-      if (k === 2) { r("#b8bcc4", 2, 7, 10, 3); r("#7d5332", 12, 7, 3, 3); }
-      if (k === 3) { r("#e2463e", 4, 6, 2, 4); r("#5f636c", 4, 10, 2, 3); r("#5f636c", 9, 7, 1, 6); }
-    } else if (ch === "=") {
-      r("#a87a4e", 0, 5, 16, 8); r("#8a613b", same(-1) ? 0 : 0, 5, 1, 8); r("#8a613b", 8, 5, 1, 8);
-      r("#e0c99d", 6, 9, 1, 1); r("#e0c99d", 10, 9, 1, 1); r("#7a5434", 0, 12, 16, 1);
+      if (k === 0) { r(O, 5, 14, 3, 11); r("#7d5332", 6, 17, 1, 8); r("#8b919d", 3, 14, 7, 3); }
+      if (k === 1) { r("#8b919d", 6, 15, 3, 10); r("#8b919d", 4, 15, 7, 3); r("#e2463e", 19, 15, 3, 6); r("#4c5160", 20, 21, 1, 5); }
+      if (k === 2) { r("#c4c8d0", 4, 16, 18, 5); r(O, 4, 21, 18, 1); r("#7d5332", 22, 15, 6, 7); }
+      if (k === 3) { r("#4c5160", 6, 15, 2, 10); r("#4c5160", 11, 15, 2, 10); r("#f6d04b", 18, 16, 8, 8); r(O, 18, 24, 8, 1); }
+    } else if (room === "library") {
+      for (let s = 0; s < 2; s++) {
+        let bx = 1;
+        for (let i = 0; bx < 31; i++) {
+          const bh = hashStr(x + ":" + s + ":" + i), w = 2 + bh % 2;
+          r(["#9a2c2c", "#3c7bd1", "#347a3b", "#cf982b", "#7d4f9e", "#c4c8d0", "#b0603a"][bh % 7], bx, 12 + s * 9 + bh % 2, Math.min(w, 31 - bx), 7 - bh % 2);
+          bx += w;
+        }
+        r("#4a2f1c", 0, 19 + s * 9, 32, 2);
+      }
+    } else if (h % 4 === 0) {  // a framed picture
+      r(O, 9, 13, 14, 11); r("#e8d3a0", 10, 14, 12, 9); r("#8fd0ee", 11, 15, 10, 4); r("#5db35a", 11, 19, 10, 3); r("#f6d04b", 17, 16, 2, 2);
+    } else if (h % 4 === 1 && room === "hall") {  // a shelf with a pot
+      r(O, 6, 20, 20, 3); r("#9c6a3a", 7, 21, 18, 1); r("#b8643a", 10, 15, 6, 5); r("#5db35a", 9, 12, 8, 4); r("#3c7bd1", 19, 15, 3, 5);
     }
   }
+  function drawDoor(r, x, y, ch) {
+    const wallish = (dx, dy) => "#WNQ+E".includes(tileAt(x + dx, y + dy));
+    if (ch === "E" || wallish(0, -1) && wallish(0, 1)) {  // in a side wall: posts above and below, and a mat
+      r("#3a3f52", 0, 0, 32, 4); r("#3a3f52", 0, 28, 32, 4);
+      if (ch === "E") { r(O, 6, 7, 22, 18); r("#a8443c", 7, 8, 20, 16); r("#c45a4f", 9, 10, 16, 12); r("#e0c070", 11, 15, 12, 2); }
+      else { r("rgba(160,210,235,.35)", 0, 4, 32, 24); r("#8a6a4a", 10, 8, 14, 16); }
+    } else if (wallish(-1, 0) && wallish(1, 0)) {  // a wide doorway in a front wall
+      r("rgba(0,0,0,.16)", 0, 0, 32, 8);
+      if (!"+".includes(tileAt(x - 1, y))) { r("#6b4a2f", 0, 0, 4, 32); r(O, 4, 0, 1, 32); }
+      if (!"+".includes(tileAt(x + 1, y))) { r("#6b4a2f", 28, 0, 4, 32); r(O, 27, 0, 1, 32); }
+      r("#b08a5c", 0, 28, 32, 3);
+    }
+  }
+  // a top joined with its neighbours into one counter or table: outline on the outer edges, a front face under the last row
+  function slab(r, same, top, hi, face, fh) {
+    const L = same(-1, 0), Rt = same(1, 0), U = same(0, -1), D = same(0, 1);
+    const x0 = L ? 0 : 2, x1 = Rt ? 32 : 30, y0 = U ? 0 : 6, y1 = D ? 32 : 30 - fh, ox = L ? 0 : x0 - 1, oy = U ? 0 : y0 - 1;
+    r(O, ox, oy, (Rt ? 32 : x1 + 1) - ox, (D ? 32 : 31) - oy);
+    r(top, x0, y0, x1 - x0, y1 - y0);
+    if (!U) r(hi, x0, y0, x1 - x0, 1);
+    if (!D) { r(face, x0, y1, x1 - x0, fh); r("rgba(0,0,0,.2)", x0, y1, x1 - x0, 1); }
+  }
+  const RUNS = ["KMZ"];  // letters that join into one counter
+  const GLASS = ["#5db35a", "#3c7bd1", "#e2463e", "#f6d04b"];
   function drawThing(g, x, y) {
-    const ch = tileAt(x, y), r = painter(g, x, y), h = tileHash(x, y), same = (dx, dy) => tileAt(x + dx, y + dy) === ch;
-    if (WALLS.includes(ch)) return drawWall(g, x, y, ch);
-    if (ch === "+") {
-      r("rgba(0,0,0,.25)", 0, 0, 16, 2); r("#5a3d27", 0, 0, 2, 16); r("#5a3d27", 14, 0, 2, 16); r("#d7b98a", 2, 14, 12, 2);
+    const ch = tileAt(x, y), r = painter(g, x, y), h = tileHash(x, y), grp = c => RUNS.find(s => s.includes(c)) || c;
+    const same = (dx, dy) => grp(tileAt(x + dx, y + dy)) === grp(ch), at = (dx, dy) => tileAt(x + dx, y + dy);
+    if (WALLS.includes(ch)) return drawWall(r, x, y, ch, h);
+    if (ch === "+" || ch === "E") return drawDoor(r, x, y, ch);
+    if (ch === "*") {  // an empty chair at a desk or table
+      const side = [[0, 1], [0, -1], [1, 0], [-1, 0]].find(([dx, dy]) => "DTR".includes(at(dx, dy)));
+      if (!side) return;
+      const wood = at(side[0], side[1]) !== "D", c1 = wood ? "#8a5a35" : "#3a3f4c", c2 = wood ? "#a8744a" : "#4f566a";
+      r.box(c1, 9, 12, 14, 12); r(c2, 10, 13, 12, 3);
+      if (side[1] === 1) r.box(c1, 9, 4, 14, 6);
+      if (side[1] === -1) r.box(c1, 9, 25, 14, 5);
+      if (side[0] === 1) r.box(c1, 4, 8, 4, 18);
+      if (side[0] === -1) r.box(c1, 24, 8, 4, 18);
       return;
     }
-    if (ch === "E") { r("#5a3d27", 0, 0, 16, 2); r("#5a3d27", 0, 14, 16, 2); r("#a8443c", 3, 3, 11, 10); r("#c45a4f", 4, 4, 9, 8); r("#e0c070", 5, 7, 7, 2); return; }
     switch (ch) {
       case "P":
-        r("#2f6b33", 3, 2, 10, 8); r("#3f8a40", 4, 1, 8, 7); r("#5cad55", 5, 2, 3, 3); r("#5cad55", 9, 4, 2, 2);
-        r("#8d4b2c", 4, 10, 8, 5); r("#b0603a", 4, 10, 8, 1); r("#6e3a22", 5, 15, 6, 1);
+        r.blob([[7, 6, 18, 14], [11, -2, 10, 10], [3, 10, 9, 7], [20, 10, 9, 7]], "#2f7a3a", "#3f9a46", "#7fd07a");
+        r.box("#b8643a", 10, 20, 12, 10); r("#d07a4a", 10, 20, 12, 2); r("#8f4a29", 10, 28, 12, 2);
         break;
-      case "T": case "R": {
-        const top = ch === "T" ? "#8a5a35" : "#a4703f", edge = ch === "T" ? "#5e3c22" : "#6f4a28";
-        r(top, 0, 0, 16, 16);
-        if (!same(0, -1)) r(edge, 0, 0, 16, 1);
-        if (!same(0, 1)) { r(edge, 0, 13, 16, 3); r("rgba(0,0,0,.2)", 0, 15, 16, 1); }
-        if (!same(-1, 0)) r(edge, 0, 0, 1, 16);
-        if (!same(1, 0)) r(edge, 15, 0, 1, 16);
-        if (h % 3 === 0) { r("#f1e9d2", 4, 4, 6, 7); r("#c4c8d0", 5, 6, 4, 1); r("#c4c8d0", 5, 8, 3, 1); }
-        if (h % 3 === 1 && ch === "T") { r("#4c5160", 4, 5, 8, 5); r("#a3dcff", 5, 6, 6, 3); }
-        if (h % 3 === 1 && ch === "R") { r("#3c7bd1", 3, 4, 5, 7); r("#f1e9d2", 8, 4, 5, 7); r("#9a2c2c", 7, 4, 1, 7); }
+      case "i":
+        r("rgba(255,226,140,.18)", 2, 6, 28, 24);
+        r.box("#4c5160", 15, 6, 2, 20); r.box("#4c5160", 10, 26, 12, 3); r.box("#f3d27a", 8, -4, 16, 11); r("#fbe7a8", 9, -3, 14, 3);
         break;
-      }
-      case "H":
-        r("#9aa3ad", 0, 0, 16, 16); r("#c7ccd3", 1, 0, 14, 15); r("#8fc7de", 2, 2, 12, 7); r("#c8ecf7", 3, 3, 3, 2);
-        r("#5db35a", 7 + (x % 2) * 2, 5, 3, 3); r("#e2e5e9", 2, 10, 12, 4); r("#8b919d", 7, 11, 2, 1);
+      case "U":
+        r.box("#e3e6ea", 9, 12, 14, 17); r("#c8ccd2", 9, 26, 14, 3); r.box("#8fd0f0", 11, -2, 10, 13); r("#c8ecf7", 12, 0, 3, 9);
+        r("#3c7bd1", 12, 17, 3, 2); r("#e2463e", 17, 17, 3, 2);
         break;
-      case "Z":
-        r("#9aa3ad", 0, 2, 16, 14); r("#e8ecef", 0, 2, 16, 6); r("#b8c0c8", 3, 3, 10, 4); r("#8b919d", 7, 1, 2, 3); r("#7d8794", 0, 8, 16, 8); r("#c4c8d0", 7, 11, 2, 1);
+      case "C":
+        r.box("#8b94a2", 7, -6, 18, 34); r("#a3abb7", 8, -5, 16, 2);
+        for (let i = 0; i < 3; i++) { r("#6d7684", 8, 4 + i * 10, 16, 1); r("#d8dcdf", 13, -1 + i * 10, 6, 2); }
         break;
-      case "G":
-        r("#6d7784", 0, 0, 16, 16); r("#b9dbe6", 1, 1, 14, 14);
-        for (let i = 0; i < 3; i++) { r("#6d7784", 1, 5 + i * 5, 14, 1); r(["#e2463e", "#5db35a", "#f6d04b"][(i + x) % 3], 3 + i * 3, 2 + i * 5, 2, 3); }
+      case "D":
+        slab(r, same, "#f1ede4", "#ffffff", "#bdb4a2", 6);
+        r.box("#2b2f3a", 7, 1, 18, 11); r(["#4f8fd6", "#3d8a6a", "#6a4fd6"][h % 3], 8, 2, 16, 8);
+        r("#c8e4ff", 10, 3, 6 + h % 6, 1); r("#c8e4ff", 10, 5, 4 + (h >>> 3) % 8, 1); r("#c8e4ff", 10, 7, 7, 1); r("#4c5160", 14, 12, 4, 2);
+        r.box("#dfe2e6", 7, 16, 14, 4); r("#b8bec6", 8, 17, 12, 1); r("#b8bec6", 8, 19, 12, 1); r.box("#dfe2e6", 24, 16, 3, 4);
+        if (h % 3 === 0) { r.box("#e2463e", 25, 8, 4, 5); r("#fbfaf5", 26, 9, 2, 1); }
         break;
-      case "L": {
-        r("#7f8a97", 0, 0, 16, 16); r("#eef2f4", 0, 2, 16, 7); r("#c3ccd3", 0, 8, 16, 1);
-        if (!same(-1, 0)) r("#5f6976", 0, 0, 1, 16);
-        if (!same(1, 0)) r("#5f6976", 15, 0, 1, 16);
-        r("#6c7683", 7, 10, 1, 6); r("#c4c8d0", 5, 12, 1, 1); r("#c4c8d0", 9, 12, 1, 1);
-        const kit = (x + y) % 3;
-        if (kit === 0) { r("#cfe8f0", 3, 1, 4, 6); r("#3c7bd1", 3, 4, 4, 3); r("#cfe8f0", 9, 2, 3, 5); r("#5db35a", 9, 4, 3, 3); }
-        if (kit === 1) { r("#4c5160", 5, 0, 3, 7); r("#2b2f3a", 4, 6, 7, 2); r("#c4c8d0", 7, 1, 3, 2); }
-        if (kit === 2) for (let i = 0; i < 4; i++) { r("#cfe8f0", 3 + i * 3, 1, 2, 6); r(["#e2463e", "#f6d04b", "#5db35a", "#a36fd6"][i], 3 + i * 3, 4, 2, 3); }
-        break;
-      }
-      case "B": {
-        r("#6d4a2c", 0, 0, 16, 16); r("#b9874f", 0, 1, 16, 8); r("#d3a46b", 0, 1, 16, 1);
-        if (!same(-1, 0)) r("#4e3420", 0, 0, 1, 16);
-        if (!same(1, 0)) r("#4e3420", 15, 0, 1, 16);
-        r("#5a3d24", 2, 11, 12, 1); r("#c4c8d0", 7, 12, 2, 1);
-        const kit = x % 3;
-        if (kit === 0) { r("#8b919d", 3, 2, 6, 4); r("#4c5160", 4, 3, 4, 2); }
-        if (kit === 1) { r("#d8dcdf", 2, 4, 10, 2); r("#7d5332", 12, 3, 3, 4); }
-        if (kit === 2) { r("#c0392b", 4, 2, 8, 5); r("#e2463e", 4, 2, 8, 1); r("#4c5160", 7, 3, 2, 1); }
-        break;
-      }
-      case "J":
-        r("#5f636c", 3, 13, 10, 3); r("#8b919d", 7, 2, 2, 11); r("#c0392b", 4, 1, 8, 5); r("#e2463e", 4, 1, 8, 1); r("#c4c8d0", 7, 6, 2, 3); r("#4c5160", 5, 10, 6, 2);
-        break;
-      case "X":
-        r("#7d5332", 1, 1, 14, 14); r("#b88a4a", 2, 2, 12, 12); r("#9c7038", 2, 5, 12, 1); r("#9c7038", 2, 10, 12, 1);
-        r("#7d5332", 2, 2, 2, 12); r("#7d5332", 12, 2, 2, 12);
+      case "T": case "R":
+        if (ch === "T") slab(r, same, "#9a6a42", "#b07e54", "#6e4a2c", 6);
+        else slab(r, same, "#b07c4a", "#c99462", "#7a5232", 6);
+        if (h % 4 === 0) { r.box("#f7f5ee", 8, 10, 10, 12); r("#c4c8d0", 10, 13, 6, 1); r("#c4c8d0", 10, 16, 5, 1); }
+        if (h % 4 === 1 && ch === "T") { r.box("#c4c8d0", 9, 10, 14, 9); r("#4c5160", 10, 11, 12, 5); r("#a3dcff", 11, 12, 6, 1); }
+        if (h % 4 === 1 && ch === "R") { r.box("#f1e9d2", 7, 10, 18, 11); r("#9a2c2c", 15, 10, 2, 11); r("#c4c8d0", 9, 13, 5, 1); r("#c4c8d0", 18, 13, 5, 1); }
+        if (h % 4 === 2) { r.box("#fbfaf5", 14, 12, 5, 5); r("#7d5332", 15, 13, 3, 1); }
         break;
       case "S": {
-        r("#4a2f1c", 0, 0, 16, 16); r("#5e3c24", 1, 0, 14, 15);
-        for (let s = 0; s < 3; s++) {
-          let bx = 1;
-          for (let i = 0; bx < 15; i++) {
-            const bh = hashStr(x + ":" + y + ":" + s + ":" + i), w = 1 + bh % 2;
-            r(["#9a2c2c", "#3c7bd1", "#347a3b", "#cf982b", "#7d4f9e", "#c4c8d0", "#b0603a"][bh % 7], bx, s * 5 + 1 + bh % 2, Math.min(w, 15 - bx), 4 - bh % 2);
-            bx += w;
-          }
-          r("#3a2414", 0, s * 5 + 5, 16, 1);
+        const U = same(0, -1), D = same(0, 1);
+        r(O, 0, 0, 23, 32); r("#5e3c24", 0, U ? 0 : 1, 22, D ? 32 : 30);
+        if (!U) r("#7a5233", 0, 1, 22, 2);
+        for (let i = 0; i < 9; i++) {
+          const bh = hashStr(x + ":" + y + ":" + i);
+          if (i % 3 === 2) { r("#4a2f1c", 0, 3 + i * 3, 22, 2); continue; }
+          r(["#9a2c2c", "#3c7bd1", "#347a3b", "#cf982b", "#7d4f9e", "#c4c8d0", "#b0603a"][bh % 7], 2, 3 + i * 3, 10 + bh % 9, 2);
         }
         break;
       }
-      case "i":
-        r("#4c5160", 7, 6, 2, 9); r("#4c5160", 5, 14, 6, 2); r("#f6d04b", 4, 1, 8, 5); r("#fbe79a", 5, 2, 6, 2);
-        break;
       case "h":
-        r("#5c2a2a", 2, 2, 12, 13); r("#8c3b3b", 3, 3, 10, 6); r("#a44c4c", 4, 9, 8, 4); r("#5c2a2a", 2, 8, 2, 7); r("#5c2a2a", 12, 8, 2, 7);
+        r.box("#7a3232", 5, 4, 22, 24); r("#5c2a2a", 5, 4, 22, 8); r("#8c3b3b", 6, 5, 20, 4);
+        r("#5c2a2a", 5, 12, 4, 16); r("#5c2a2a", 23, 12, 4, 16); r("#a44c4c", 9, 13, 14, 12); r("#bf6464", 10, 14, 12, 2);
         break;
-      case "D": {
-        r("#9d978a", 0, 3, 16, 13); r("#e2dccd", 0, 3, 16, 7); r("#c7c0b0", 0, 9, 16, 1);
-        if (!same(-1, 0)) r("#7d776b", 0, 3, 1, 13);
-        if (!same(1, 0)) r("#7d776b", 15, 3, 1, 13);
-        if (!same(-1, 0)) { r("#2b2f3a", 3, 0, 11, 7); r("#4b8bd6", 4, 1, 9, 5); r("#a3dcff", 5, 2, 5, 1); r("#a3dcff", 5, 4, 3, 1); r("#4c5160", 8, 7, 2, 2); }
-        else { r("#f1e9d2", 3, 4, 6, 4); r("#c4c8d0", 4, 5, 4, 1); r("#f7f5ee", 11, 4, 3, 3); r("#7d5332", 12, 5, 1, 1); }
+      case "H":
+        if (!same(0, -1)) {
+          r.box("#c7ccd3", 1, -8, 30, 38); r("#e2e5e9", 2, -7, 28, 3); r("#9fd3e6", 4, -2, 24, 22); r("#e8f6fb", 6, 0, 3, 14);
+          r.box("#d9eef5", 15, 10, 6, 8); r("#5db35a", 15, 14, 6, 4); r("#8b919d", 4, 20, 24, 2);
+        } else {
+          r.box("#9aa3ad", 1, 0, 30, 28); r("#b7bec7", 2, 1, 28, 3); r(O, 15, 5, 1, 22); r("#d8dcdf", 11, 13, 2, 4); r("#d8dcdf", 18, 13, 2, 4);
+        }
+        break;
+      case "G":
+        r.box("#6d7784", 3, -14, 26, 42); r("#cfe9f2", 5, -12, 22, 38);
+        for (let s = 0; s < 3; s++) {
+          r("#6d7784", 5, -2 + s * 12, 22, 2);
+          for (let i = 0; i < 3; i++) { r(O, 7 + i * 7, -9 + s * 12, 5, 7); r(GLASS[(i + s + x) % 4], 8 + i * 7, -8 + s * 12, 3, 6); }
+        }
+        r("#e8f6fb", 6, -11, 2, 30);
+        break;
+      case "L": {
+        slab(r, same, "#eef2f4", "#ffffff", "#7f8a97", 9);
+        r("#c4c8d0", 12, 24, 2, 2); r("#c4c8d0", 19, 24, 2, 2);
+        const kit = (x + y) % 3;
+        if (kit === 0) for (let i = 0; i < 2; i++) {
+          r.box("#d9eef5", 8 + i * 11, 4, 3, 5); r.box("#d9eef5", 6 + i * 11, 9, 7, 8); r(GLASS[(h >>> i) % 4], 6 + i * 11, 13, 7, 4);
+        }
+        if (kit === 1) { r.box("#4c5160", 13, 4, 4, 10); r.box("#2b2f3a", 9, 14, 13, 3); r.box("#c4c8d0", 11, 1, 7, 3); r.box("#a3dcff", 19, 10, 4, 2); }
+        if (kit === 2) {
+          for (let i = 0; i < 4; i++) { r.box("#d9eef5", 7 + i * 5, 3, 3, 10); r(GLASS[i], 7 + i * 5, 8, 3, 5); }
+          r.box("#9c6a3a", 5, 11, 22, 4);
+        }
         break;
       }
-      case "C":
-        r("#6d7784", 2, 0, 12, 16); r("#9aa1ab", 3, 1, 10, 14);
-        for (let i = 0; i < 3; i++) { r("#6d7784", 3, 5 + i * 5, 10, 1); r("#d8dcdf", 7, 2 + i * 5, 2, 1); }
+      case "Z": case "K": case "M": {
+        const kitchen = roomAt(x, y) === "lounge";
+        slab(r, same, kitchen ? "#e9e4da" : "#dfe3e7", "#fbf8f2", kitchen ? "#8a6544" : "#7f8a97", 11);
+        r("rgba(0,0,0,.15)", 4, 21, 11, 7); r("rgba(0,0,0,.15)", 17, 21, 11, 7); r("#e0c99d", 13, 24, 1, 2); r("#e0c99d", 18, 24, 1, 2);
+        if (ch === "Z") { r.box("#b8c0c8", 7, 8, 18, 8); r("#8fa0ad", 8, 9, 16, 6); r("#a6d4ea", 9, 10, 6, 2); r.box("#8b919d", 15, 3, 2, 5); }
+        if (ch === "M") {
+          r.box("#2b2b30", 8, -6, 16, 18); r("#4a4a52", 9, -5, 14, 4); r("#e2463e", 20, -4, 2, 2); r("#14141a", 11, 4, 10, 2);
+          r.box("#fbfaf5", 13, 7, 6, 5); r("#5b3820", 14, 8, 4, 1);
+        }
+        if (ch === "K" && h % 3 === 0) { r.box("#d8b47a", 6, 8, 13, 8); r.box("#e2463e", 9, 10, 3, 3); r("#5db35a", 14, 11, 3, 2); }
+        if (ch === "K" && h % 3 === 1) {
+          r.box("#f6d04b", 11, 6, 3, 3); r.box("#e2463e", 15, 5, 3, 3); r.box("#5db35a", 18, 6, 3, 3); r.box("#3c7bd1", 9, 9, 14, 5);
+        }
+        if (ch === "K" && h % 3 === 2) { r.box("#c4c8d0", 11, 3, 9, 11); r("#e6e9ee", 12, 4, 3, 8); r(O, 20, 6, 3, 1); r(O, 22, 6, 1, 5); }
         break;
-      case "U":
-        r("#d8dcdf", 4, 7, 8, 9); r("#b8bec5", 4, 15, 8, 1); r("#8fd0f0", 5, 0, 6, 7); r("#c8ecf7", 6, 1, 2, 4); r("#3c7bd1", 7, 10, 2, 1);
+      }
+      case "B":
+        slab(r, same, "#c49258", "#dcae74", "#7a5232", 8);
+        if (x % 3 === 0) { r.box("#5f636c", 6, 8, 10, 8); r("#8b919d", 7, 9, 8, 2); r.box("#d3a46b", 18, 10, 9, 5); }
+        if (x % 3 === 1) { r.box("#c4c8d0", 5, 11, 16, 5); r("#8b919d", 5, 15, 16, 1); r.box("#7d5332", 21, 10, 6, 7); }
+        if (x % 3 === 2) {
+          r.box("#c0392b", 7, 8, 18, 9); r("#e2463e", 8, 9, 16, 2); r("#4c5160", 14, 12, 4, 2);
+          r(O, 12, 4, 8, 1); r(O, 12, 4, 1, 4); r(O, 19, 4, 1, 4);
+        }
+        break;
+      case "J":
+        r("rgba(0,0,0,.15)", 5, 26, 24, 5);
+        r.box("#5f636c", 6, 24, 20, 5); r.box("#8b919d", 14, -6, 4, 30); r.box("#5f636c", 9, 14, 14, 3);
+        r.box("#c0392b", 7, -8, 18, 10); r("#e2463e", 8, -7, 16, 2); r.box("#c4c8d0", 15, 3, 2, 6);
+        break;
+      case "X":
+        r.box("#b88a4a", 3, 2, 26, 26); r("#7d5332", 3, 2, 26, 3); r("#7d5332", 3, 25, 26, 3); r("#7d5332", 3, 2, 3, 26); r("#7d5332", 26, 2, 3, 26);
+        r("#9c7038", 6, 10, 20, 1); r("#9c7038", 6, 17, 20, 1); r("#d3a46b", 7, 6, 18, 1);
         break;
       case "F":
-        r("#9aa3ad", 1, 0, 14, 16); r("#eef1f3", 2, 0, 12, 15); r("#9aa3ad", 2, 6, 12, 1); r("#8b919d", 11, 2, 1, 3); r("#8b919d", 11, 8, 1, 5);
-        r("#f6d04b", 4, 9, 2, 2); r("#e2463e", 6, 3, 2, 2);
+        r.box("#e6eaee", 3, -14, 26, 42); r("#ffffff", 4, -13, 24, 2); r(O, 3, 2, 26, 1);
+        r("#8b919d", 23, -9, 2, 8); r("#8b919d", 23, 6, 2, 12); r("#f6d04b", 7, 8, 3, 3); r("#e2463e", 11, -6, 3, 3); r("#3c7bd1", 8, -3, 4, 2);
         break;
-      case "K": case "M": case "O": {
-        r("#8a5f3a", 0, 0, 16, 16); r("#e2d8c2", 0, 1, 16, 7); r("#c9bea6", 0, 7, 16, 1);
-        r("#a8784a", 1, 9, 14, 6); r("#8a5f3a", 7, 9, 1, 6); r("#e0c99d", 5, 11, 1, 1); r("#e0c99d", 10, 11, 1, 1);
-        if (ch === "M") { r("#2b2b30", 3, 0, 10, 7); r("#4a4a52", 4, 1, 8, 2); r("#e2463e", 11, 1, 1, 1); r("#f7f5ee", 6, 4, 4, 3); r("#5b3820", 7, 4, 2, 1); }
-        if (ch === "O") { r("#2b2b30", 1, 1, 14, 7); for (const [cx, cy] of [[4, 3], [10, 3]]) { r("#5f636c", cx - 2, cy - 1, 4, 3); r("#e2463e", cx - 1, cy, 2, 1); } r("#2b2b30", 2, 9, 12, 6); r("#ff9830", 4, 11, 8, 2); }
-        if (ch === "K" && h % 3 === 0) { r("#d8b47a", 3, 2, 7, 4); r("#e2463e", 5, 3, 2, 2); }
-        if (ch === "K" && h % 3 === 1) { r("#3c7bd1", 9, 2, 4, 4); r("#a3dcff", 10, 2, 2, 1); }
+      case "I":
+        slab(r, same, "#d6d0c6", "#ebe7e0", "#5f6c7a", 9);
+        if (h % 3 === 0) { r.box("#fbfaf5", 8, 10, 5, 5); r.box("#e2463e", 18, 12, 5, 5); }
+        if (h % 3 === 1) { r.blob([[10, 5, 12, 8]], "#2f7a3a", "#3f9a46", "#7fd07a"); r.box("#fbfaf5", 11, 12, 10, 5); }
+        break;
+      case "Y":
+        slab(r, same, "#8a5a35", "#a8744a", "#5e3c22", 5);
+        if (x % 2) { r.box("#fbfaf5", 10, 11, 4, 4); r.box("#f6d04b", 18, 14, 4, 4); }
+        else { r.box("#2b2b30", 8, 12, 12, 5); r("#e2463e", 17, 13, 2, 2); r.box("#3c7bd1", 21, 9, 7, 9); }
+        break;
+      case "V": {
+        slab(r, same, "#6b4a2f", "#86603f", "#4e3420", 8);
+        const L = same(-1, 0), Rt = same(1, 0), a = L ? 0 : 3, b = Rt ? 32 : 29;
+        r(O, a, -8, b - a, 22); r("#1d1f26", a, -7, b - a, 20);
+        const ia = L ? 0 : a + 2, ib = Rt ? 32 : b - 2;
+        r("#6fc3ff", ia, -5, ib - ia, 9); r("#5db35a", ia, 4, ib - ia, 6); r("#347a3b", ia, 9, ib - ia, 1);
+        if (!L) { r("#f6d04b", 7, -3, 4, 4); r("#fbfaf5", 14, -2, 6, 2); }
+        if (!Rt) { r("#e2463e", 16, 0, 4, 4); r("#fbfaf5", 17, 1, 1, 1); }
+        if (L && Rt) { r("#fbfaf5", 6, -3, 8, 2); r("#7d5332", 20, 1, 3, 3); }
         break;
       }
-      case "I":
-        r("#5f6c7a", 0, 0, 16, 16); r("#d6d0c6", 0, 1, 16, 9); r("#ebe7e0", 0, 1, 16, 1); r("#4d5866", 0, 15, 16, 1);
-        if (!same(-1, 0)) r("#4d5866", 0, 0, 1, 16);
-        if (!same(1, 0)) r("#4d5866", 15, 0, 1, 16);
-        if (h % 2) { r("#f7f5ee", 5, 3, 5, 4); r("#5b3820", 6, 3, 3, 1); }
+      case "A":
+        r.box("#3b2766", 4, -14, 24, 44); r("#5a3b8c", 6, -12, 20, 40); r("#f6d04b", 6, -12, 20, 5); r("#e2463e", 9, -11, 14, 2);
+        r.box("#1d1f26", 8, -4, 16, 12); r("#2b2f6a", 9, -3, 14, 10); r("#7fe0ff", 13, -1, 6, 2); r("#7fe0ff", 12, 1, 8, 2); r("#5db35a", 14, 5, 4, 1);
+        r(O, 8, 11, 16, 1); r("#e2463e", 10, 14, 3, 3); r("#f6d04b", 16, 14, 3, 3); r(O, 20, 12, 1, 4); r("#2b1c4a", 6, 24, 20, 4);
         break;
       case "c": {
-        r("#2c5e63", 0, 0, 16, 16); r("#3d8086", 0, 1, 16, 6); r("#4c9aa0", 0, 7, 16, 7); r("#5fb1b6", 0, 7, 16, 1); r("#245055", 0, 14, 16, 2);
-        if (same(-1, 0)) r("#2c5e63", 0, 2, 1, 12); else { r("#245055", 0, 1, 4, 15); r("#3d8086", 1, 5, 2, 8); }
-        if (!same(1, 0)) { r("#245055", 12, 1, 4, 15); r("#3d8086", 13, 5, 2, 8); }
+        const c = (dx, dy) => at(dx, dy) === "c", up = c(0, -1), dn = c(0, 1), lf = c(-1, 0), rt = c(1, 0);
+        const backN = !up && (lf || rt), backW = !lf && (up || dn), armE = backN && !rt && !backW, armS = backW && !dn;
+        const x0 = lf ? 0 : 2, x1 = rt ? 32 : 30, y0 = up ? 0 : 2, y1 = dn ? 32 : 29;
+        r(O, lf ? 0 : 1, up ? 0 : 1, (rt ? 32 : 31) - (lf ? 0 : 1), (dn ? 32 : 30) - (up ? 0 : 1));
+        r("#3f6f7a", x0, y0, x1 - x0, y1 - y0);
+        if (backN) r("#4d818c", x0, y0, x1 - x0, 3);
+        if (backW) r("#4d818c", x0, y0, 3, y1 - y0);
+        const cx0 = backW ? x0 + 10 : x0, cy0 = backN ? y0 + 10 : y0, cx1 = armE ? x1 - 6 : x1, cy1 = armS ? y1 - 6 : y1 - 2;
+        r(O, cx0, cy0 - 1, cx1 - cx0, 1);
+        r("#5a8f9b", cx0, cy0, cx1 - cx0, cy1 - cy0); r("#74aab5", cx0 + 1, cy0 + 1, cx1 - cx0 - 2, 2);
+        if (lf && !backW) r("#3f6f7a", 0, cy0, 1, cy1 - cy0);
+        if (up && !backN) r("#3f6f7a", cx0, 0, cx1 - cx0, 1);
         break;
       }
       case "b":
-        r("#a8521f", 2, 4, 12, 11); r("#e07b39", 3, 3, 10, 10); r("#f29a5b", 4, 4, 4, 3); r("#a8521f", 3, 13, 10, 2);
-        break;
-      case "Y":
-        r("#5e3c22", 0, 3, 16, 10); r("#8a5a35", 0, 3, 16, 8);
-        if (!same(-1, 0)) r("#5e3c22", 0, 3, 1, 10);
-        if (!same(1, 0)) r("#5e3c22", 15, 3, 1, 10);
-        if (x % 3 === 0) { r("#f7f5ee", 6, 4, 3, 3); r("#5b3820", 7, 4, 1, 1); }
-        if (x % 3 === 1) { r("#3c7bd1", 3, 5, 7, 4); r("#e2463e", 4, 6, 3, 1); }
-        if (x % 3 === 2) { r("#2b2b30", 4, 5, 7, 3); r("#e2463e", 5, 6, 1, 1); r("#3c7bd1", 9, 6, 1, 1); }
-        break;
-      case "V":
-        r("#5e3c22", 0, 9, 16, 7); r("#7d5332", 0, 9, 16, 2);
-        if (!same(-1, 0)) r("#4a2f1c", 0, 9, 1, 7);
-        if (!same(1, 0)) r("#4a2f1c", 15, 9, 1, 7);
-        r("#1d1f26", same(-1, 0) ? 0 : 2, 2, 16 - (same(-1, 0) ? 0 : 2) - (same(1, 0) ? 0 : 2), 7); r("#6fc3ff", same(-1, 0) ? 0 : 2, 1, 16 - (same(-1, 0) ? 0 : 2) - (same(1, 0) ? 0 : 2), 1);
-        r("#3a3d47", 5, 4, 6, 1);
-        break;
-      case "A":
-        r("#3b2766", 2, 0, 12, 16); r("#5a3b8c", 3, 1, 10, 14); r("#f6d04b", 3, 1, 10, 2); r("#1d1f26", 4, 4, 8, 5); r("#7fe0ff", 5, 5, 6, 3);
-        r("#e2463e", 5, 10, 2, 2); r("#f6d04b", 9, 10, 2, 2); r("#2b1c4a", 3, 13, 10, 2);
+        r.blob([[5, 10, 22, 18], [8, 5, 16, 9]], "#a8521f", "#e07b39", "#f6b07a");
         break;
       case "j": case "l": {
-        const left = ch === "j", x0 = left ? 5 : 0, w = left ? 11 : 13;
-        r("rgba(0,0,0,.15)", x0 + 1, 13, w, 2);
-        r("#8b919d", x0, 3, w, 11);
-        r("#f2f2f2", x0 + (left ? 1 : 0), 4, w - 1, 9);
-        for (let i = x0 + (left ? 2 : 1); i < x0 + w - 1; i += 3) r("#3c7bd1", i, 4, 1, 9);
-        if (left) { r("#d8dcdf", 6, 4, 4, 9); r("#b8bec5", 6, 12, 4, 1); }
-        else { r("#6d7784", 11, 13, 2, 2); r("#6d7784", 1, 13, 1, 2); }
+        const left = ch === "j";
+        r("rgba(0,0,0,.15)", left ? 5 : 0, 27, left ? 27 : 28, 3);
+        r(O, left ? 3 : 0, 5, left ? 29 : 29, 23); r("#d9d2c3", left ? 4 : 0, 6, 28, 21); r("#f4f4f2", left ? 5 : 0, 8, left ? 27 : 26, 17);
+        for (let i = left ? 7 : 2; i < (left ? 32 : 26); i += 5) r("#7fb2e5", i, 8, 2, 17);
+        if (left) { r("rgba(0,0,0,.12)", 5, 8, 10, 17); r.box("#fbfaf5", 7, 11, 6, 11); }
+        else r("#8b919d", 24, 27, 3, 2);
         break;
       }
       case "@":
-        r("rgba(0,0,0,.18)", 1, 9, 14, 6);
-        r("#c4c8d0", 7, 6, 2, 9);
-        r("#e2463e", 1, 0, 14, 7); r("#f7f5ee", 4, 0, 3, 7); r("#f7f5ee", 10, 0, 3, 7); r("#9a2c2c", 1, 6, 14, 1);
+        r("rgba(0,0,0,.15)", -4, 18, 40, 10); r.box("#c4c8d0", 15, 0, 2, 28);
+        r(O, -3, -16, 38, 15);
+        for (let i = 0; i < 6; i++) r(i % 2 ? "#fbfaf5" : "#e2463e", -2 + i * 6, -15, 6, 13);
+        r("#9a2c2c", 13, -19, 6, 3);
         break;
       case "&":
-        r("#7d5332", 7, 6, 3, 10); r("#9c6a3a", 7, 8, 3, 1); r("#9c6a3a", 7, 12, 3, 1);
-        r("#347a3b", 1, 2, 14, 4); r("#5db35a", 3, 0, 10, 4); r("#5db35a", 0, 4, 4, 2); r("#5db35a", 12, 4, 4, 2); r("#7fd07a", 6, 1, 4, 1);
+        r("rgba(0,0,0,.18)", 3, 24, 26, 6);
+        r.box("#7d5332", 12, 14, 8, 15); r("#9c6a3a", 13, 15, 2, 13);
+        r.blob([[2, -6, 28, 22], [7, -14, 18, 12], [-2, 2, 10, 12], [24, 2, 10, 12]], "#2f7a3a", "#3f9a46", "#7fd07a");
         break;
       case "%":
-        r("#2f6b33", 0, 1, 16, 15); r("#3f8a40", 1, 0, 14, 12); r("#52a24f", 3, 2, 4, 3); r("#52a24f", 9, 5, 4, 3);
+        r.blob([[3, 8, 26, 20], [7, 3, 18, 10]], "#2f6b33", "#3f8a40", "#6cc068");
         break;
     }
   }
+  // zone names: soft pills on the floor, drawn on the backdrop; their boxes keep tags and bubbles off them
+  function roundBox(g, x, y, w, h) {
+    g.beginPath();
+    if (g.roundRect) g.roundRect(x, y, w, h, h / 2); else g.rect(x, y, w, h);
+    g.fill();
+  }
   function labels(g) {
-    const f = Math.round((8 + scale) * px / scale);
+    const u = px / scale, f = Math.round(12 * u), pad = Math.round(9 * u), hh = Math.round(20 * u);
     g.font = "600 " + f + "px system-ui, sans-serif";
     g.textBaseline = "middle";
-    const tag = (text, tx, ty) => {
-      const w = g.measureText(text).width + f;
-      g.fillStyle = "rgba(17,18,23,.72)";
-      g.fillRect(Math.round(tx * T * px + 2 * px), Math.round((ty * T + 5) * px), Math.ceil(w), Math.round(f * 1.5));
-      g.fillStyle = "#f0f0f0";
-      g.fillText(text, Math.round(tx * T * px + 2 * px + f / 2), Math.round((ty * T + 5) * px + f * 0.78));
-    };
-    for (const k of ROOM_KEYS) if (k !== "lounge") tag(ROOMS[k].name, ROOMS[k].x, ROOMS[k].y - 1);
-    tag("Kitchen", ROOMS.lounge.x, ROOMS.lounge.y - 1);
-    tag("Living room", KITCHEN_END + 1, ROOMS.lounge.y - 1);
+    labelBoxes = LABELS.map(([text, tx, ty]) => {
+      const w = Math.ceil(g.measureText(text).width) + pad * 2, X = Math.round(tx * T * px - w / 2), Y = Math.round(ty * T * px - hh / 2);
+      g.fillStyle = "rgba(255,255,255,.8)";
+      roundBox(g, X, Y, w, hh);
+      g.fillStyle = "#5d6470";
+      g.fillText(text, X + pad, Y + hh / 2 + Math.round(u));
+      return {x: X, y: Y, w, h: hh};
+    });
   }
 
-  // ---- sizing: an integer scale that fits the window, then the device pixel ratio on top ----
+  // ---- sizing: the largest integer scale that fits the window, then the device pixel ratio on top ----
   function resize() {
-    const avail = Math.max(LW, canvas.parentElement.clientWidth - 18);
-    scale = Math.max(1, Math.min(4, Math.floor(avail / LW)));
+    const wrap = canvas.parentElement, top = wrap.getBoundingClientRect().top + window.scrollY + 10;
+    const fit = Math.min((wrap.clientWidth - 18) / LW, (window.innerHeight - top - 10) / LH);
+    // below 1x whole art pixels no longer fit, so a small window gets a plain fit rather than a scrollbar
+    scale = fit >= 1 ? Math.min(4, Math.floor(fit)) : Math.max(0.25, fit);
     px = Math.max(1, Math.round(scale * (window.devicePixelRatio || 1)));
     canvas.width = LW * px;
     canvas.height = LH * px;
-    canvas.style.width = LW * scale + "px";
-    canvas.style.height = LH * scale + "px";
+    canvas.style.width = Math.round(LW * scale) + "px";
+    canvas.style.height = Math.round(LH * scale) + "px";
     backdrop.width = canvas.width;
     backdrop.height = canvas.height;
     const g = backdrop.getContext("2d");
@@ -743,10 +835,10 @@ function demoState(n, ts) {
         g.fillStyle = a.look.pal[ch] || PAL[ch];
         g.fillRect(x, y, 1, 1);
       }));
-      s = {c, ax: spec.ax};
+      s = {c, ax: spec.ax, lie: !!spec.lie, top: Math.max(0, spec.rows.findIndex(row => /[^.]/.test(row)))};
       sprites.set(key, s);
     }
-    return {c: s.c, ax: flip ? s.c.width - s.ax : s.ax, flip};
+    return {c: s.c, ax: flip ? s.c.width - s.ax : s.ax, flip, lie: s.lie, top: s.top};
   }
   function tileOf(a) { return a.path.length ? a.path[0] : [Math.round(a.x), Math.round(a.y)]; }
   function goTo(a, gx, gy) {
@@ -857,49 +949,65 @@ function demoState(n, ts) {
   }
   function place(a) {
     const f = frameOf(a), s = sprite(a, f.pose, f.frame, f.dir);
-    const x = Math.round(a.x * T + T / 2 - s.ax), y = Math.round(a.y * T + T - s.c.height);
-    return {f, s, x, y, w: s.c.width, h: s.c.height};
+    // feet stand 3 px above the tile's bottom edge; a lying sprite fills its tile
+    const x = Math.round(a.x * T + T / 2 - s.ax), y = Math.round(a.y * T + T - s.c.height + (s.lie ? 0 : 1));
+    return {f, s, x, y, w: s.c.width, h: s.c.height, top: y + s.top};
   }
 
-  // ---- drawing ----
+  // ---- drawing: boxes in device pixels; u is one CSS pixel ----
   function text(size, weight) { ctx.font = (weight || 500) + " " + Math.round(size * px / scale) + "px system-ui, sans-serif"; }
-  function pill(x, y, label, bg, fg, chip) {  // x is the centre, y the top, in logical pixels
-    text(9 + scale);
-    const tw = ctx.measureText(label).width, u = px, pad = 3 * u / scale * 2, cw = chip ? 6 * px / scale : 0;
-    const w = Math.ceil(tw + pad * 2 + cw), hgt = Math.round((12 + scale * 1.5) * px / scale);
-    const X = Math.max(0, Math.min(canvas.width - w, Math.round(x * px - w / 2))), Y = Math.round(y * px);
-    ctx.fillStyle = bg;
-    ctx.fillRect(X, Y, w, hgt);
-    if (chip) { ctx.fillStyle = chip; ctx.fillRect(X + pad * 0.6, Y + hgt / 2 - cw / 2, cw, cw); }
-    ctx.fillStyle = fg;
-    ctx.textBaseline = "middle";
-    ctx.fillText(label, X + pad + cw, Y + hgt / 2 + px / scale);
-    return {x: X, y: Y, w, h: hgt};
+  // boxes keep a 2 px gap, which also covers the bubbles' 1 px outline
+  function hits(b, list) {
+    const m = 2 * Math.max(1, Math.round(px / scale));
+    return list.some(o => o.x < b.x + b.w + m && b.x < o.x + o.w + m && o.y < b.y + b.h + m && b.y < o.y + o.h + m);
   }
-  function bubble(cx, bottom, mark, note, colour, taken, dots) {  // a pixel speech bubble above a head
-    text(10 + scale, 700);
-    const label = note ? mark + " " + note : mark, u = Math.max(1, Math.round(px / scale));
-    const w = dots ? 13 * u : Math.ceil(ctx.measureText(label).width + 8 * u), hgt = dots ? 7 * u : Math.round((13 + scale) * u);
-    const X = Math.round(cx * px - w / 2);
-    const Y0 = Math.round(bottom * px - hgt - 3 * u);
-    let Y = Y0;
-    while (taken.some(b => b.x < X + w + 2 * u && X < b.x + b.w + 2 * u && b.y < Y + hgt + 2 * u && Y < b.y + b.h + 2 * u)) Y -= hgt + 3 * u;
-    taken.push({x: X, y: Y, w, h: hgt});
-    ctx.fillStyle = "#241c2c";
-    ctx.fillRect(X - u, Y - u, w + 2 * u, hgt + 2 * u);
-    ctx.fillRect(Math.round(cx * px) - 2 * u, Y + hgt, 4 * u, 3 * u + Y0 - Y);
+  function fits(b) { return b.x >= 0 && b.y >= 0 && b.x + b.w <= canvas.width && b.y + b.h <= canvas.height; }
+  // the first candidate box that stays on the canvas and clear of everything taken
+  function pick(cands, taken) { return cands.find(b => fits(b) && !hits(b, taken)); }
+  // a small dark pill centred above the head; if that spot is taken it stacks upward, then tries under the feet
+  function tagBoxes(cx, top, bottom, label) {
+    text(11, 600);
+    const u = px / scale, w = Math.ceil(ctx.measureText(label).width + 22 * u), hh = Math.round(16 * u);
+    const X = Math.round(Math.max(0, Math.min(canvas.width - w, cx * px - w / 2))), Y = Math.round(top * px - hh - 3 * u);
+    return [Y, Y - hh - 2 * u, Y - 2 * hh - 4 * u, Math.round(bottom * px + 2 * u)].map(y => ({x: X, y: Math.round(y), w, h: hh}));
+  }
+  function drawTag(b, label, chip, hot) {
+    const u = px / scale;
+    ctx.fillStyle = hot ? "rgba(224,123,0,.95)" : "rgba(24,22,32,.84)";
+    roundBox(ctx, b.x, b.y, b.w, b.h);
+    if (chip) { ctx.fillStyle = chip; ctx.beginPath(); ctx.arc(b.x + 8 * u, b.y + b.h / 2, 3 * u, 0, 7); ctx.fill(); }
+    text(11, 600);
+    ctx.fillStyle = "#f4f4f6";
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, b.x + (chip ? 14 : 8) * u, b.y + b.h / 2 + u / 2);
+  }
+  // a pixel speech bubble beside the head: right or left, then one step up, one down, two up; the box includes its tail
+  function bubbleBoxes(cx, top, label, dots) {
+    text(12, 700);
+    const u = Math.max(1, Math.round(px / scale)), w = dots ? 17 * u : Math.ceil(ctx.measureText(label).width + 12 * u), hh = 17 * u;
+    const right = Math.round((cx + 10) * px), left = Math.round((cx - 10) * px - w), y0 = Math.round((top + 1) * px - hh);
+    const out = [];
+    for (const k of [0, 1, -1, 2]) for (const [x, side] of [[right, 0], [left, 1]]) out.push({x, y: y0 - k * (hh + 6 * u), w, h: hh + 3 * u, side});
+    return out;
+  }
+  function drawBubble(b, mark, note, colour, dots) {
+    const u = Math.max(1, Math.round(px / scale)), h = b.h - 3 * u, tx = b.side ? b.x + b.w - 6 * u : b.x + 3 * u;
+    ctx.fillStyle = "#2a2233";
+    ctx.fillRect(b.x - u, b.y - u, b.w + 2 * u, h + 2 * u);
+    ctx.fillRect(tx - u, b.y + h, 5 * u, 3 * u);
     ctx.fillStyle = "#fbfaf6";
-    ctx.fillRect(X, Y, w, hgt);
-    ctx.fillRect(Math.round(cx * px) - u, Y + hgt, 2 * u, 2 * u + Y0 - Y);
+    ctx.fillRect(b.x, b.y, b.w, h);
+    ctx.fillRect(tx, b.y + h - u, 3 * u, 3 * u);
     if (dots) {
       ctx.fillStyle = colour;
-      for (let i = 0; i < dots; i++) ctx.fillRect(X + (2 + i * 4) * u, Y + 3 * u, 2 * u, 2 * u);
+      for (let i = 0; i < dots; i++) ctx.fillRect(b.x + (3 + i * 4) * u, b.y + 7 * u, 3 * u, 3 * u);
       return;
     }
+    text(12, 700);
     ctx.textBaseline = "middle";
     ctx.fillStyle = colour;
-    ctx.fillText(mark, X + 4 * u, Y + hgt / 2 + u);
-    if (note) { ctx.fillStyle = "#241c2c"; ctx.fillText(" " + note, X + 4 * u + ctx.measureText(mark).width, Y + hgt / 2 + u); }
+    ctx.fillText(mark, b.x + 6 * u, b.y + h / 2 + u);
+    if (note) { ctx.fillStyle = "#2a2233"; ctx.fillText(" " + note, b.x + 6 * u + ctx.measureText(mark).width, b.y + h / 2 + u); }
   }
   function draw() {
     if (!backdrop.width) return;
@@ -908,8 +1016,8 @@ function demoState(n, ts) {
     const list = visible(), placed = list.map(a => [a, place(a)]);
     for (const [a, p] of placed) {
       if (a.id === highlight || a.id === hoverId) {
-        ctx.fillStyle = "rgba(255,152,48,.55)";
-        ctx.fillRect(Math.round((a.x * T + 2) * px), Math.round((a.y * T + 13) * px), 12 * px, 3 * px);
+        ctx.fillStyle = "rgba(255,152,48,.7)";
+        roundBox(ctx, Math.round((a.x * T + 4) * px), Math.round((a.y * T + 25) * px), 24 * px, 6 * px);
       }
       if (p.s.flip) {
         ctx.save();
@@ -919,36 +1027,40 @@ function demoState(n, ts) {
         ctx.restore();
       } else ctx.drawImage(p.s.c, p.x * px, p.y * px, p.w * px, p.h * px);
     }
-    // a name tag on everyone: idea and project on a lead, the role on an agent; nudged down when it would cover another
-    const boxes = [];
-    for (const [a] of placed.slice().sort((p, q) => (p[0].d.kind === "lead" ? 0 : 1) - (q[0].d.kind === "lead" ? 0 : 1))) {
-      if (a.leaving) continue;
-      const label = a.d.kind === "agent" ? a.d.role.slice(0, 20)
-        : (a.d.idea ? a.d.idea.slice(0, 18) + " · " : "") + (a.d.project || "?").slice(0, 12);
-      let y = a.y * T + T + 1, box;
-      for (let i = 0; i < 4; i++) {
-        text(9 + scale);
-        const w = ctx.measureText(label).width + 12 * px / scale, X = (a.x * T + T / 2) * px - w / 2, Y = y * px, H = (12 + scale * 1.5) * px / scale;
-        box = {x: X, y: Y, w, h: H};
-        if (!boxes.some(b => b.x < box.x + box.w && box.x < b.x + b.w && b.y < box.y + box.h && box.y < b.y + b.h)) break;
-        y += (13 + scale * 1.5) / scale;
-      }
-      boxes.push(pill(a.x * T + T / 2, y, label, a.id === highlight || a.id === hoverId ? "rgba(255,152,48,.92)" : "rgba(17,18,23,.78)", "#f2f2f2", a.look.pal.c));
-    }
+    // nothing drawn below may cover a zone label or another tag or bubble
+    const taken = labelBoxes.slice(), shown = placed.filter(([a]) => !a.leaving);
     // shortcut: a room shows only as many characters as it has spots and then a "+k" sign, add spots when rooms overflow often
     for (const [g, k] of overflow) {
       const s = SPOTS.filter(sp => spotGroup(sp) === g);
       if (!s.length) continue;
       const x = Math.max(...s.map(sp => sp.x)), y = Math.min(...s.map(sp => sp.y));
-      pill(x * T + T / 2, y * T - 12, "+" + k, "#ff9830", "#1d1f26");
+      const b = pick(tagBoxes(x * T + T / 2, y * T + 6, y * T + T, "+" + k), taken);
+      if (b) { drawTag(b, "+" + k, "", true); taken.push(b); }
     }
-    const taken = [];
-    for (const [a, p] of placed.slice().reverse()) {
-      if (a.leaving) continue;
-      const cx = a.x * T + T / 2 - (p.f.pose === "sunbathe" ? 8 : 0), top = p.y + (p.f.pose === "sunbathe" ? 3 : 4);
-      if (a.d.activity === "wait") bubble(cx, top, "!", a.d.note || "you", "#e07b00", taken);
-      else if (a.d.activity === "reply") bubble(cx, top, "?", "", "#3871dc", taken);
-      else if (wanders(a)) bubble(cx, top, "", "", "#241c2c", taken, still() ? 3 : 1 + tick % 3);
+    for (const [a, p] of shown) {
+      const cx = a.x * T + T / 2, wait = a.d.activity === "wait", reply = a.d.activity === "reply";
+      if (!wait && !reply) continue;
+      const note = wait ? a.d.note || "you" : "", cands = bubbleBoxes(cx, p.top, wait ? "! " + note : "?", 0);
+      // a bubble must stay readable: when the crowd leaves no clear spot, it may cover tags but never a label
+      const b = pick(cands, taken) || cands.find(c => fits(c) && !hits(c, labelBoxes)) || cands[0];
+      drawBubble(b, wait ? "!" : "?", note, wait ? "#e07b00" : "#3871dc");
+      taken.push(b);
+    }
+    // a name tag on everyone: idea and project on a lead, the role on an agent; one with no clear spot shows on hover or roster focus
+    const order = (a) => a.id === highlight || a.id === hoverId ? 0 : a.d.kind === "lead" ? 1 : 2;
+    for (const [a, p] of shown.slice().sort((m, n) => order(m[0]) - order(n[0]))) {
+      const hot = a.id === highlight || a.id === hoverId;
+      const label = a.d.kind === "agent" ? a.d.role.slice(0, 20)
+        : (a.d.idea ? a.d.idea.slice(0, 18) + " · " : "") + (a.d.project || "?").slice(0, 12);
+      const cands = tagBoxes(a.x * T + T / 2, p.top, p.y + p.h, label), b = pick(cands, taken) || (hot ? cands[0] : null);
+      if (!b) continue;
+      drawTag(b, label, a.look.pal.c, hot);
+      taken.push(b);
+    }
+    for (const [a, p] of shown) {
+      if (!wanders(a)) continue;  // the chief's talk dots are decoration: only where there is room
+      const b = pick(bubbleBoxes(a.x * T + T / 2, p.top, "", 1), taken);
+      if (b) { drawBubble(b, "", "", "#2a2233", still() ? 3 : 1 + tick % 3); taken.push(b); }
     }
   }
   function frame(ts) {
@@ -1024,7 +1136,7 @@ function demoState(n, ts) {
     for (const a of visible().reverse()) {
       if (a.leaving) continue;
       const p = place(a);
-      if (lx >= p.x && lx < p.x + p.w && ly >= p.y + 3 && ly < p.y + p.h) { hit = a; break; }
+      if (lx >= p.x && lx < p.x + p.w && ly >= p.top && ly < p.y + p.h) { hit = a; break; }
     }
     const id = hit ? hit.id : "";
     if (hit) {
