@@ -77,9 +77,9 @@ const ROOMS = {
 const ROOM_KEYS = Object.keys(ROOMS);
 const KITCHEN_END = 14;  // lounge rows up to here are the kitchen side
 const OPEN_ZONES = ["office", "lab", "workshop", "lounge"];  // drawn as a floor patch, with no walls
-// zone names float on the floor: [text, centre x, centre y] in tiles
-const LABELS = [["Meeting room", 5, 9.5], ["Library", 5, 11.5], ["Office", 14, 1.5], ["Lab", 22, 1.5],
-  ["Workshop", 14, 10.5], ["Kitchen", 22, 10.5], ["Living room", 23, 15.5], ["Pool", 31.5, 3.5]];
+// zone names sit inside their zone, on free floor: [text, centre x, centre y] in tiles
+const LABELS = [["Meeting room", 5, 6.5], ["Library", 5, 14.3], ["Office", 14, 7.5], ["Lab", 22, 6.5],
+  ["Workshop", 14, 14.25], ["Kitchen", 19, 13.3], ["Living room", 23, 15.5], ["Pool", 31.5, 4.5]];
 const WALK = ".+E*k,_:", SEATS = "cbl", WALLS = "#WNQ";
 
 function tileAt(x, y) { return (MAP[y] || "")[x] || "#"; }
@@ -394,7 +394,7 @@ function demoState(n, ts) {
   const actors = new Map(), sprites = new Map();
   let reduced = motion.matches, paused = false, scale = 1, px = 1, raf = 0, timer = 0, lastTs = 0, tick = 0;
   let highlight = "", hoverId = "", demoStep = 0, loaded = false, inflight = false, rosterKey = "", overflow = new Map();
-  let labelBoxes = [];
+  let labelBoxes = [], labelFont = "";
   const base = document.createElement("canvas");
   base.width = LW;
   base.height = LH;
@@ -782,7 +782,7 @@ function demoState(n, ts) {
         break;
     }
   }
-  // zone names: soft pills on the floor, drawn on the backdrop; their boxes keep tags and bubbles off them
+  // zone names: soft pills on the floor, drawn above the characters (draw()); their boxes keep tags and bubbles off them
   function roundBox(g, x, y, w, h) {
     g.beginPath();
     if (g.roundRect) g.roundRect(x, y, w, h, h / 2); else g.rect(x, y, w, h);
@@ -790,16 +790,22 @@ function demoState(n, ts) {
   }
   function labels(g) {
     const u = px / scale, f = Math.round(12 * u), pad = Math.round(9 * u), hh = Math.round(20 * u);
-    g.font = "600 " + f + "px system-ui, sans-serif";
-    g.textBaseline = "middle";
+    g.font = labelFont = "600 " + f + "px system-ui, sans-serif";
     labelBoxes = LABELS.map(([text, tx, ty]) => {
-      const w = Math.ceil(g.measureText(text).width) + pad * 2, X = Math.round(tx * T * px - w / 2), Y = Math.round(ty * T * px - hh / 2);
-      g.fillStyle = "rgba(255,255,255,.8)";
-      roundBox(g, X, Y, w, hh);
-      g.fillStyle = "#5d6470";
-      g.fillText(text, X + pad, Y + hh / 2 + Math.round(u));
-      return {x: X, y: Y, w, h: hh};
+      const w = Math.ceil(g.measureText(text).width) + pad * 2;
+      return {x: Math.round(tx * T * px - w / 2), y: Math.round(ty * T * px - hh / 2), w, h: hh, text, pad};
     });
+  }
+  function drawLabels() {
+    ctx.font = labelFont;
+    ctx.textBaseline = "middle";
+    const u = px / scale;
+    for (const b of labelBoxes) {
+      ctx.fillStyle = "rgba(255,255,255,.8)";
+      roundBox(ctx, b.x, b.y, b.w, b.h);
+      ctx.fillStyle = "#5d6470";
+      ctx.fillText(b.text, b.x + b.pad, b.y + b.h / 2 + Math.round(u));
+    }
   }
 
   // ---- sizing: the largest integer scale that fits the window, then the device pixel ratio on top ----
@@ -1027,6 +1033,7 @@ function demoState(n, ts) {
         ctx.restore();
       } else ctx.drawImage(p.s.c, p.x * px, p.y * px, p.w * px, p.h * px);
     }
+    drawLabels();
     // nothing drawn below may cover a zone label or another tag or bubble
     const taken = labelBoxes.slice(), shown = placed.filter(([a]) => !a.leaving);
     // shortcut: a room shows only as many characters as it has spots and then a "+k" sign, add spots when rooms overflow often
