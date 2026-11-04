@@ -1626,9 +1626,11 @@ function demoState(n, ts) {
     for (let k = 1; k < n; k++) { const sx = k * 64; a.shadow(sx - 12, 58, 24, 5); a("#3a3f4c", sx - 8, 52, 2, 10); a("#3a3f4c", sx + 6, 52, 2, 10); a("#5a6070", sx - 8, 57, 16, 1);
       a.box("#2f8a86", sx - 11, 46, 22, 6); a(ramp("#2f8a86")[3], sx - 10, 46, 20, 1); }
     a.drop(14, 26, 24); a.box("#e9e4da", 14, 18, 24, 8); a.box("#f28a2a", 16, 13, 7, 6); a.box("#5db35a", 23, 12, 7, 7); a.box("#e2463e", 29, 13, 7, 6); a("#f6d04b", 18, 11, 14, 2);
-    a.drop(W / 2 - 34, 26, 10); a.box("#e9f0f8", W / 2 - 34, 12, 10, 14); a.leaves([[W / 2 - 40, -4, 10, 12], [W / 2 - 32, -6, 10, 12]], "#4f9a4a");
-    for (const [fx, fy, fc] of [[W / 2 - 38, -2, "#e88aa8"], [W / 2 - 30, -4, "#f6d04b"], [W / 2 - 34, 2, "#fbfaf5"]]) a.box(fc, fx, fy, 4, 4);
-    a.drop(W / 2 + 10, 28, 26); a.box("#e9e4da", W / 2 + 10, 25, 26, 3); a(GLASS_EDGE, W / 2 + 12, 6, 22, 19); a(GLASS_IN, W / 2 + 13, 7, 20, 17); a("#e88aa8", W / 2 + 14, 15, 18, 9); a("#fbfaf5", W / 2 + 14, 14, 18, 2); a("#ffffff", W / 2 + 15, 8, 2, 8);
+    // tall things stand on the middle tile with no kitchen spot behind it, so nobody's feet meet them
+    const vx = 140, cx = 82;
+    a.drop(vx, 26, 10); a.box("#e9f0f8", vx, 12, 10, 14); a.leaves([[vx - 6, -4, 10, 12], [vx + 2, -6, 10, 12]], "#4f9a4a");
+    for (const [fx, fy, fc] of [[vx - 4, -2, "#e88aa8"], [vx + 4, -4, "#f6d04b"], [vx, 2, "#fbfaf5"]]) a.box(fc, fx, fy, 4, 4);
+    a.drop(cx, 28, 26); a.box("#e9e4da", cx, 25, 26, 3); a(GLASS_EDGE, cx + 2, 12, 22, 13); a(GLASS_IN, cx + 3, 13, 20, 11); a("#e88aa8", cx + 4, 17, 18, 7); a("#fbfaf5", cx + 4, 16, 18, 2); a("#ffffff", cx + 5, 14, 2, 6);
     for (const mx of [W - 50, W - 36]) { a.drop(mx, 26, 8); a.box(mx > W - 40 ? "#3c7bd1" : "#fbfaf5", mx, 18, 8, 8); a("#5b3820", mx + 1, 19, 6, 1); }
   }
   // the L-sofa, drawn whole from its corner: backs along the north and west, seat cushions, arms and pillows
