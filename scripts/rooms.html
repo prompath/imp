@@ -62,8 +62,8 @@ const MAP = [
   "#P........................+.@.~~~.@.",
   "E.........................+...~~~...",
   "#U.........QQQQQ..FKMKKZK.#jl.~~~.jl",
-  "######++##..*.*.J..k.k.k..#...~~~...",
-  "#.*...*..#.BBBB.X...IIII..#jl.~~~.jl",
+  "######++##..*.*.J..k...k..#...~~~...",
+  "#.*...*..#.BBBB.X...IIII.k#jl.~~~.jl",
   "#S.......#......+..k....k+#P...+...P",
   "#S.*RRR*.#..*..*Xi......PA#,,,,:,,,,",
   "#S..RRR..#.BBB.BB.ccccc...#&,,,,:,%,",
@@ -401,35 +401,41 @@ const HI_SIDE_SIT = [["p", 22, 68, 28, 8], ["P", 22, 74, 28, 2], ["z", 26, 69, 1
   ["f", 41, 86, 13, 5], ["F", 45, 86, 6, 1]];
 const HI_SIDE_REST = [["c", 28, 49, 8, 10], ["C", 28, 49, 2, 10], ["c", 31, 57, 10, 5], ["C", 31, 60, 10, 2], ["s", 40, 59, 6, 5], ["S", 40, 63, 6, 1]];
 const HI_SIDE_REACH = [["c", 28, 49, 8, 9], ["C", 28, 49, 2, 9], ["c", 32, 55, 14, 5], ["C", 32, 58, 14, 2], ["s", 45, 54, 6, 6], ["S", 45, 59, 6, 1]];
-// lying on a lounger, seen from above, in the 128 x 64 art px of its two tiles: the head on the backrest at the left,
-// face up with sunglasses, arms along the sides, trunks in the project colour, two legs to the foot end
+// lying face up on a lounger, seen from above: drawn upright like a standing figure (u across the body, v from the crown
+// to the feet) and then laid down by swapping the axes, so the crown is on the backrest, the chin points at the feet,
+// the eyes sit across the body and the light still comes from the top left. The head and hair are the standing ones,
+// less the bun, which is under the head
 const LIE_BODY = [
-  ["S", 32, 25, 6, 6],  // the neck
-  ["s", 37, 15, 6, 26], ["s", 36, 16, 8, 24], ["a", 37, 15, 5, 1], ["S", 36, 38, 8, 2],
-  ["s", 40, 20, 26, 17], ["a", 40, 20, 24, 1], ["S", 40, 34, 26, 3], ["S", 42, 28, 10, 1], ["S", 58, 27, 2, 2], ["S", 45, 22, 1, 4],
-  ["s", 40, 15, 23, 4], ["a", 40, 15, 23, 1], ["s", 63, 14, 6, 5], ["S", 66, 14, 3, 5],
-  ["s", 40, 38, 23, 4], ["S", 40, 41, 23, 1], ["s", 63, 38, 6, 5], ["S", 66, 38, 3, 5],
-  ["c", 64, 20, 15, 16], ["C", 64, 20, 2, 16], ["x", 67, 21, 8, 2], ["C", 64, 32, 15, 4], ["w", 67, 26, 1, 3], ["C", 73, 28, 6, 1],
-  ["s", 79, 20, 18, 8], ["s", 97, 21, 13, 6], ["a", 80, 20, 16, 1], ["S", 79, 26, 31, 1], ["S", 91, 22, 2, 3],
-  ["s", 79, 30, 18, 8], ["s", 97, 31, 13, 6], ["a", 80, 30, 16, 1], ["S", 79, 36, 31, 2], ["S", 91, 32, 2, 3],
-  ["s", 110, 19, 6, 9], ["a", 114, 20, 2, 7], ["s", 110, 29, 6, 9], ["a", 114, 30, 2, 7],
-  ["h", 13, 9, 18, 3], ["h", 11, 11, 22, 4], ["h", 10, 14, 24, 5], ["h", 9, 17, 3, 10], ["h", 32, 17, 3, 10],
-  ["j", 15, 10, 6, 2], ["j", 13, 12, 3, 3], ["H", 28, 12, 5, 6], ["H", 32, 20, 3, 7],
-  ["s", 12, 19, 20, 10], ["s", 13, 29, 18, 3], ["s", 15, 32, 14, 2], ["S", 29, 21, 3, 9], ["S", 16, 33, 12, 1],
-  ["h", 12, 17, 20, 2], ["H", 12, 19, 20, 1], ["s", 9, 23, 3, 4], ["s", 32, 23, 3, 4],
-  ["k", 13, 21, 8, 4], ["k", 23, 21, 8, 4], ["k", 21, 22, 2, 1], ["l", 14, 21, 2, 1], ["l", 24, 21, 2, 1],
-  ["S", 21, 26, 2, 2], ["q", 13, 26, 3, 2], ["q", 28, 26, 3, 2], ["m", 19, 29, 6, 1],
+  ["s", 28, 44, 8, 4],  // the neck, under the chin
+  // shoulders wider than the neck, tapering to the waist, the far side in shade; collarbones, chest and navel
+  ["s", 20, 47, 24, 1], ["s", 19, 48, 26, 7], ["s", 20, 55, 24, 5], ["s", 21, 60, 22, 5], ["s", 23, 65, 18, 7],
+  ["a", 20, 49, 2, 5], ["S", 41, 48, 4, 7], ["S", 40, 55, 4, 5], ["S", 39, 60, 4, 5], ["S", 37, 65, 4, 7],
+  ["S", 24, 50, 5, 1], ["S", 35, 50, 5, 1], ["S", 24, 58, 6, 1], ["S", 34, 58, 6, 1], ["S", 31, 66, 2, 2],
+  // arms: shoulder, upper arm, a bend at the elbow, the forearm in toward the hip and a rounded hand
+  ["s", 15, 49, 4, 5], ["s", 14, 54, 5, 10], ["s", 13, 64, 5, 3], ["s", 15, 67, 5, 4], ["s", 17, 71, 5, 4],
+  ["s", 19, 75, 3, 1], ["s", 18, 76, 5, 3], ["s", 19, 79, 3, 1], ["a", 14, 54, 1, 10], ["S", 18, 55, 1, 9], ["S", 19, 67, 1, 4], ["S", 21, 71, 1, 4],
+  ["s", 45, 49, 4, 5], ["s", 45, 54, 5, 10], ["s", 46, 64, 5, 3], ["s", 44, 67, 5, 4], ["s", 42, 71, 5, 4],
+  ["s", 42, 75, 3, 1], ["s", 41, 76, 5, 3], ["s", 42, 79, 3, 1], ["S", 48, 54, 2, 10], ["S", 49, 64, 2, 3], ["S", 47, 67, 2, 4], ["S", 45, 71, 2, 4], ["S", 44, 76, 2, 3],
+  // trunks in the project colour, split between the legs
+  ["c", 21, 72, 22, 10], ["x", 21, 72, 22, 1], ["C", 38, 73, 5, 9], ["C", 31, 76, 2, 6],
+  // legs: thighs, knees, shins narrowing to the ankles, then the feet turned up and out
+  ["s", 22, 82, 10, 13], ["s", 23, 95, 9, 4], ["s", 23, 99, 8, 6], ["s", 24, 105, 7, 5], ["s", 25, 110, 5, 2], ["s", 23, 112, 7, 5], ["s", 24, 117, 5, 1],
+  ["a", 22, 83, 2, 11], ["a", 25, 96, 3, 1], ["a", 24, 112, 2, 4],
+  ["S", 30, 82, 2, 13], ["S", 30, 95, 2, 4], ["S", 29, 99, 2, 6], ["S", 29, 105, 2, 5], ["S", 28, 112, 2, 5],
+  ["s", 33, 82, 10, 13], ["s", 33, 95, 9, 4], ["s", 33, 99, 8, 6], ["s", 33, 105, 7, 5], ["s", 34, 110, 5, 2], ["s", 34, 112, 7, 5], ["s", 35, 117, 5, 1],
+  ["a", 33, 83, 1, 11], ["a", 35, 96, 3, 1], ["a", 35, 112, 2, 4],
+  ["S", 41, 82, 2, 13], ["S", 40, 95, 2, 4], ["S", 39, 99, 2, 6], ["S", 38, 105, 2, 5], ["S", 39, 112, 2, 5],
 ];
-const LIE_HAIR = {long: [["h", 6, 17, 4, 18], ["H", 6, 28, 4, 7], ["h", 34, 17, 4, 12]], bun: [["h", 16, 5, 12, 5], ["H", 16, 8, 12, 2], ["j", 18, 6, 4, 1]],
-  curly: [["h", 8, 9, 6, 6], ["h", 30, 9, 6, 6], ["h", 18, 6, 8, 4], ["j", 20, 7, 3, 1]]};
-// a towel in the trouser colour under the body, lit along the top, with two stripes at the foot end
-const LIE_TOWEL = [["p", 36, 15, 82, 28], ["z", 36, 15, 82, 1], ["P", 36, 41, 82, 2], ["z", 106, 15, 2, 28], ["z", 110, 15, 2, 28]];
+// sunglasses over the standing head's eyes
+const LIE_SHADES = [["k", 22, 30, 8, 6], ["k", 35, 30, 8, 6], ["k", 30, 31, 5, 1], ["l", 23, 31, 2, 1], ["l", 36, 31, 2, 1]];
+// a light striped towel in lounger art px, the same for everyone, so every skin tone stands out from it
+const LIE_TOWEL = [["l", 38, 14, 84, 31], ["w", 38, 14, 84, 1], ["L", 38, 44, 84, 1], ["w", 110, 15, 2, 29], ["w", 114, 15, 2, 29]];
 // the body and the towel are outlined apart, so a 1 art px line keeps the body off the towel and the towel off the cushion
 function lieRows(style) {
-  const towel = grid(128, 64), body = grid(128, 64);
+  const towel = grid(128, 64), body = grid(128, 64), lay = rects => rects.map(([k, x, y, w = 1, h = 1]) => [k, y, x, h, w]);
   paint(towel, LIE_TOWEL, 0, 0);
   outline(towel);
-  paint(body, LIE_BODY.concat(own(LIE_HAIR, style) ? LIE_HAIR[style] : []), 0, 0);
+  paint(body, lay(LIE_BODY.concat(HI_HEAD.d, own(HI_HAIR, style) && style !== "bun" ? HI_HAIR[style].d : [], LIE_SHADES)), 2, -3);
   outline(body);
   return body.map((row, y) => row.map((ch, x) => ch === "." ? towel[y][x] : ch).join(""));
 }
@@ -2305,7 +2311,7 @@ function demoState(n, ts) {
     // tags and bubbles keep off every face and shoulders (a box 16 world px wide, from the top of the hair down 30),
     // and off the desks, benches, counters and wall faces, the richest art in the room; hard holds only labels, tags and bubbles
     const hard = labelBoxes.slice(), taken = labelBoxes.concat(AVOID.map(b => ({x: b.x * px, y: b.y * px, w: b.w * px, h: b.h * px})), shown.filter(([, p]) => !p.s.lie).map(([a, p]) =>
-      ({x: Math.round((a.x * T + T / 2 - 8) * px), y: Math.round(p.top * px), w: 16 * px, h: 30 * px})));
+      ({a, x: Math.round((a.x * T + T / 2 - 8) * px), y: Math.round(p.top * px), w: 16 * px, h: (p.sit || p.f.pose === "couch" || p.f.pose === "games" ? 30 : p.y + p.h - 3 - p.top) * px})));
     const put = b => { taken.push(b); hard.push(b); };
     // shortcut: a room shows only as many characters as it has spots and then a "+k" sign, add spots when rooms overflow often
     for (const [g, k] of overflow) {
@@ -2332,14 +2338,25 @@ function demoState(n, ts) {
       const hot = a.id === highlight || a.id === hoverId, full = tagText(a.d, hot);
       const short = cut(a.d.kind === "agent" ? a.d.role : a.d.idea || a.d.project || "?", 10);
       // a lounger's middle is its left tile's right edge; someone seated is tagged under the chair, never above, where the desk is
-      const cx = p.s.lie ? a.x * T : a.x * T + T / 2, cands = [];
+      const cx = p.s.lie ? a.x * T : a.x * T + T / 2, cands = [], legs = [], hips = Math.round((p.y + p.h - 11) * px);
       for (const label of short === full ? [full] : [full, short]) {
         const t = tagBoxes(cx, p.top, p.y + p.h, label, p.sit ? p.y + p.h - 18 : p.top + 10), shift = d => Object.assign({}, t.under, {x: t.under.x + d});
         const below = [t.under, shift(-(t.under.w >> 1)), shift(t.under.w >> 1)];
         for (const b of p.sit ? below.concat(t.right, t.left) : [t.above, t.up].concat(below, t.right, t.left))
           cands.push(Object.assign(b, {label}));
+        legs.push(Object.assign({}, t.under, {y: hips - t.under.h, label}));
       }
       let b = pick(cands, taken);
+      // then over a standing person's own hips and legs, ending 8 px above the tile's foot, where the art of the row
+      // below reaches up: only if every tile under it is floor, so it covers no furniture; it may cover its own face box
+      if (!b && !p.sit && !p.s.lie) {
+        const others = taken.filter(o => o.a !== a), wt = T * px, floor = c => {
+          for (let y = Math.floor(c.y / wt); y <= Math.floor((c.y + c.h - 1) / wt); y++)
+            for (let x = Math.floor(c.x / wt); x <= Math.floor((c.x + c.w - 1) / wt); x++) if (!passable(x, y)) return false;
+          return true;
+        };
+        b = legs.find(c => fits(c) && floor(c) && !hits(c, others));
+      }
       if (!b) {  // the clear spot that covers the least art and fewest faces
         const cover = c => taken.reduce((n, o) => n + Math.max(0, Math.min(c.x + c.w, o.x + o.w) - Math.max(c.x, o.x)) * Math.max(0, Math.min(c.y + c.h, o.y + o.h) - Math.max(c.y, o.y)), 0);
         forced++;
