@@ -11,7 +11,7 @@
 .top a{color:var(--blue)}#status{color:var(--amber)}
 .top button:disabled{opacity:.5;cursor:default}.top button{background:var(--head);color:var(--text);border:1px solid var(--border);border-radius:3px;padding:2px 10px;font:inherit;cursor:pointer}
 #wrap{position:relative;padding:8px;overflow:auto}
-#scene{display:block;margin:0 auto;image-rendering:pixelated;border:1px solid var(--border);border-radius:3px;background:#2e323d}
+#scene{display:block;position:relative;margin:0 auto;image-rendering:pixelated;border:1px solid var(--border);border-radius:3px;background:#2e323d}
 #tip{position:absolute;pointer-events:none;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:3px;
 padding:4px 8px;font-size:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:3px;margin:0 8px 8px}
@@ -38,18 +38,18 @@ const T = 32;
 // Floor: . floor, + doorway or zone entry, E campus door, , grass, : stone path, _ rug. Work spots: * stage rooms, k kitchen.
 // Seats, walkable only as a path's end: c couch, b beanbag, l lounger (j is its backrest).
 // Props: P plant, i lamp, U water cooler, C filing cabinet, D desk, T meeting table, R reading table, S bookshelf,
-// h armchair, H fume hood, G glass cabinet, L lab bench, Z sink, B workbench, J drill press, X crate, F fridge,
+// h armchair, O gas cylinders, H fume hood, G glass cabinet, L lab bench, Z sink, B workbench, J drill press, X crate, F fridge,
 // K counter, M coffee machine, I island, Y coffee table, V TV, A arcade, @ umbrella, & tree, % bush, ~ water.
 // Meeting room and library are walled; office, lab, workshop and lounge are open zones on one floor; the pool is outside.
 const MAP = [
   "#NN#WWW#N##NN#NN####NN#NN##,&,,,,&,,",
   "#P..*.*.P#................#,,,,%,,,&",
-  "#........#..*.*.*..H.*.*G.#&,,,,,,,,",
+  "#........#.P.......H.*.*G.#&,,,,,,,,",
   "#.*TTTT*.#.DDDDDD..H.LLL..#,,,,,,,,&",
-  "#.*TTTT*.#..........*LLL*.#.........",
-  "#..*..*..#..*.*.*.....*...#jl.~~~.jl",
-  "#........#.DDDDDD.........#...~~~...",
-  "#P......P#.C.+..P..Z.*+.P.#jl.~~~.jl",
+  "#.*TTTT*.#..*.*.*...*LLL*.#.........",
+  "#..*..*..#............*...#jl.~~~.jl",
+  "#........#.DDDDDD..LL..OG.#...~~~...",
+  "#P......P#.C*+*.*..Z.*+.P.#jl.~~~.jl",
   "######++##P..............P#...~~~...",
   "#P........................+.@.~~~..@",
   "E.........................+...~~~...",
@@ -79,7 +79,7 @@ const ROOM_KEYS = Object.keys(ROOMS);
 const KITCHEN_END = 14;  // lounge rows up to here are the kitchen side
 const OPEN_ZONES = ["office", "lab", "workshop", "lounge"];  // drawn as a floor patch, with no walls
 // zone names sit inside their zone, on free floor: [text, centre x, centre y] in tiles
-const LABELS = [["Meeting room", 5, 6.5], ["Library", 5, 14.3], ["Office", 14, 7.5], ["Lab", 22, 6.5],
+const LABELS = [["Meeting room", 5, 6.5], ["Library", 5, 14.3], ["Office", 14, 5.35], ["Lab", 22.5, 7.45],
   ["Workshop", 14, 14.25], ["Kitchen", 19, 13.3], ["Living room", 23, 15.5], ["Pool", 31.5, 4.5]];
 const WALK = ".+E*k,_:", SEATS = "cbl", WALLS = "#WNQ";
 
@@ -350,7 +350,7 @@ const HI_HEAD = {
   d: [["h", 22, 9, 20, 2], ["h", 19, 11, 26, 2], ["h", 17, 13, 30, 3], ["h", 16, 16, 32, 10],
     ["s", 14, 30, 3, 6], ["s", 47, 30, 3, 6], ["S", 15, 32, 1, 3], ["S", 48, 32, 1, 3],
     ["s", 18, 24, 28, 16], ["s", 19, 40, 26, 3], ["s", 21, 43, 22, 2], ["s", 24, 45, 16, 1],
-    ["S", 43, 30, 3, 10], ["S", 41, 38, 3, 4], ["S", 38, 42, 5, 2], ["a", 19, 30, 1, 6], ["a", 21, 27, 5, 1],
+    ["S", 44, 31, 2, 5], ["S", 40, 42, 4, 2], ["a", 19, 30, 1, 6], ["a", 21, 27, 5, 1],
     ["h", 18, 24, 28, 3], ["H", 18, 26, 28, 1], ["h", 18, 27, 6, 2], ["h", 40, 27, 6, 2], ["H", 19, 28, 5, 1], ["H", 40, 28, 5, 1],
     ["h", 16, 24, 3, 9], ["H", 45, 24, 3, 9], ["j", 23, 11, 8, 2], ["j", 20, 13, 6, 2], ["j", 18, 15, 3, 4], ["j", 34, 12, 5, 1],
     ["H", 43, 15, 3, 9], ["H", 41, 19, 2, 5], ["H", 22, 29, 5, 1], ["H", 37, 29, 5, 1],
@@ -363,21 +363,32 @@ const HI_HEAD = {
   r: [["h", 22, 9, 20, 2], ["h", 19, 11, 26, 2], ["h", 17, 13, 30, 3], ["h", 16, 16, 32, 8],
     ["s", 24, 24, 22, 16], ["s", 46, 32, 2, 5], ["s", 26, 40, 19, 3], ["s", 29, 43, 14, 2], ["S", 28, 46, 9, 2],
     ["h", 16, 24, 11, 14], ["h", 17, 38, 8, 4], ["H", 16, 34, 9, 8], ["s", 27, 29, 5, 7], ["S", 28, 31, 3, 4],
-    ["h", 28, 24, 18, 3], ["H", 30, 26, 16, 1], ["h", 42, 27, 4, 2], ["S", 28, 40, 7, 3], ["S", 30, 43, 6, 2], ["a", 38, 27, 4, 1],
+    ["h", 28, 24, 18, 3], ["H", 30, 26, 16, 1], ["h", 42, 27, 4, 2], ["a", 38, 27, 4, 1],
     ["H", 38, 29, 5, 1], ["w", 39, 31, 4, 5], ["e", 41, 31, 3, 6], ["w", 42, 32, 1, 2], ["q", 35, 37, 4, 2], ["S", 46, 36, 2, 1],
-    ["m", 41, 41, 4, 1], ["j", 23, 11, 8, 2], ["j", 20, 13, 6, 2], ["j", 18, 15, 3, 4], ["H", 36, 14, 10, 6]],
+    ["m", 41, 41, 4, 1], ["j", 23, 11, 8, 2], ["j", 20, 13, 6, 2], ["j", 18, 15, 3, 4], ["H", 38, 14, 8, 2], ["H", 44, 16, 2, 6]],
 };
 const HI_HAIR = {
   long: {d: [["h", 14, 24, 5, 24], ["h", 45, 24, 5, 24], ["H", 46, 24, 4, 24], ["j", 15, 26, 1, 14]],
     u: [["h", 16, 40, 32, 12], ["h", 17, 52, 30, 2], ["H", 16, 48, 32, 4], ["j", 20, 41, 8, 1]],
     r: [["h", 14, 22, 13, 26], ["H", 14, 42, 13, 6], ["j", 16, 24, 2, 12]]},
   bun: {d: [["h", 25, 1, 14, 9], ["H", 25, 8, 14, 2], ["j", 27, 2, 5, 2]], u: [["h", 25, 1, 14, 9], ["H", 25, 8, 14, 2], ["j", 27, 2, 5, 2]],
-    r: [["h", 7, 11, 11, 11], ["H", 7, 19, 11, 3], ["j", 9, 12, 4, 2]]},
+    r: [["h", 15, 8, 8, 8], ["H", 15, 13, 8, 3], ["j", 17, 9, 3, 1]]},
   curly: {d: [["h", 16, 9, 7, 5], ["h", 27, 6, 10, 4], ["h", 41, 9, 7, 5], ["h", 13, 20, 4, 12], ["h", 47, 20, 4, 12],
     ["j", 29, 7, 4, 1], ["j", 18, 10, 3, 1], ["H", 48, 24, 3, 8]],
     u: [["h", 16, 9, 7, 5], ["h", 27, 6, 10, 4], ["h", 41, 9, 7, 5], ["h", 13, 20, 4, 24], ["h", 47, 20, 4, 24], ["j", 29, 7, 4, 1]],
-    r: [["h", 16, 9, 7, 5], ["h", 27, 6, 10, 4], ["h", 13, 20, 5, 16], ["j", 29, 7, 4, 1]]},
+    r: [["h", 17, 10, 6, 3], ["H", 17, 12, 6, 1], ["j", 18, 10, 2, 1], ["h", 27, 7, 10, 3], ["j", 29, 7, 4, 1],
+      ["h", 14, 20, 4, 14], ["H", 14, 30, 4, 4], ["j", 15, 21, 1, 5]]},
 };
+// heads are drawn 36 art px wide, then narrowed to 32 by dropping four columns, so a monitor is wider than a head
+const SQUEEZE = [20, 28, 35, 43];
+function squeeze(rects) {
+  const m = b => b + SQUEEZE.filter(d => d < 32 && d >= b).length - SQUEEZE.filter(d => d >= 32 && d < b).length;
+  return rects.map(([k, x, y, w = 1, h = 1]) => [k, m(x), y, m(x + w) - m(x), h]).filter(r => r[3] > 0);
+}
+for (const d of "dur") {
+  HI_HEAD[d] = squeeze(HI_HEAD[d]);
+  for (const st of Object.keys(HI_HAIR)) HI_HAIR[st][d] = squeeze(HI_HAIR[st][d]);
+}
 const HI_TORSO = {
   d: [["c", 17, 47, 30, 24], ["c", 15, 49, 34, 7], ["x", 18, 49, 4, 17], ["x", 21, 47, 6, 2], ["C", 41, 49, 6, 22], ["C", 17, 66, 30, 3],
     ["C", 26, 56, 1, 8], ["x", 27, 56, 1, 6], ["C", 37, 58, 1, 7], ["C", 16, 53, 1, 13], ["C", 47, 53, 1, 13],
@@ -392,8 +403,10 @@ const HI_ARM = {
     none: []},
   R: {down: [["c", 48, 49, 7, 12], ["C", 51, 49, 4, 10], ["C", 48, 59, 7, 2], ["s", 48, 61, 7, 6], ["S", 51, 61, 4, 6]],
     front: [["c", 48, 49, 7, 9], ["C", 51, 49, 4, 8], ["c", 43, 55, 9, 6], ["C", 43, 59, 9, 2], ["s", 39, 56, 6, 6], ["S", 39, 61, 6, 1]],
-    up: [["c", 48, 36, 7, 15], ["C", 51, 36, 4, 15], ["C", 48, 36, 7, 2], ["s", 48, 29, 7, 7], ["S", 51, 29, 4, 7]], none: []},
+    up: [["c", 48, 36, 7, 15], ["C", 51, 36, 4, 15], ["C", 48, 36, 7, 2], ["s", 48, 29, 7, 7], ["S", 51, 29, 4, 7]], none: [],
+    back: [["c", 48, 49, 7, 11], ["C", 51, 49, 4, 11], ["C", 48, 58, 7, 2]], type: [["c", 48, 48, 7, 10], ["C", 51, 48, 4, 10], ["C", 48, 56, 7, 2]]},
 };
+HI_ARM.L.back = [["c", 9, 49, 7, 11], ["x", 10, 50, 2, 9], ["C", 9, 58, 7, 2]];
 const HI_SHOES = (l, r) => [["f", 17, l, 14, 5], ["f", 33, r, 14, 5], ["F", 18, l, 6, 1], ["F", 34, r, 6, 1]];
 const HI_LEGS = [
   [["p", 18, 71, 28, 5], ["p", 19, 76, 12, 11], ["p", 33, 76, 12, 11], ["P", 38, 71, 8, 5], ["P", 27, 76, 4, 11], ["P", 41, 76, 4, 11],
@@ -416,15 +429,29 @@ const HI_SIDE = {
 };
 function hiPerson(dir, f, o) {
   if (dir === "r") return HI_HEAD.r.concat(HI_SIDE.torso, HI_SIDE.legs[f], HI_SIDE.arm[f]);
-  return HI_HEAD[dir].concat(HI_TORSO[dir], HI_LEGS[f], HI_ARM.L[o.armL || "down"], HI_ARM.R[o.armR || "down"]);
+  return HI_HEAD[dir].concat(HI_TORSO[dir], o.sit ? [] : HI_LEGS[f], HI_ARM.L[o.armL || "down"], HI_ARM.R[o.armR || "down"]);
 }
+// a round lens about 15 art px across: a frame ring, glass and a glint, centred on (cx, cy)
+function lensRing(cx, cy) {
+  const out = [];
+  for (let dy = -7; dy <= 7; dy++) {
+    const hw = Math.round(Math.sqrt(56 - dy * dy));
+    out.push(["G", cx - hw, cy + dy, hw * 2 + 1, 1]);
+    if (Math.abs(dy) < 6) out.push([dy > 2 ? "L" : "l", cx - hw + 2, cy + dy, hw * 2 - 3, 1]);
+  }
+  return out.concat([["w", cx - 3, cy - 4, 2, 2], ["w", cx - 4, cy - 2, 1, 2]]);
+}
+const handle = (x, y, n, dx, dy) => Array.from({length: n}, (_, i) => ["B", x + Math.floor(i * dx), y + i * dy, 3, 1]);
+const HI_BOOK = [["R", 14, 52, 36, 18], ["u", 16, 53, 15, 15], ["u", 33, 53, 15, 15], ["B", 31, 52, 2, 18], ["g", 18, 56, 11, 1],
+  ["g", 18, 59, 9, 1], ["g", 18, 62, 11, 1], ["g", 35, 56, 11, 1], ["g", 35, 59, 10, 1], ["g", 35, 62, 8, 1], ["s", 11, 58, 5, 6], ["s", 48, 58, 5, 6]];
+const HI_EASEL = [["G", 8, 56, 3, 37], ["G", 36, 56, 3, 37], ["G", 22, 56, 3, 30], ["g", 2, 14, 44, 3], ["w", 3, 17, 42, 37], ["g", 2, 54, 44, 3],
+  ["L", 8, 21, 20, 2], ["G", 8, 25, 13, 1], ["G", 7, 51, 33, 1], ["r", 9, 44, 5, 7], ["y", 16, 39, 5, 12], ["n", 23, 34, 5, 17], ["L", 30, 29, 5, 22]];
 const HI_RAISE = [["c", 48, 38, 7, 13], ["C", 51, 38, 4, 13], ["s", 48, 32, 7, 6], ["S", 51, 32, 4, 6]];
 const HI_ITEMS = {
   hammerUp: HI_RAISE.concat([["B", 50, 12, 3, 20], ["G", 42, 6, 16, 7], ["g", 42, 6, 16, 2], ["d", 42, 12, 16, 1]]),
   hammerDown: [["c", 47, 49, 7, 9], ["C", 50, 49, 4, 9], ["s", 45, 57, 7, 6], ["B", 36, 58, 20, 3], ["G", 54, 51, 7, 14], ["g", 54, 51, 2, 14]],
-  lensUp: HI_RAISE.concat([["B", 50, 22, 3, 10], ["G", 41, 4, 22, 20], ["l", 44, 7, 16, 14], ["L", 44, 16, 16, 5], ["w", 46, 9, 4, 3]]),
-  lensDown: [["c", 48, 49, 7, 12], ["C", 51, 49, 4, 12], ["s", 48, 61, 7, 5], ["B", 50, 66, 3, 7], ["G", 43, 72, 18, 16],
-    ["l", 46, 75, 12, 10], ["L", 46, 81, 12, 4], ["w", 48, 77, 3, 2]],
+  lensUp: HI_RAISE.concat(handle(50, 26, 6, 0.5, 1).reverse(), lensRing(54, 18)),
+  lensDown: [["c", 48, 49, 7, 12], ["C", 51, 49, 4, 12], ["s", 48, 61, 7, 5]].concat(handle(51, 66, 4, 0.5, 1), lensRing(55, 77)),
   laptop: [["d", 15, 49, 34, 16], ["G", 16, 50, 32, 1], ["g", 30, 55, 5, 5], ["g", 13, 65, 38, 3], ["G", 13, 68, 38, 1]],
   clip: [["B", 17, 50, 24, 26], ["u", 19, 54, 20, 20], ["G", 24, 48, 10, 4], ["g", 25, 48, 8, 1], ["g", 21, 58, 15, 1],
     ["g", 21, 62, 13, 1], ["g", 21, 66, 15, 1], ["g", 21, 70, 10, 1], ["s", 13, 62, 6, 6]],
@@ -442,6 +469,13 @@ const HI_POSES = {
     ? [["L", 34, 60, 2, 10], ["s", 33, 67, 6, 5], ["n", 22, 72, 8, 1]] : [["L", 42, 50, 2, 10], ["s", 40, 58, 6, 6]])}),
   pen: f => ({armL: "front", armR: "front", items: HI_ITEMS.paper.concat(f
     ? [["r", 36, 56, 2, 11], ["s", 34, 64, 6, 5], ["r", 20, 67, 12, 1]] : [["r", 44, 44, 2, 12], ["R", 44, 55, 2, 2], ["s", 42, 55, 6, 6]])}),
+  read: f => ({armL: "front", armR: "front", items: f ? HI_BOOK.concat([["u", 33, 50, 13, 3], ["g", 35, 51, 8, 1]]) : HI_BOOK}),
+  // the easel stands left of the presenter: the canvas is 56 world px wide and the body starts 24 in
+  board: f => ({w: 56, ox: 24, armL: "none", items: HI_EASEL.concat(f
+    ? [["c", 52, 40, 8, 12], ["C", 52, 49, 8, 2], ["s", 51, 34, 7, 6], ["k", 36, 36, 15, 2]]
+    : [["c", 46, 49, 13, 7], ["C", 46, 54, 13, 2], ["s", 41, 49, 6, 6], ["k", 28, 51, 13, 2]])}),
+  // seated at a desk, seen from behind; the chair is drawn over the lower body
+  desk: f => ({dir: "u", sit: true, armL: "back", armR: f ? "type" : "back"}),
 };
 
 // a quarter turn anticlockwise: the top row becomes the left column
@@ -449,17 +483,17 @@ function rotate(rows) {
   const w = rows[0].length;
   return Array.from({length: w}, (_, r) => rows.map(row => row[w - 1 - r]).join(""));
 }
-// shortcut: poses outside the office and the lab still use the 32 x 48 round-1 art, doubled; redraw them at 64 x 96 in step 3
+// shortcut: the lounge and pool poses (coffee, couch, games, sunbathe) still use the 32 x 48 round-1 art, doubled; redraw them at 64 x 96 in step 3
 function doubled(rows) { return rows.flatMap(r => Array(S).fill([...r].map(c => c.repeat(S)).join(""))); }
 // a pose frame as palette rows at art density; ax is the art column that stands on the tile centre
 function spriteRows(pose, frame, dir, style) {
   if (own(HI_POSES, pose)) {
-    const p = HI_POSES[pose](frame, dir), d = p.dir || "d", gr = grid(32 * S, 48 * S);
-    paint(gr, hiPerson(d, p.frame || 0, p), 0, 0);
-    paint(gr, own(HI_HAIR, style) ? HI_HAIR[style][d] : [], 0, 0);
+    const p = HI_POSES[pose](frame, dir), d = p.dir || "d", ox = (p.ox || 0) * S, gr = grid((p.w || 32) * S, 48 * S);
+    paint(gr, hiPerson(d, p.frame || 0, p), ox, 0);
+    paint(gr, own(HI_HAIR, style) ? HI_HAIR[style][d] : [], ox, 0);
     paint(gr, p.items || [], 0, 0);
     outline(gr);
-    return {rows: gr.map(r => r.join("")), ax: 16 * S};
+    return {rows: gr.map(r => r.join("")), ax: ox + 16 * S};
   }
   const p = POSES[pose](frame, dir), d = p.dir || "d", ox = p.ox || 0, oy = p.sit ? 3 : 0, gr = grid(p.w || 32, 48);
   paint(gr, person(d, p.frame || 0, p), ox, oy);
@@ -511,6 +545,8 @@ const DEMO = [
   lead("dotfiles", "zsh-speedup", "Faster zsh start", "office", "work"),
   agent("dotfiles", "zsh-speedup", 1, "code-investigator", "office"),
   agent("dotfiles", "zsh-speedup", 2, "reviewer", "office"),
+  agent("dotfiles", "zsh-speedup", 3, "tech-researcher", "office"),  // research ideas have no stage room, so they work in the office
+  agent("imp", "agent-rooms", 4, "presenter", "lab"),
   {id: "s1", kind: "lead", role: "chief", room: "office", activity: "work", project: "scratch", idea: "", title: "", note: ""},
   {id: "s1#1", kind: "agent", role: "general-purpose", room: "office", activity: "work", project: "scratch", idea: "", title: "", note: ""},
   lead("aiur", "feature-store", "Feature store", "lounge", "wait", "G1 Plan"),
@@ -550,11 +586,12 @@ function demoState(n, ts) {
   const actors = new Map(), sprites = new Map();
   let reduced = motion.matches, paused = false, scale = 1, px = 1, raf = 0, timer = 0, lastTs = 0, tick = 0;
   let highlight = "", hoverId = "", demoStep = 0, loaded = false, inflight = false, rosterKey = "", overflow = new Map();
-  let labelBoxes = [], labelFont = "", zoomed = false, statusText = "", perfText = "", dprQuery = null;
+  let labelBoxes = [], labelFont = "", zoomed = false, statusText = "", perfText = "", dprQuery = null, tu = 1;
   const base = document.createElement("canvas");
   base.width = LW * S;
   base.height = LH * S;
   const backdrop = document.createElement("canvas");
+  const chairTop = document.createElement("canvas");  // the office chair, drawn again over a seated person
 
   function still() { return reduced || paused || document.hidden; }
 
@@ -590,8 +627,10 @@ function demoState(n, ts) {
       a(top, ax, ay, w, h); a(t[3], ax, ay + h - 1, w, 1);
       a(face, ax, ay + h, w, fh); a(f[1], ax, ay + h, w, 1); a(f[1], ax, ay + h + fh - 2, w, 2);
     };
-    // a contact shadow on the floor, with cut corners
-    a.shadow = (ax, ay, w, h) => { a(SHADOW, ax + 1, ay, w - 2, 1); a(SHADOW, ax, ay + 1, w, h - 2); a(SHADOW, ax + 1, ay + h - 1, w - 2, 1); };
+    // a contact shadow on the floor with cut corners, cast 2 art px down and to the right
+    a.shadow = (ax, ay, w, h) => { ax += 2; ay += 2; a(SHADOW, ax + 1, ay, w - 2, 1); a(SHADOW, ax, ay + 1, w, h - 2); a(SHADOW, ax + 1, ay + h - 1, w - 2, 1); };
+    // a small object's shadow on a desk or bench top: a 2 art px strip under its base
+    a.drop = (ax, ay, w) => a(SHADOW, ax + 1, ay, w, 2);
     // leaf clumps from one ramp, back to front, each outlined so the layers read; every other clump a shade lighter
     a.leaves = (parts, c) => {
       parts.forEach(([lx, ly, w, h], i) => {
@@ -644,7 +683,7 @@ function demoState(n, ts) {
       for (let i = 0; i < 32; i += 8) for (let j = 0; j < 32; j += 8) { r("#6276ab", j + 3, i + 1, 2, 6); r("#6276ab", j + 1, i + 3, 6, 2); r("#4d5f93", j + 3, i + 3, 2, 2); }
     },
     office: (r, h, x, y) => carpet(r.a, x, y, h),
-    lab: (r, h) => labTiles(r.a, h),
+    lab: (r, h, x, y) => labTiles(r.a, h, x, y),
     workshop: (r, h) => {
       r("#b8b1a5", 0, 0, 32, 32);
       for (let i = 0; i < 12; i++) r(i % 2 ? "#a9a296" : "#c6c0b5", (h >>> i * 2) % 32, (h >>> i * 2 + 5) % 32);
@@ -720,7 +759,7 @@ function demoState(n, ts) {
     if (!wallAt(x - 1, y)) r.a(t[0], 0, 0, 2, 12);
     if (!wallAt(x + 1, y)) r.a(t[0], 62, 0, 2, 12);
     const room = roomAt(x, y + 1) || roomAt(x, y + 2) || "hall", same = dx => tileAt(x + dx, y) === ch;
-    if (room === "hall") return hallFace(r, x, y, ch, h, same);
+    if (WALLSET[room]) return richFace(r, x, y, ch, h, same, room);
     plainFace(r, room);
     r("rgba(255,255,255,.3)", 0, 6, 32, 1);
     if (ch === "N") {
@@ -756,18 +795,24 @@ function demoState(n, ts) {
     }
   }
   function drawDoor(r, x, y, ch) {
-    const wallish = (dx, dy) => "#WNQ+E".includes(tileAt(x + dx, y + dy));
+    const a = r.a, wallish = (dx, dy) => "#WNQ+E".includes(tileAt(x + dx, y + dy));
     if (ch === "E" || wallish(0, -1) && wallish(0, 1)) {  // in a side wall: the partition's posts above and below, and a mat
       const sx = x === 0 ? 0 : 26;
       if (wallAt(x, y - 1)) capBand(r.a, sx, 0, 12, 8);
       if (wallAt(x, y + 1)) capBand(r.a, sx, 56, 12, 8);
-      if (ch === "E") { r(O, 6, 7, 22, 18); r("#a8443c", 7, 8, 20, 16); r("#c45a4f", 9, 10, 16, 12); r("#e0c070", 11, 15, 12, 2); }
+      if (ch === "E") {  // the entrance mat
+        const m = ramp("#a8443c");
+        a.shadow(12, 14, 42, 34); a.box("#a8443c", 12, 14, 40, 32); a(m[1], 15, 17, 34, 26); a("#a8443c", 17, 19, 30, 22);
+        for (let i = 21; i < 40; i += 3) a(m[3], 19, i, 26, 1);
+        a("#e0c070", 22, 29, 20, 3); a(ramp("#e0c070")[3], 22, 29, 20, 1);
+      }
       else { r.a("rgba(160,210,235,.4)", sx + 1, 8, 10, 48); r.a("rgba(255,255,255,.5)", sx + 3, 12, 1, 40); }
     } else if (wallish(-1, 0) && wallish(1, 0)) {  // a wide doorway in a front wall
-      r("rgba(0,0,0,.16)", 0, 0, 32, 8);
-      if (!"+".includes(tileAt(x - 1, y))) { r("#6b4a2f", 0, 0, 4, 32); r(O, 4, 0, 1, 32); }
-      if (!"+".includes(tileAt(x + 1, y))) { r("#6b4a2f", 28, 0, 4, 32); r(O, 27, 0, 1, 32); }
-      r("#b08a5c", 0, 28, 32, 3);
+      const post = ramp("#6b4a2f"), sill = ramp("#b08a5c");
+      for (let k = 0; k < 6; k++) a("rgba(34,24,56," + (0.3 - k * 0.05).toFixed(2) + ")", 0, k * 2, 64, 2);
+      if (!"+".includes(tileAt(x - 1, y))) { a(post[0], 0, 0, 9, 64); a("#6b4a2f", 0, 0, 7, 64); a(post[3], 0, 0, 2, 64); a(post[1], 6, 0, 1, 64); }
+      if (!"+".includes(tileAt(x + 1, y))) { a(post[0], 55, 0, 9, 64); a("#6b4a2f", 57, 0, 7, 64); a(post[3], 57, 0, 2, 64); a(post[1], 63, 0, 1, 64); }
+      a(sill[0], 0, 55, 64, 8); a("#b08a5c", 0, 56, 64, 6); a(sill[3], 0, 56, 64, 1); a(sill[1], 0, 61, 64, 1);
     }
   }
   // a top joined with its neighbours into one counter or table: outline on the outer edges, a front face under the last row
@@ -984,7 +1029,7 @@ function demoState(n, ts) {
     }
   }
   // ---- round-2 art for the office, the lab and the hall, in art px (S per world px) from the tile's corner ----
-  const SHADOW = "rgba(34,24,56,.22)", CAP = "#4d546c", GLASS_EDGE = "#5d7d8c", GLASS_IN = "#e3f4fa";
+  const SHADOW = "rgba(34,24,56,.4)", CAP = "#4d546c", GLASS_EDGE = "#5d7d8c", GLASS_IN = "#e3f4fa";
   const BOTTLES = ["#c8862a", "#3c7bd1", "#5db35a", "#cfe9f2", "#e2463e", "#8e5bc4"];
   function wallAt(x, y) { return x >= 0 && y >= 0 && x < MAP_W && y < MAP_H && WALLS.includes(MAP[y][x]); }
   function hasFace(x, y) { return wallAt(x, y) && y + 1 < MAP_H && !WALLS.includes(tileAt(x, y + 1)); }
@@ -1030,17 +1075,33 @@ function demoState(n, ts) {
       a(t[1], ox + 31, oy, 1, 32);
     }
     for (let i = 0; i < 14; i++) a(i % 2 ? "rgba(255,255,255,.14)" : "rgba(20,24,48,.18)", (h >>> i) % 63, (h >>> (i * 2 + 1) % 29) % 63);
+    if (tileAt(x, y - 1) !== "D") return;
+    // a rug under the chair row of each workstation, two tiles wide, in the workstation's colour
+    const left = (x - 11) % 2 === 0, c = RUGS[((x - 11) >> 1) + (y > 5 ? 1 : 0)], t = ramp(c), x0 = left ? 6 : 0, x1 = left ? 64 : 58;
+    a(t[0], x0, 2, x1 - x0, 56); a(c, x0 + (left ? 2 : 0), 4, x1 - x0 - 2, 52);
+    a(t[3], x0 + (left ? 4 : 0), 6, x1 - x0 - 6 + (left ? 2 : 0), 1); a(t[3], x0 + (left ? 4 : 0), 53, x1 - x0 - 6 + (left ? 2 : 0), 1);
+    for (let i = 10; i < 50; i += 6) for (let j = x0 + 6 + (i % 12 ? 3 : 0); j < x1 - 4; j += 6) a(t[1], j, i, 2, 2);
   }
+  const RUGS = ["#2f8a86", "#a0507a", "#4f6ac0", "#c0703a"];
   // lab tiles with bevels and a diagonal sheen on some
-  function labTiles(a, h) {
+  function matAt(x, y) {
+    return roomAt(x, y) === "lab" && WALK.includes(tileAt(x, y)) && [[0, -1], [0, 1], [-1, 0], [1, 0]].some(([dx, dy]) => tileAt(x + dx, y + dy) === "L");
+  }
+  function labTiles(a, h, x, y) {
     for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) {
-      const ox = j * 32, oy = i * 32, k = (h >>> (i * 2 + j) * 3) % 7;
+      const ox = j * 32, oy = i * 32, k = (h >>> (i * 2 + j) * 3) % 7, sx = (h >>> (i * 2 + j) * 3 + 11) % 9, sl = 5 + (h >>> (i * 2 + j) + 17) % 5;
       a(k ? "#e7eef0" : "#dde7ea", ox, oy, 32, 32);
       a("#f6fafb", ox + 1, oy + 1, 30, 1); a("#f6fafb", ox + 1, oy + 1, 1, 30);
       a("#d2dce0", ox + 1, oy + 30, 30, 1); a("#d2dce0", ox + 30, oy + 1, 1, 30);
       a("#b7c5cb", ox, oy + 31, 32, 1); a("#b7c5cb", ox + 31, oy, 1, 32);
-      if (k < 2) for (let d = 0; d < 8; d++) { a("rgba(255,255,255,.75)", ox + 7 + d, oy + 23 - d, 2, 1); if (d < 4) a("rgba(255,255,255,.6)", ox + 13 + d, oy + 24 - d, 1, 1); }
+      if (k < 2) for (let d = 0; d < sl; d++) { a("rgba(255,255,255,.75)", ox + 4 + sx + d, oy + 23 - d, 2, 1); if (d < 4) a("rgba(255,255,255,.6)", ox + 10 + sx + d, oy + 24 - d, 1, 1); }
     }
+    // an anti-fatigue mat on the floor round a bench; mats on neighbouring tiles join into one
+    if (!matAt(x, y)) return;
+    const t = ramp("#8e9cab"), x0 = matAt(x - 1, y) ? 0 : 6, x1 = matAt(x + 1, y) ? 64 : 58, y0 = matAt(x, y - 1) ? 0 : 6, y1 = matAt(x, y + 1) ? 64 : 58;
+    a(t[1], x0, y0, x1 - x0, y1 - y0); a("#8e9cab", x0 + (x0 ? 1 : 0), y0 + (y0 ? 1 : 0), x1 - x0 - (x0 ? 1 : 0) - (x1 < 64 ? 1 : 0), y1 - y0 - (y0 ? 1 : 0) - (y1 < 64 ? 1 : 0));
+    if (y0) a(t[3], x0 + 1, y0 + 1, x1 - x0 - 2, 1);
+    for (let i = y0 + 5; i < y1 - 3; i += 6) for (let j = x0 + 5 + (i % 12 ? 3 : 0); j < x1 - 3; j += 6) a(t[1], j, i, 2, 2);
   }
   // a wall with no face: a thin partition between the floors of its neighbours
   function wallFloor(g, x, y) {
@@ -1074,31 +1135,72 @@ function demoState(n, ts) {
     }
     a(CAP, sx, 0, 12, 64); a(t[3], sx, 0, 1, 64); a(t[0], sx + 11, 0, 1, 64);
   }
-  const PAPER = "#efe3cc", RAIL = "#a9794a", WAINS = "#c39260", SKIRT = "#6c4a2e";
-  // a wall face with no decor: the hall's papered wall over wainscot, or a round-1 colour
+  // wall faces in round-2 art: an upper wall, a rail, a lower panel and a skirting board, each from one ramp
+  const WALLSET = {
+    hall: {up: "#6f8f86", rail: "#a9794a", low: "#7a5236", skirt: "#4a3020", stripe: true},
+    office: {up: "#56607e", rail: "#8f99b0", low: "#454e68", skirt: "#2f3548"},
+    lab: {up: "#5f8f8c", rail: "#c9d1d8", low: "#dfe9ea", skirt: "#6b7a87", tiles: true},
+  };
+  // a wall face with no decor: rich for the hall, the office and the lab, else a round-1 colour
   function plainFace(r, room) {
-    const a = r.a;
-    if (room !== "hall") { r(FACE[room] || FACE.hall, 0, 6, 32, 26); r("rgba(0,0,0,.25)", 0, 29, 32, 3); return; }
-    a(PAPER, 0, 12, 64, 28);
-    for (let i = 3; i < 64; i += 8) a("#e6d7bc", i, 12, 2, 28);
-    a("rgba(34,24,56,.2)", 0, 12, 64, 2);
-    const w = ramp(WAINS), rl = ramp(RAIL), sk = ramp(SKIRT);
-    a(RAIL, 0, 40, 64, 3); a(rl[3], 0, 40, 64, 1); a(rl[0], 0, 43, 64, 1);
-    a(WAINS, 0, 44, 64, 14);
-    for (let i = 0; i < 64; i += 32) { a(w[1], i + 4, 46, 24, 1); a(w[1], i + 4, 46, 1, 10); a(w[3], i + 4, 56, 25, 1); a(w[3], i + 28, 46, 1, 11); }
-    a(SKIRT, 0, 58, 64, 6); a(sk[3], 0, 58, 64, 1); a(sk[0], 0, 63, 64, 1);
+    const a = r.a, w = WALLSET[room];
+    if (!w) { r(FACE[room] || FACE.hall, 0, 6, 32, 26); r("rgba(0,0,0,.25)", 0, 29, 32, 3); return; }
+    const up = ramp(w.up), rl = ramp(w.rail), lo = ramp(w.low), sk = ramp(w.skirt);
+    a(w.up, 0, 12, 64, 28);
+    if (w.stripe) for (let i = 3; i < 64; i += 8) a(up[1], i, 12, 2, 28);
+    else for (let i = 0; i < 64; i += 16) a(up[3], i, 16 + (i >> 4) % 2 * 10, 1, 1);
+    a(up[0], 0, 12, 64, 2); a(up[1], 0, 14, 64, 2);
+    a(w.rail, 0, 40, 64, 3); a(rl[3], 0, 40, 64, 1); a(rl[0], 0, 43, 64, 1);
+    a(w.low, 0, 44, 64, 14);
+    if (w.tiles) { for (let i = 0; i < 64; i += 8) a(lo[1], i, 44, 1, 14); a(lo[1], 0, 51, 64, 1); }
+    else for (let i = 0; i < 64; i += 32) { a(lo[1], i + 4, 46, 24, 1); a(lo[1], i + 4, 46, 1, 10); a(lo[3], i + 4, 56, 25, 1); a(lo[3], i + 28, 46, 1, 11); }
+    a(w.skirt, 0, 58, 64, 6); a(sk[3], 0, 58, 64, 1); a(sk[0], 0, 63, 64, 1);
   }
-  function hallFace(r, x, y, ch, h, same) {
+  // tall windows with a dark frame, a mullion and a transom, a three-tone sky and a sill; neighbours join into one window
+  function windowFace(a, same) {
+    const L = same(-1) ? 0 : 5, R = same(1) ? 64 : 59, fr = "#3b4152", ft = ramp(fr), g0 = same(-1) ? 0 : L + 2, g1 = same(1) ? 64 : R - 2;
+    a(ft[0], L, 14, R - L, 26); a(fr, g0, 15, g1 - g0, 24);
+    const gx0 = same(-1) ? 0 : L + 3, gx1 = same(1) ? 64 : R - 3;
+    a("#6fbde6", gx0, 17, gx1 - gx0, 6); a("#9fd6f0", gx0, 23, gx1 - gx0, 7); a("#cdeefa", gx0, 30, gx1 - gx0, 7);
+    a("#ffffff", gx0, 34, gx1 - gx0, 1);
+    a(fr, gx0, 24, gx1 - gx0, 2); a(ft[3], gx0, 26, gx1 - gx0, 1);
+    a(fr, 31, 17, 2, 20); a(ft[3], 33, 17, 1, 20);
+    if (!same(-1)) a(ft[3], L + 2, 17, 1, 20);
+    for (let d = 0; d < 6; d++) { a("rgba(255,255,255,.7)", gx0 + 4 + d, 35 - d, 1, 1); a("rgba(255,255,255,.5)", gx0 + 7 + d, 35 - d, 1, 1); }
+    a.box("#d8d2c4", L - 2, 38, R - L + 4, 3); a("rgba(34,24,56,.35)", L - 2, 42, R - L + 4, 2);
+  }
+  function richFace(r, x, y, ch, h, same, room) {
     const a = r.a;
-    plainFace(r, "hall");
-    if (ch === "N") {  // tall windows; neighbours join into one long window
-      const L = same(-1) ? 0 : 6, R = same(1) ? 64 : 58, fr = "#f1ece2", ft = ramp(fr), g0 = same(-1) ? 2 : L + 3, g1 = same(1) ? 62 : R - 3;
-      a(ft[0], L, 14, R - L, 25); a(fr, same(-1) ? 0 : L + 1, 15, R - L - (same(-1) ? 0 : 1) - (same(1) ? 0 : 1), 23);
-      a("#8ccbea", g0, 17, g1 - g0, 7); a("#a9daf1", g0, 24, g1 - g0, 6); a("#c6e8f7", g0, 30, g1 - g0, 6);
-      a(fr, g0, 26, g1 - g0, 2); a(fr, 31, 17, 2, 19);
-      for (let d = 0; d < 6; d++) { a("rgba(255,255,255,.6)", g0 + 3 + d, 34 - d, 1, 1); a("rgba(255,255,255,.45)", g0 + 6 + d, 34 - d, 1, 1); }
-      a.box("#e9e2d4", L - 2, 38, R - L + 4, 3);
-      if (h % 3 === 0) { a.leaves([[40, 26, 9, 7], [45, 24, 8, 8]], "#4f9a4a"); a.box("#c46a3c", 42, 31, 8, 6); }
+    plainFace(r, room);
+    if (ch === "N") {
+      windowFace(a, same);
+      if (room === "hall" && h % 3 === 0) { a.leaves([[40, 26, 9, 7], [45, 24, 8, 8]], "#4f9a4a"); a.box("#c46a3c", 42, 31, 8, 6); }
+      return;
+    }
+    if (room === "lab") {
+      if (x % 2 === 0) {  // a whiteboard with a reaction scheme and a marker tray
+        a.box("#c4c8d0", 4, 15, 56, 24); a("#fbfbf9", 6, 17, 52, 20);
+        a("#3c7bd1", 9, 20, 12, 1); a("#3c7bd1", 9, 23, 8, 1); a("#e2463e", 24, 21, 6, 1); a("#e2463e", 28, 20, 1, 3);
+        a("#2f9a5a", 33, 20, 14, 1); a("#2b2f3a", 9, 28, 30, 1); a("#2b2f3a", 42, 27, 12, 6); a("#fbfbf9", 43, 28, 10, 4); a("#e2463e", 45, 30, 6, 1);
+        a.box("#8b919d", 10, 39, 44, 2); a("#e2463e", 14, 38, 5, 1); a("#3c7bd1", 21, 38, 5, 1);
+      } else {  // a hazard poster and a periodic table
+        a.box("#fbfaf5", 6, 17, 22, 20);
+        for (let k = 0; k < 10; k++) a("#f6d04b", 17 - k, 20 + k, 1 + k * 2, 1); a("#2b2f3a", 16, 25, 2, 6); a("#2b2f3a", 16, 32, 2, 1);
+        a.box("#2b2f3a", 34, 17, 24, 18);
+        for (let i = 0; i < 4; i++) for (let j = 0; j < 7; j++) if (i || j === 0 || j === 6) a(BOTTLES[(i * 7 + j) % 6], 36 + j * 3, 19 + i * 4, 2, 3);
+      }
+      return;
+    }
+    if (room === "office") {
+      if (x % 2) {  // an abstract print, in the office's accent colours
+        a.box("#fbfaf5", 14, 15, 36, 23); a("#f2a03c", 17, 18, 14, 17); a("#1f9e8f", 31, 18, 16, 9); a("#e88aa8", 35, 27, 12, 8); a("#2b2f3a", 24, 24, 6, 6);
+      } else {  // a clock over a shelf with a plant and books
+        a("#2b2f3a", 27, 15, 10, 1); a("#2b2f3a", 26, 16, 12, 10); a("#2b2f3a", 27, 26, 10, 1);
+        a("#f7f3ea", 27, 16, 10, 10); a("#2b2f3a", 31, 18, 1, 4); a("#2b2f3a", 32, 21, 3, 1); a("#e2463e", 31, 21, 1, 1);
+        a.leaves([[10, 26, 9, 7], [16, 24, 8, 8]], "#4f9a4a"); a.box("#f2a03c", 12, 31, 8, 5);
+        for (let i = 0; i < 4; i++) a.box(BRIGHT[i + 1], 40 + i * 4, 28 - i % 2 * 2, 3, 8 + i % 2 * 2);
+        a.box("#8a5a35", 8, 36, 48, 3);
+      }
       return;
     }
     switch ((x * 3 + y) % 5) {
@@ -1122,7 +1224,7 @@ function demoState(n, ts) {
         }
         break;
       default:  // a wall lamp and its glow
-        a("rgba(255,230,160,.22)", 20, 14, 24, 24); a("rgba(255,230,160,.18)", 24, 12, 16, 30);
+        a("rgba(255,230,160,.3)", 20, 14, 24, 24); a("rgba(255,230,160,.24)", 24, 12, 16, 30);
         a.box("#d9b45a", 29, 20, 6, 8); a("#fff3c4", 30, 26, 4, 1); a("#8a6a3a", 31, 28, 2, 4);
     }
   }
@@ -1131,15 +1233,16 @@ function demoState(n, ts) {
     for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) {
       if (tileAt(x, y) !== "N" || !hasFace(x, y)) continue;
       const a = painter(g, x, y + 1).a;
-      for (let k = 0; k < 72; k += 4) { a("rgba(255,240,196,.13)", 6 + k / 4, k, 52, 4); if (k < 52) a("rgba(255,246,214,.1)", 16 + k / 4, k, 32, 4); }
+      for (let k = 0; k < 72; k += 4) { a("rgba(255,240,196,.2)", 6 + k / 4, k, 52, 4); if (k < 52) a("rgba(255,246,214,.15)", 16 + k / 4, k, 32, 4); }
     }
     for (const [tx, ty] of [[4, 9], [11, 9], [18, 9], [23, 9]]) {
       const a = painter(g, tx, ty).a;
-      [44, 64, 76, 80, 80, 76, 64, 44].forEach((w, i) => { a("rgba(255,236,186,.11)", 32 - w / 2, 40 + i * 6, w, 6); if (i > 1 && i < 6) a("rgba(255,242,206,.09)", 32 - w / 4, 40 + i * 6, w / 2, 6); });
+      [44, 64, 76, 80, 80, 76, 64, 44].forEach((w, i) => { a("rgba(255,236,186,.16)", 32 - w / 2, 40 + i * 6, w, 6); if (i > 1 && i < 6) a("rgba(255,242,206,.13)", 32 - w / 4, 40 + i * 6, w / 2, 6); });
     }
   }
   function monitor(a, mx, my, w, h, kind) {
     const cx = mx + (w >> 1), sx = mx + 2, sy = my + 2, sw = w - 4, sh = h - 5;
+    a.drop(cx - 7, my + h + 7, 14);
     a.box("#3a3f4c", cx - 2, my + h, 4, 5);
     a.box("#2f333e", cx - 7, my + h + 5, 14, 2);
     a.box("#262a34", mx, my, w, h);
@@ -1148,66 +1251,95 @@ function demoState(n, ts) {
       for (let i = 0; i < sh - 1; i += 2) a(["#7fd1a0", "#f2c14e", "#e88aa8", "#7fc4f0", "#b9c2d6"][(i + mx) % 5], sx + 1 + (i * 3 + mx) % 5, sy + 1 + i, 3 + (i * 7 + mx * 3) % (sw - 8), 1);
     } else if (kind === 1) {  // charts
       a("#e9f0f8", sx, sy, sw, sh); a("#4f8fd6", sx, sy, sw, 2);
-      for (let i = 0; i < sw - 4; i += 4) { const bh = 2 + (i * 5 + mx) % (sh - 5); a(i % 8 ? "#5db35a" : "#4f8fd6", sx + 2 + i, sy + sh - 1 - bh, 2, bh); }
-    } else {  // a video call
+      for (let i = 0; i < sw - 4; i += 4) { const bh = 2 + (i * 5 + mx) % (sh - 5); a(i % 8 ? "#5db35a" : "#e2463e", sx + 2 + i, sy + sh - 1 - bh, 2, bh); }
+    } else if (kind === 2) {  // a video call
       a("#2c3a4f", sx, sy, sw, sh);
       const tw = (sw - 3) >> 1, th = (sh - 3) >> 1;
       for (let i = 0; i < 4; i++) {
         const ox = sx + 1 + (i % 2) * (tw + 1), oy = sy + 1 + (i >> 1) * (th + 1);
         a(["#5a7a9a", "#6b8f6a", "#9a6b7a", "#8a7a5a"][i], ox, oy, tw, th); a(["#f0c8a0", "#c98c5f", "#e8b88f", "#9a6440"][i], ox + (tw >> 1) - 1, oy + 1, 3, 3);
       }
+    } else if (kind === 3) {  // a sunset wallpaper
+      const bands = ["#5b3f8c", "#a24f9a", "#e2618a", "#f39a5c", "#f6c75a"];
+      for (let i = 0; i < 5; i++) a(bands[i], sx, sy + Math.floor(i * sh / 5), sw, Math.ceil(sh / 5));
+      a("#f9e3a0", sx + (sw >> 1) - 3, sy + sh - 7, 6, 3);
+      for (let i = 0; i < sw; i += 2) a("#2a2140", sx + i, sy + sh - 2 - ((i * 7 + mx) % 5 >> 1), 2, 2 + ((i * 7 + mx) % 5 >> 1));
+    } else {  // a teal app with cards
+      a("#e8f4f2", sx, sy, sw, sh); a("#1f9e8f", sx, sy, sw, 4); a("#fbfaf5", sx + 2, sy + 1, 6, 2);
+      for (let i = 0; i < 3; i++) { a(["#f2a03c", "#e88aa8", "#5b8fd6"][i], sx + 2 + i * Math.floor((sw - 2) / 3), sy + 7, Math.floor((sw - 2) / 3) - 2, sh - 10); }
     }
     a("rgba(255,255,255,.16)", sx + sw - 5, sy, 2, sh);
   }
-  // a workstation is two desk tiles: the chair tile carries the screens, the other one the desk's clutter
+  // a workstation is two desk tiles, drawn whole from the left one: the agent sits south of the right one
+  const DESK_TOPS = ["#ece7dc", "#c99a66", "#ece7dc", "#e6e1d6", "#5fb3a8", "#c99a66"];
+  const BRIGHT = ["#e2463e", "#f2a03c", "#e88aa8", "#1f9e8f", "#8e5bc4", "#3c7bd1"];
   function officeDesk(a, x, y) {
     let x0 = x;
     while (tileAt(x0 - 1, y) === "D") x0--;
-    const part = (x - x0) % 2, v = hashStr("ws" + (x - part) + ":" + y), dark = ramp("#4b5163")[0];
-    if (!part) {
-      a.shadow(8, 50, 124, 12);
-      a(dark, 7, 50, 3, 9); a(dark, 118, 50, 3, 9);
-      a.block("#ece4d4", "#7c869b", 3, 4, 122, 38, 10);
-      const A = v % 3, B = (v >>> 2) % 3, C = (v >>> 4) % 3;
-      if (A === 0) {  // a desk lamp and its pool of light
-        a("rgba(255,236,170,.3)", 14, 22, 22, 16); a("rgba(255,236,170,.25)", 18, 19, 14, 22);
-        a.box("#3a3f4c", 8, 34, 12, 4); a("#5a6070", 13, 22, 2, 12); a("#5a6070", 15, 18, 2, 5); a("#5a6070", 17, 15, 3, 4);
-        a.box("#f2c14e", 16, 10, 12, 6); a("#fff3c4", 18, 15, 8, 1);
-      } else if (A === 1) {  // a small plant
-        a.leaves([[6, 18, 10, 8], [12, 13, 10, 10], [16, 20, 9, 7]], "#4f9a4a"); a.box("#f1ede6", 10, 29, 10, 9);
-      } else {  // a pen cup and sticky notes
-        a("#e2463e", 11, 24, 1, 6); a("#3c7bd1", 13, 23, 1, 7); a("#f6d04b", 14, 25, 1, 5);
-        a.box("#5b6b8c", 10, 29, 6, 9); a.box("#f6e27a", 19, 31, 7, 6); a.box("#9fd8a4", 21, 22, 7, 6);
-      }
-      if (B === 0) { a.box("#f0eee8", 30, 25, 16, 11); a.box("#fbfaf5", 28, 27, 16, 11); for (const [ly, lw] of [[29, 11], [31, 9], [33, 12], [35, 8]]) a("#b8bec6", 30, ly, lw, 1); }
-      else if (B === 1) { a.box("#3c7bd1", 28, 26, 18, 12); a("#fbfaf5", 30, 27, 14, 10); a("#3c7bd1", 36, 27, 1, 10); for (const ly of [29, 31, 33, 35]) { a("#b8bec6", 31, ly, 4, 1); a("#b8bec6", 38, ly, 4, 1); } a("#2b2f3a", 46, 27, 1, 9); }
-      else { a.box("#9a2c2c", 28, 32, 18, 5); a.box("#cf982b", 30, 27, 16, 5); a.box("#347a3b", 29, 22, 15, 5); a("#f4efe4", 44, 33, 1, 3); a("#f4efe4", 45, 28, 1, 3); }
-      if (C === 0) { a.box("#e2463e", 52, 28, 6, 7); a("#5b3820", 53, 28, 4, 1); a(ramp("#e2463e")[0], 58, 30, 2, 3); }
-      else if (C === 1) { a.box("#2b2f3a", 50, 30, 10, 7); a("#7fc4f0", 52, 31, 6, 2); for (let i = 0; i < 3; i++) a("#8b919d", 52 + i * 2, 34, 1, 1); }
-      else { a.box("#d9dde3", 50, 25, 11, 13); a("#4f8fd6", 51, 26, 9, 10); a("#c8e4ff", 52, 28, 5, 1); }
-      return;
+    if ((x - x0) % 2) return;
+    const v = hashStr("ws" + x + ":" + y), ws = (x - x0) / 2 + (y > 4 ? 3 : 0), top = DESK_TOPS[ws % 6], dark = ramp("#4b5163")[0];
+    const kind = ws % 3, wall = n => (v >>> n) % 5, pop = n => BRIGHT[(v >>> n) % 6];
+    a.shadow(6, 50, 124, 10);
+    a(dark, 6, 52, 4, 8); a(dark, 118, 52, 4, 8);
+    a.block(top, "#6f7890", 4, 8, 120, 36, 10);
+    a("rgba(34,24,56,.35)", 4, 54, 120, 2);
+    // the back of the desk: a tower or a lamp, a bright object, then the screens
+    if (kind !== 1) {
+      a.drop(8, 30, 14);
+      a.box("#2b2f3a", 8, -6, 14, 36); a("#3f4555", 9, -5, 12, 2);
+      for (let i = 0; i < 5; i++) a("#20232c", 10, 2 + i * 3, 10, 1);
+      a("#7fe0a0", 11, 24, 2, 1); a(pop(3), 17, 24, 2, 1);
+    } else {  // a desk lamp and its pool of light
+      a("rgba(255,236,170,.32)", 6, 18, 28, 20); a("rgba(255,236,170,.25)", 10, 14, 20, 26);
+      a.drop(8, 31, 12); a.box("#3a3f4c", 8, 27, 12, 4); a("#5a6070", 13, 15, 2, 12); a("#5a6070", 15, 11, 2, 5); a("#5a6070", 17, 8, 3, 4);
+      a.box("#f2a03c", 16, 3, 12, 6); a("#fff3c4", 18, 8, 8, 1);
     }
-    const kind = v % 3, s1 = (v >>> 6) % 3, s2 = (v >>> 8) % 3;
-    if (kind === 0) { monitor(a, 3, -4, 28, 21, s1); monitor(a, 33, -4, 28, 21, s2); }
-    else if (kind === 1) monitor(a, 5, -5, 54, 23, s1);
-    else {
-      monitor(a, 2, -4, 34, 22, s1);
-      a.box("#2b2f3a", 40, 8, 19, 14); a("#7fc4f0", 41, 9, 17, 11); a("#c8e4ff", 42, 11, 8, 1); a("#c8e4ff", 42, 13, 11, 1); a("#c8e4ff", 42, 15, 6, 1); a.box("#c4c8d0", 39, 22, 21, 6);
+    const toy = (v >>> 9) % 3;
+    if (toy === 0) {  // a yellow duck
+      a.drop(26, 24, 9); a.box("#f6d04b", 26, 16, 9, 8); a.box("#f6d04b", 28, 11, 6, 6); a("#f28a2a", 34, 14, 3, 2); a("#2a2233", 31, 13, 1, 1);
+    } else if (toy === 1) {  // a plant
+      a.leaves([[24, 4, 9, 8], [29, 1, 9, 9], [31, 8, 8, 7]], "#4f9a4a"); a.drop(26, 24, 10); a.box(pop(5), 26, 16, 10, 8);
+    } else {  // a bright mug
+      a.drop(27, 22, 8); a.box(pop(5), 27, 15, 8, 7); a(ramp(pop(5))[0], 35, 17, 2, 3); a("#5b3820", 28, 15, 6, 1);
     }
-    a.box("#dfe2e7", 16, 31, 30, 6);
-    for (let i = 0; i < 14; i++) { a("#b6bcc6", 17 + i * 2, 32, 1, 1); a("#b6bcc6", 18 + i * 2, 34, 1, 1); }
-    a.box("#eef0f3", 50, 32, 4, 6); a("#b6bcc6", 51, 33, 2, 1);
-    if (s2 === 1) a.box("#f6e27a", kind === 1 ? 53 : 26, 11, 4, 4);  // a sticky note on the bezel
+    if (kind === 0) { monitor(a, 38, -12, 34, 26, wall(11)); monitor(a, 74, -16, 42, 30, wall(14)); }
+    else if (kind === 1) {
+      monitor(a, 62, -14, 62, 30, wall(11));
+      a.drop(38, 31, 22); a.box("#c4c8d0", 38, 26, 22, 5); a.box("#2b2f3a", 40, 10, 18, 15); a("#7fc4f0", 41, 11, 16, 13); a("#c8e4ff", 42, 13, 8, 1);
+    } else {
+      monitor(a, 74, -16, 42, 30, wall(11));
+      a.box("#262a34", 50, -14, 20, 34); a(["#1f9e8f", "#5b3f8c", "#1d2539"][wall(14) % 3], 52, -12, 16, 29);
+      for (let i = 0; i < 6; i++) a("#e8f4f2", 54, -9 + i * 4, 6 + (i * 5) % 7, 1);
+      a.box("#3a3f4c", 57, 21, 6, 4);
+    }
+    // the front of the desk: papers or books, a phone, the keyboard and a bright mouse mat
+    const B = (v >>> 17) % 3;
+    if (B === 0) { a.drop(10, 41, 18); a.box("#f0eee8", 10, 30, 18, 11); a.box("#fbfaf5", 8, 32, 18, 9); for (const [ly, lw] of [[34, 12], [36, 9], [38, 13]]) a("#b8bec6", 10, ly, lw, 1); }
+    else if (B === 1) { a.drop(8, 41, 20); a.box(pop(19), 8, 30, 20, 11); a("#fbfaf5", 10, 31, 16, 9); a(pop(19), 17, 31, 1, 9); for (const ly of [33, 35, 37]) { a("#b8bec6", 11, ly, 5, 1); a("#b8bec6", 19, ly, 5, 1); } }
+    else { a.drop(8, 41, 20); a.box("#9a2c2c", 8, 36, 20, 5); a.box("#cf982b", 10, 31, 18, 5); a.box("#347a3b", 9, 26, 17, 5); a("#f4efe4", 26, 37, 1, 3); a("#f4efe4", 27, 32, 1, 3); }
+    a.drop(44, 38, 10); a.box("#2b2f3a", 44, 30, 10, 8); a("#7fc4f0", 45, 31, 8, 3);
+    a.drop(76, 36, 36); a.box("#dfe2e7", 76, 29, 36, 7);
+    for (let i = 0; i < 17; i++) { a("#b6bcc6", 77 + i * 2, 30, 1, 1); a("#b6bcc6", 78 + i * 2, 32, 1, 1); a("#b6bcc6", 77 + i * 2, 34, 1, 1); }
+    a.box(pop(23), 114, 28, 10, 10); a.drop(117, 35, 5); a.box("#eef0f3", 117, 29, 4, 6); a("#b6bcc6", 118, 30, 2, 1);
   }
-  function officeChair(a) {
-    a.shadow(14, 46, 38, 10);
-    a("#2b2f3a", 30, 38, 4, 9);
-    a.box("#3b4152", 16, 47, 32, 3);
-    for (const cx of [14, 30, 46]) a.box("#2b2f3a", cx, 50, 4, 3);
-    a.box("#48506a", 14, 26, 36, 13);
-    a.box("#3d4459", 18, 4, 28, 22);
-    a(ramp("#3d4459")[1], 22, 12, 20, 1); a(ramp("#3d4459")[1], 22, 18, 20, 1);
-    a.box("#2f3445", 11, 24, 4, 12); a.box("#2f3445", 49, 24, 4, 12);
+  // an office chair seen from behind, as the person at the desk sits in it; also drawn over a seated person
+  function officeChair(a, bare) {
+    if (!bare) a.shadow(12, 52, 42, 10);
+    const seat = ramp("#48506a"), back = ramp("#3d4459");
+    a.box("#2b2f3a", 16, 56, 32, 3);
+    for (const cx of [13, 30, 46]) a.box("#1d2028", cx, 58, 5, 4);
+    a("#3a3f4c", 30, 44, 4, 12);
+    a.box("#48506a", 12, 40, 40, 8); a(seat[3], 12, 40, 40, 1);
+    a.box("#2f3445", 9, 30, 4, 13); a.box("#2f3445", 51, 30, 4, 13);
+    a.box("#3d4459", 16, 21, 32, 22);
+    a(back[3], 17, 22, 30, 1); a(back[1], 20, 27, 24, 1); a(back[1], 20, 33, 24, 1); a(back[1], 31, 24, 2, 16); a(back[1], 16, 42, 32, 1);
+  }
+  // a backpack on the floor beside some workstations
+  function bag(a, x, y) {
+    const c = BRIGHT[hashStr("bag" + x + ":" + y) % 6], t = ramp(c);
+    a.shadow(18, 54, 26, 6);
+    a.box(c, 20, 28, 22, 26); a(t[3], 21, 29, 20, 2); a.box(t[1], 23, 40, 16, 10); a(t[3], 24, 41, 14, 1);
+    a(t[0], 26, 22, 10, 2); a(t[0], 25, 24, 2, 4); a(t[0], 35, 24, 2, 4);
   }
   function cabinet(a) {
     a.shadow(14, 54, 42, 8);
@@ -1266,12 +1398,15 @@ function demoState(n, ts) {
     let w = 1, n = 1;
     while (tileAt(x + w, y) === "L") w++;
     while (tileAt(x, y + n) === "L") n++;
-    const W = w * 64, H = n * 64, f = ramp("#e1e6ea");
-    a.shadow(8, H - 10, W, 12); a.shadow(W - 4, 16, 10, H - 20);
-    a.block("#3b4250", "#e1e6ea", 4, 6, W - 8, H - 28, 16);
-    for (let i = 36; i < W - 8; i += 36) a(f[1], 4 + i, H - 20, 1, 13);
-    for (let i = 0; i + 36 <= W - 8; i += 36) { a.box("#9aa3ad", 4 + i + 16, H - 16, 5, 1); }
-    a("rgba(255,255,255,.12)", 6, 8, W - 12, 1);
+    const W = w * 64, H = n * 64, f = ramp(BENCH_FACE), tp = ramp(BENCH_TOP);
+    a.shadow(8, H - 12, W - 4, 12); a.shadow(W - 6, 16, 8, H - 22);
+    // an epoxy worktop with a lit edge and a lighter band at the front, over darker cupboards
+    a.block(BENCH_TOP, BENCH_FACE, 4, 6, W - 8, H - 28, 16);
+    a(tp[3], 4, 6, W - 8, 1); a(tp[3], 4, H - 25, W - 8, 2); a(tp[1], 6, 8, W - 12, 1);
+    for (let i = 36; i < W - 8; i += 36) a(f[0], 4 + i, H - 20, 1, 13);
+    for (let i = 0; i + 36 <= W - 8; i += 36) { a.box("#d9dde3", 4 + i + 16, H - 16, 5, 1); }
+    a("rgba(34,24,56,.35)", 4, H - 6, W - 8, 2);
+    if (n === 1) return labIsland(a, W);
     // the reagent shelf down the spine, with bottles
     a.block("#c9d1d8", "#97a3af", 10, 54, W - 20, 4, 5);
     for (let i = 0, bx = 14; bx < W - 22; i++, bx += 11) {
@@ -1304,6 +1439,27 @@ function demoState(n, ts) {
       flask(a, 143, 66, "#f2c14e");
       if (W > 150) { a.box("#fbfaf5", 164, 80, 18, 13); for (const ly of [83, 86, 89]) a("#b8bec6", 166, ly, 12, 1); a("#2b2f3a", 180, 79, 1, 10); }
     }
+  }
+  const BENCH_TOP = "#6f8196", BENCH_FACE = "#56606e";
+  // a one-row island bench: a centrifuge, a laptop, a pipette rack and glassware
+  function labIsland(a, W) {
+    a.drop(10, 31, 22); a.box("#e9edf0", 10, 14, 22, 17); a.box("#c9d1d8", 12, 10, 18, 8); a("#8b919d", 14, 12, 14, 1); a("#5db35a", 13, 26, 3, 2); a("#2b2f3a", 18, 25, 10, 3);
+    a.drop(38, 32, 26); a.box("#c4c8d0", 38, 27, 26, 5); a.box("#2b2f3a", 40, 10, 22, 16); a("#e8f4f2", 41, 11, 20, 14); a("#1f9e8f", 41, 11, 20, 3);
+    for (let i = 0; i < 4; i++) a(["#e2463e", "#f2a03c", "#5b8fd6", "#5db35a"][i], 43 + i * 4, 17 + (i % 2) * 2, 3, 6 - (i % 2) * 2);
+    a.drop(70, 31, 20); a.box("#d9b77e", 70, 24, 20, 7);
+    for (let i = 0; i < 4; i++) { a(GLASS_EDGE, 72 + i * 4, 10, 3, 14); a(BOTTLES[(i + 2) % 6], 73 + i * 4, 18, 1, 5); }
+    if (W >= 128) { flask(a, 100, 8, "#e88aa8"); beaker(a, 112, 16, "#f2c14e"); }
+  }
+  // a rack of three gas cylinders, chained to the wall
+  function gasRack(a) {
+    a.shadow(8, 54, 50, 8);
+    for (const [cx, c] of [[12, "#3f8a46"], [27, "#8b919d"], [42, "#3c7bd1"]]) {
+      const t = ramp(c);
+      a.box(c, cx, -18, 13, 74); a(t[3], cx + 2, -16, 2, 70); a(t[1], cx + 10, -16, 2, 70);
+      a.box("#c4c8d0", cx + 3, -26, 7, 8); a.box("#2b2f3a", cx + 4, -30, 5, 4); a("#fbfaf5", cx + 1, 6, 11, 5); a(c, cx + 3, 8, 7, 1);
+    }
+    a.box("#6b7a87", 8, 14, 50, 3); a.box("#6b7a87", 8, 40, 50, 3);
+    a.box("#f6d04b", 46, -38, 12, 10); a("#2b2f3a", 51, -36, 2, 4); a("#2b2f3a", 51, -31, 2, 1);
   }
   function fumeHood(a, x, y) {
     if (tileAt(x, y - 1) === "H") return;
@@ -1356,7 +1512,9 @@ function demoState(n, ts) {
   // the redrawn props; false hands the tile to the round-1 art
   function drawHi(a, x, y, ch, h) {
     switch (ch) {
-      case "*": if (tileAt(x, y + 1) !== "D") return false; officeChair(a); return true;
+      case "*": if (tileAt(x, y - 1) !== "D") return false; officeChair(a); return true;
+      case ".": if (tileAt(x, y - 1) !== "D" || tileAt(x + 1, y) !== "*" || hashStr("bag" + x + ":" + y) % 3 === 0) return false; bag(a, x, y); return true;
+      case "O": gasRack(a); return true;
       case "D": officeDesk(a, x, y); return true;
       case "C": cabinet(a); return true;
       case "P": plant(a, x, y); return true;
@@ -1376,7 +1534,7 @@ function demoState(n, ts) {
     g.fill();
   }
   function labels(g) {
-    const u = px / scale, f = Math.round(12 * u), pad = Math.round(9 * u), hh = Math.round(20 * u);
+    const u = tu, f = Math.round(12 * u), pad = Math.round(9 * u), hh = Math.round(20 * u);
     g.font = labelFont = "600 " + f + "px system-ui, sans-serif";
     labelBoxes = LABELS.map(([text, tx, ty]) => {
       const w = Math.ceil(g.measureText(text).width) + pad * 2;
@@ -1386,7 +1544,7 @@ function demoState(n, ts) {
   function drawLabels() {
     ctx.font = labelFont;
     ctx.textBaseline = "middle";
-    const u = px / scale;
+    const u = tu;
     for (const b of labelBoxes) {
       ctx.fillStyle = "rgba(255,255,255,.8)";
       roundBox(ctx, b.x, b.y, b.w, b.h);
@@ -1414,11 +1572,17 @@ function demoState(n, ts) {
     if (zoomed) k = zk;
     px = k;
     scale = k / dpr;  // CSS px per world px; px / scale is the DPR, so text stays at device resolution
+    tu = Math.min(dpr, k);  // device px per CSS px of text: text shrinks with the scene when the scene can't grow (125%, 150%)
     canvas.width = LW * k;
     canvas.height = LH * k;
     canvas.style.width = LW * k / dpr + "px";
     canvas.style.height = LH * k / dpr + "px";
     wrap.style.maxHeight = Math.max(240, window.innerHeight - top) + "px";
+    // put the canvas corner on a whole device px, so a fractional DPR does not resample it
+    canvas.style.left = canvas.style.top = "0px";
+    const box = canvas.getBoundingClientRect(), snap = v => (Math.round(v * dpr) - v * dpr) / dpr;
+    canvas.style.left = snap(box.left) + "px";
+    canvas.style.top = snap(box.top) + "px";
     backdrop.width = canvas.width;
     backdrop.height = canvas.height;
     const g = backdrop.getContext("2d");
@@ -1541,7 +1705,7 @@ function demoState(n, ts) {
           let gx = h.x, gy = h.y;
           if (atHome) for (let i = 0; i < 12; i++) {
             const tx = r.x + Math.floor(Math.random() * r.w), ty = r.y + Math.floor(Math.random() * r.h);
-            if (tileAt(tx, ty) === "." && Math.abs(tx - h.x) + Math.abs(ty - h.y) <= 4) { gx = tx; gy = ty; break; }
+            if (tileAt(tx, ty) === "." && tileAt(tx, ty + 1) !== "D" && Math.abs(tx - h.x) + Math.abs(ty - h.y) <= 4) { gx = tx; gy = ty; break; }
           }
           a.wanderAt = now + 1500 + Math.random() * 3500;
           if (gx !== a.x || gy !== a.y) goTo(a, gx, gy);
@@ -1573,9 +1737,12 @@ function demoState(n, ts) {
   function visible() {
     return [...actors.values()].filter(a => a.spot >= 0 || a.leaving).sort((p, q) => p.y - q.y || p.x - q.x);
   }
+  // at an office desk spot, in place: sits with its back to the viewer
+  function seated(a) { const h = home(a); return !a.path.length && h && a.x === h.x && a.y === h.y && tileAt(h.x, h.y - 1) === "D"; }
   function frameOf(a) {
     const st = stateOf(a);
     if (st === "walk") return {pose: "walk", frame: [0, 1, 0, 2][Math.floor(a.walked * 4) % 4], dir: a.dir};
+    if (seated(a)) return {pose: "desk", frame: st === "work" && !still() ? tick % 2 : 0, dir: "u"};
     return {pose: poseFor(a.d), frame: st === "work" && !still() ? tick % 2 : 0, dir: "d"};
   }
   function place(a) {
@@ -1583,14 +1750,14 @@ function demoState(n, ts) {
     // feet stand 3 px above the tile's bottom edge; a lying sprite fills its tile
     const snap = v => Math.round(v * S) / S;  // whole art px
     const x = snap(a.x * T + T / 2 - s.ax), y = snap(a.y * T + T - s.h + (s.lie ? 0 : 1));
-    return {f, s, x, y, w: s.w, h: s.h, top: y + s.top};
+    return {f, s, x, y, w: s.w, h: s.h, top: y + s.top, sit: f.pose === "desk"};
   }
 
   // ---- drawing: boxes in device pixels; u is one CSS pixel ----
-  function text(size, weight) { ctx.font = (weight || 500) + " " + Math.round(size * px / scale) + "px system-ui, sans-serif"; }
+  function text(size, weight) { ctx.font = (weight || 500) + " " + Math.round(size * tu) + "px system-ui, sans-serif"; }
   // boxes keep a 2 px gap, which also covers the bubbles' 1 px outline
   function hits(b, list) {
-    const m = 2 * Math.max(1, Math.round(px / scale));
+    const m = 2 * Math.max(1, Math.round(tu));
     return list.some(o => o.x < b.x + b.w + m && b.x < o.x + o.w + m && o.y < b.y + b.h + m && b.y < o.y + o.h + m);
   }
   function fits(b) { return b.x >= 0 && b.y >= 0 && b.x + b.w <= canvas.width && b.y + b.h <= canvas.height; }
@@ -1599,12 +1766,12 @@ function demoState(n, ts) {
   // a small dark pill centred above the head; if that spot is taken it stacks upward, then tries under the feet
   function tagBoxes(cx, top, bottom, label) {
     text(11, 600);
-    const u = px / scale, w = Math.ceil(ctx.measureText(label).width + 22 * u), hh = Math.round(16 * u);
+    const u = tu, w = Math.ceil(ctx.measureText(label).width + 22 * u), hh = Math.round(16 * u);
     const X = Math.round(Math.max(0, Math.min(canvas.width - w, cx * px - w / 2))), Y = Math.round(top * px - hh - 3 * u);
     return [Y, Y - hh - 2 * u, Y - 2 * hh - 4 * u, Math.round(bottom * px + 2 * u)].map(y => ({x: X, y: Math.round(y), w, h: hh}));
   }
   function drawTag(b, label, chip, hot) {
-    const u = px / scale;
+    const u = tu;
     ctx.fillStyle = hot ? "rgba(224,123,0,.95)" : "rgba(24,22,32,.84)";
     roundBox(ctx, b.x, b.y, b.w, b.h);
     if (chip) { ctx.fillStyle = chip; ctx.beginPath(); ctx.arc(b.x + 8 * u, b.y + b.h / 2, 3 * u, 0, 7); ctx.fill(); }
@@ -1616,14 +1783,14 @@ function demoState(n, ts) {
   // a pixel speech bubble beside the head: right or left, then one step up, one down, two up; the box includes its tail
   function bubbleBoxes(cx, top, label, dots) {
     text(12, 700);
-    const u = Math.max(1, Math.round(px / scale)), w = dots ? 17 * u : Math.ceil(ctx.measureText(label).width + 12 * u), hh = 17 * u;
+    const u = Math.max(1, Math.round(tu)), w = dots ? 17 * u : Math.ceil(ctx.measureText(label).width + 12 * u), hh = 17 * u;
     const right = Math.round((cx + 10) * px), left = Math.round((cx - 10) * px - w), y0 = Math.round((top + 1) * px - hh);
     const out = [];
     for (const k of [0, 1, -1, 2]) for (const [x, side] of [[right, 0], [left, 1]]) out.push({x, y: y0 - k * (hh + 6 * u), w, h: hh + 3 * u, side});
     return out;
   }
   function drawBubble(b, mark, note, colour, dots) {
-    const u = Math.max(1, Math.round(px / scale)), h = b.h - 3 * u, tx = b.side ? b.x + b.w - 6 * u : b.x + 3 * u;
+    const u = Math.max(1, Math.round(tu)), h = b.h - 3 * u, tx = b.side ? b.x + b.w - 6 * u : b.x + 3 * u;
     ctx.fillStyle = "#2a2233";
     ctx.fillRect(b.x - u, b.y - u, b.w + 2 * u, h + 2 * u);
     ctx.fillRect(tx - u, b.y + h, 5 * u, 3 * u);
@@ -1649,16 +1816,18 @@ function demoState(n, ts) {
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(backdrop, 0, 0);
     const list = visible(), placed = list.map(a => [a, place(a)]);
+    const ring = a => {
+      ctx.fillStyle = "rgba(255,152,48,.7)";
+      roundBox(ctx, Math.round((a.x * T + 4) * px), Math.round((a.y * T + 25) * px), 24 * px, 6 * px);
+    };
     for (const [a, p] of placed) {
-      // a soft foot shadow, stepped like the art
-      ctx.fillStyle = "rgba(28,20,44,.22)";
-      const fx = (a.x * T + T / 2) * px, fy = (p.y + p.h - 2.5) * px;
-      if (!p.s.lie) for (const [w, dy, h] of [[16, -2, 1], [22, -1, 2], [16, 1, 1]])
-        ctx.fillRect(Math.round(fx - w / 2 * px), Math.round(fy + dy * px), Math.round(w * px), Math.round(h * px));
-      if (a.id === highlight || a.id === hoverId) {
-        ctx.fillStyle = "rgba(255,152,48,.7)";
-        roundBox(ctx, Math.round((a.x * T + 4) * px), Math.round((a.y * T + 25) * px), 24 * px, 6 * px);
-      }
+      // a foot shadow stepped on the art grid: widths and offsets in art px
+      ctx.fillStyle = "rgba(28,20,44,.3)";
+      const fx = (a.x * T + T / 2) * px, fy = (p.y + p.h - 2.5) * px, ap = px / S;
+      if (!p.s.lie && !p.sit) for (const [w, dy, h] of [[32, -4, 2], [44, -2, 4], [32, 2, 2]])
+        ctx.fillRect(Math.round(fx - w / 2 * ap), Math.round(fy + dy * ap), Math.round(w * ap), Math.round(h * ap));
+      const hot = a.id === highlight || a.id === hoverId;
+      if (hot && !p.sit) ring(a);
       if (p.s.flip) {
         ctx.save();
         ctx.translate((p.x + p.w) * px, 0);
@@ -1666,10 +1835,17 @@ function demoState(n, ts) {
         ctx.drawImage(p.s.c, 0, p.y * px, p.w * px, p.h * px);
         ctx.restore();
       } else ctx.drawImage(p.s.c, p.x * px, p.y * px, p.w * px, p.h * px);
+      if (p.sit) {
+        ctx.drawImage(chairTop, a.x * T * px, a.y * T * px, T * px, T * px);
+        if (hot) ring(a);
+      }
     }
     drawLabels();
     // nothing drawn below may cover a zone label or another tag or bubble
-    const taken = labelBoxes.slice(), shown = placed.filter(([a]) => !a.leaving);
+    const shown = placed.filter(([a]) => !a.leaving);
+    // tags and bubbles keep off every face and shoulders: a box 16 world px wide, from the top of the hair down 30
+    const taken = labelBoxes.concat(shown.filter(([, p]) => !p.s.lie).map(([a, p]) =>
+      ({x: Math.round((a.x * T + T / 2 - 8) * px), y: Math.round(p.top * px), w: 16 * px, h: 30 * px})));
     // shortcut: a room shows only as many characters as it has spots and then a "+k" sign, add spots when rooms overflow often
     for (const [g, k] of overflow) {
       const s = SPOTS.filter(sp => spotGroup(sp) === g);
@@ -1693,7 +1869,8 @@ function demoState(n, ts) {
       const hot = a.id === highlight || a.id === hoverId;
       const label = a.d.kind === "agent" ? a.d.role.slice(0, 20)
         : (a.d.idea ? a.d.idea.slice(0, 18) + " · " : "") + (a.d.project || "?").slice(0, 12);
-      const cands = tagBoxes(a.x * T + T / 2, p.top, p.y + p.h, label), b = pick(cands, taken) || (hot ? cands[0] : null);
+      const tb = tagBoxes(a.x * T + T / 2, p.top, p.y + p.h, label), cands = p.sit ? tb.slice(3).concat(tb.slice(0, 3)) : tb;
+      const b = pick(cands, taken) || (hot ? cands[0] : null);
       if (!b) continue;
       drawTag(b, label, a.look.pal.c, hot);
       taken.push(b);
@@ -1833,6 +2010,10 @@ function demoState(n, ts) {
   const bg = base.getContext("2d");
   bg.setTransform(S, 0, 0, S, 0, 0);  // the art is written in world px; half px are whole art px
   drawStatic(bg);
+  chairTop.width = chairTop.height = T * S;
+  const cg = chairTop.getContext("2d");
+  cg.setTransform(S, 0, 0, S, 0, 0);
+  officeChair(painter(cg, 0, 0).a, true);
   resize();
   watchDpr();
   poll();
