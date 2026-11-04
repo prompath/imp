@@ -437,6 +437,35 @@ class TestRoomsPage(unittest.TestCase):
         self.assertEqual(got[6], "r" * 19 + "\u2026 \u00b7 " + "i" * 17 + "\u2026")
         self.assertEqual(got[7:], ["a-long-idea-name-\u2026 \u00b7 imp", "?"])
 
+    def test_tags_keep_off_bodies_and_stay_with_their_owner(self):
+        got = self.pure("""
+        const man = (id, rank, cx, w, hot) => ({id, rank, hot: !!hot, cx, hh: 32, body: {x: cx - 20, y: 200, w: 40, h: 96},
+          ys: [162, 126, 300], labels: [{label: id, w}]});
+        // b is listed first, but the lead a picks first; c and d are walled in above and below; e is at the canvas edge
+        const people = [man("b", 2, 264, 80), man("a", 1, 200, 240), man("c", 2, 600, 80), man("d", 0, 800, 80, true), man("e", 2, 10, 240)];
+        const blocked = [{x: 500, y: 0, w: 400, h: 200}, {x: 500, y: 296, w: 400, h: 304}];
+        const tags = placeTags(people, blocked, 1000, 600, 4, 32);
+        const hit = (b, o) => o.x < b.x + b.w && b.x < o.x + o.w && o.y < b.y + b.h && b.y < o.y + o.h;
+        const far = (x, y, o) => Math.hypot(Math.max(o.x - x, 0, x - o.x - o.w), Math.max(o.y - y, 0, y - o.y - o.h));
+        const bad = [];
+        for (const p of people) {
+          const b = tags.get(p.id);
+          if (!b || p.hot) continue;
+          const x = b.x + b.w / 2, y = b.y + b.h / 2;
+          if (people.some(q => hit(b, q.body))) bad.push(p.id + " on a body");
+          if (people.some(q => q !== p && far(x, y, q.body) <= far(x, y, p.body))) bad.push(p.id + " nearer someone else");
+          if (Math.abs(x - p.cx) > 32) bad.push(p.id + " drifts");
+        }
+        const y = id => tags.get(id) && tags.get(id).y;
+        return {bad, a: y("a"), b: y("b"), c: tags.get("c"), d: y("d"), e: tags.get("e"), size: tags.size};
+        """)
+        self.assertEqual(got["bad"], [])
+        self.assertEqual((got["a"], got["b"]), (162, 126))  # the lead takes the slot above the head, the agent the one higher
+        self.assertIsNone(got["c"])  # no clear slot: hover only
+        self.assertIsNotNone(got["d"])  # hot: drawn even when walled in
+        self.assertIsNone(got["e"])  # kept on the canvas it would drift 110 px off its owner
+        self.assertEqual(got["size"], 5)
+
     def test_wait_text_does_not_double(self):
         got = self.pure("""
         const w = note => stateText({activity: "wait", note, room: "lounge"});

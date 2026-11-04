@@ -275,6 +275,32 @@ function tagText(c, hot) {
   return (c.idea ? cut(c.idea, 18) + " \u00b7 " : "") + cut(c.project || "?", 12);
 }
 function rowCells(c) { return [c.role, c.project || "-", c.idea || "-", roomText(c), stateText(c)]; }
+// name-tag slots, all in device px. Each person: {id, rank, hot, cx, ys, body, labels: [{label, w}], hh}; body is the
+// sprite's box, head to feet with its props, and ys the tops of its slots (above the head, under the feet). A tag sits
+// centred on cx, at most drift px sideways, on the cw x ch canvas, clear of blocked, of the tags placed before it and of
+// every body, and nearer its owner's body than anyone else's. Lower rank picks first. A tag with no slot is null: it shows
+// only on hover. A hot one (hovered or focused) still takes the first slot clear of blocked boxes and tags, even over a body.
+function placeTags(people, blocked, cw, ch, gap, drift) {
+  const hit = (b, o, m) => o.x < b.x + b.w + m && b.x < o.x + o.w + m && o.y < b.y + b.h + m && b.y < o.y + o.h + m;
+  const far = (x, y, o) => Math.hypot(Math.max(o.x - x, 0, x - o.x - o.w), Math.max(o.y - y, 0, y - o.y - o.h));
+  const taken = blocked.slice(), out = new Map();
+  for (const p of people.slice().sort((m, n) => m.rank - n.rank)) {
+    const cands = [];
+    for (const {label, w} of p.labels) for (const y of p.ys) for (const d of [0, -drift / 2, drift / 2, -drift, drift]) {
+      const x = Math.max(0, Math.min(cw - w, p.cx - w / 2 + d));
+      if (Math.abs(x + w / 2 - p.cx) <= drift) cands.push({x: Math.round(x), y: Math.round(y), w, h: p.hh, label});
+    }
+    const clear = b => b.x >= 0 && b.y >= 0 && b.x + b.w <= cw && b.y + b.h <= ch && !taken.some(o => hit(b, o, gap));
+    const mine = b => {
+      const x = b.x + b.w / 2, y = b.y + b.h / 2, d = far(x, y, p.body);
+      return people.every(q => !hit(b, q.body, 0) && (q === p || far(x, y, q.body) > d));
+    };
+    const b = cands.find(c => clear(c) && mine(c)) || (p.hot ? cands.find(clear) || cands[0] : null);
+    out.set(p.id, b || null);
+    if (b) taken.push(b);
+  }
+  return out;
+}
 
 // ---- sprites: palette-letter grids built from rects, then outlined; "." is see-through ----
 // e eyes; h/H hair, s/S skin, c/C shirt (project colour), p/P trousers, f/F shoes come from the character;
@@ -2074,16 +2100,20 @@ function demoState(n, ts) {
       const spec = spriteRows(pose, frame, d, a.look.style, a.look.acc), c = document.createElement("canvas"), g = c.getContext("2d");
       c.width = spec.rows[0].length;
       c.height = spec.rows.length;
+      let x0 = c.width, x1 = 0, y0 = c.height, y1 = 0;
       spec.rows.forEach((row, y) => [...row].forEach((ch, x) => {
         if (ch === ".") return;
         g.fillStyle = a.look.pal[ch] || PAL[ch];
         g.fillRect(x, y, 1, 1);
+        if (ch === "v" || ch === "Q") return;  // steam and floor shadows are not body
+        x0 = Math.min(x0, x); x1 = Math.max(x1, x + 1); y0 = Math.min(y0, y); y1 = Math.max(y1, y + 1);
       }));
-      s = {c, ax: spec.ax, lie: !!spec.lie, top: Math.max(0, spec.rows.findIndex(row => /[^.]/.test(row)))};
+      s = {c, ax: spec.ax, lie: !!spec.lie, top: Math.max(0, spec.rows.findIndex(row => /[^.]/.test(row))), x0, x1, y0, y1};
       sprites.set(key, s);
     }
-    // art px to world px
-    return {c: s.c, ax: (flip ? s.c.width - s.ax : s.ax) / S, flip, lie: s.lie, top: s.top / S, w: s.c.width / S, h: s.c.height / S};
+    // art px to world px; body is the box head to feet, props included, from the sprite's corner
+    const body = {x: (flip ? s.c.width - s.x1 : s.x0) / S, y: s.y0 / S, w: (s.x1 - s.x0) / S, h: (s.y1 - s.y0) / S};
+    return {c: s.c, ax: (flip ? s.c.width - s.ax : s.ax) / S, flip, lie: s.lie, top: s.top / S, w: s.c.width / S, h: s.c.height / S, body};
   }
   function tileOf(a) { return a.path.length ? a.path[0] : [Math.round(a.x), Math.round(a.y)]; }
   function goTo(a, gx, gy) {
@@ -2209,7 +2239,8 @@ function demoState(n, ts) {
     const snap = v => px < S ? Math.round(v) : Math.round(v * S) / S;  // whole art px, or whole world px at k=1 so a walk does not shimmer
     const x = snap(a.x * T + T / 2 - s.ax), y = snap(a.y * T + T - s.h + (s.lie ? 0 : 1));
     const over = f.side === "N" ? OVER[chairKind(Math.round(a.x), Math.round(a.y), "N")] : null;
-    return {f, s, x, y, w: s.w, h: s.h, top: y + s.top, sit: f.side || "", over};
+    const body = {x: x + s.body.x, y: y + s.body.y, w: s.body.w, h: s.body.h};
+    return {f, s, x, y, w: s.w, h: s.h, top: y + s.top, sit: f.side || "", over, body};
   }
 
   // ---- drawing: boxes in device pixels; u is one CSS pixel ----
@@ -2223,13 +2254,15 @@ function demoState(n, ts) {
   // the first candidate box that stays on the canvas and clear of everything taken
   function pick(cands, taken) { return cands.find(b => fits(b) && !hits(b, taken)); }
   // a small dark pill centred above the head, one tag height higher (no further, or it reads as a neighbour's),
-  // under the feet, then beside the body at world y side; all in device px
-  function tagBoxes(cx, top, bottom, label, side) {
-    text(11, 600);
-    const u = tu, w = Math.ceil(ctx.measureText(label).width + 22 * u), hh = Math.round(16 * u);
-    const X = Math.max(0, Math.min(canvas.width - w, cx * px - w / 2)), Y = top * px - hh - 3 * u, box = (x, y) => ({x: Math.round(x), y: Math.round(y), w, h: hh});
-    return {above: box(X, Y), up: box(X, Y - hh - 2 * u), under: box(X, bottom * px + 2 * u),
-      right: box((cx + 11) * px, side * px), left: box((cx - 11) * px - w, side * px)};
+  // or under the feet; all in device px
+  function tagWidth(label) { text(11, 600); return Math.ceil(ctx.measureText(label).width + 22 * tu); }
+  function tagYs(top, bottom) {
+    const u = tu, hh = Math.round(16 * u), y = Math.round(top * px - hh - 3 * u);
+    return {hh, above: y, up: Math.round(y - hh - 2 * u), under: Math.round(bottom * px + 2 * u)};
+  }
+  function tagBoxes(cx, top, bottom, label) {
+    const w = tagWidth(label), t = tagYs(top, bottom), x = Math.round(Math.max(0, Math.min(canvas.width - w, cx * px - w / 2)));
+    return {above: {x, y: t.above, w, h: t.hh}, up: {x, y: t.up, w, h: t.hh}, under: {x, y: t.under, w, h: t.hh}};
   }
   function drawTag(b, label, chip, hot) {
     const u = tu;
@@ -2308,17 +2341,18 @@ function demoState(n, ts) {
     drawLabels();
     // nothing drawn below may cover a zone label or another tag or bubble
     const shown = placed.filter(([a]) => !a.leaving);
-    // tags and bubbles keep off every face and shoulders (a box 16 world px wide, from the top of the hair down 30),
-    // and off the desks, benches, counters and wall faces, the richest art in the room; hard holds only labels, tags and bubbles
-    const hard = labelBoxes.slice(), taken = labelBoxes.concat(AVOID.map(b => ({x: b.x * px, y: b.y * px, w: b.w * px, h: b.h * px})), shown.filter(([, p]) => !p.s.lie).map(([a, p]) =>
-      ({a, x: Math.round((a.x * T + T / 2 - 8) * px), y: Math.round(p.top * px), w: 16 * px, h: (p.sit || p.f.pose === "couch" || p.f.pose === "games" ? 30 : p.y + p.h - 3 - p.top) * px})));
+    // bubbles keep off every face and shoulders (a box 16 world px wide, from the top of the hair down 30), and bubbles
+    // and tags off the desks, benches, counters and wall faces, the richest art in the room; hard holds only labels, tags and bubbles
+    const walls = AVOID.map(b => ({x: b.x * px, y: b.y * px, w: b.w * px, h: b.h * px}));
+    const hard = labelBoxes.slice(), taken = labelBoxes.concat(walls, shown.filter(([, p]) => !p.s.lie).map(([a, p]) =>
+      ({x: Math.round((a.x * T + T / 2 - 8) * px), y: Math.round(p.top * px), w: 16 * px, h: (p.sit || p.f.pose === "couch" || p.f.pose === "games" ? 30 : p.y + p.h - 3 - p.top) * px})));
     const put = b => { taken.push(b); hard.push(b); };
     // shortcut: a room shows only as many characters as it has spots and then a "+k" sign, add spots when rooms overflow often
     for (const [g, k] of overflow) {
       const s = SPOTS.filter(sp => spotGroup(sp) === g);
       if (!s.length) continue;
       const x = Math.max(...s.map(sp => sp.x)), y = Math.min(...s.map(sp => sp.y));
-      const t = tagBoxes(x * T + T / 2, y * T + 6, y * T + T, "+" + k, y * T), b = pick([t.above, t.up, t.under], taken);
+      const t = tagBoxes(x * T + T / 2, y * T + 6, y * T + T, "+" + k), b = pick([t.above, t.up, t.under], taken);
       if (b) { drawTag(b, "+" + k, "", true); put(b); }
     }
     for (const [a, p] of shown) {
@@ -2330,46 +2364,33 @@ function demoState(n, ts) {
       drawBubble(b, wait ? "!" : "?", note, wait ? "#e07b00" : "#3871dc");
       put(b);
     }
-    // a name tag on everyone: idea and project on a lead, the role on an agent; a crowd shortens it, and when no spot is clear
-    // it may cover art and faces, never a label, tag or bubble
-    const order = (a) => a.id === highlight || a.id === hoverId ? 0 : a.d.kind === "lead" ? 1 : 2;
-    let tagged = 0, forced = 0;
-    for (const [a, p] of shown.slice().sort((m, n) => order(m[0]) - order(n[0]))) {
-      const hot = a.id === highlight || a.id === hoverId, full = tagText(a.d, hot);
+    // a name tag on its owner: idea and project on a lead, the role on an agent; a crowd shortens it, and where no slot
+    // keeps off every body and stays nearest its owner, the tag shows only on hover or roster focus (placeTags)
+    const bodies = new Map(shown.map(([a, p]) => [a.id, {x: Math.round(p.body.x * px), y: Math.round(p.body.y * px),
+      w: Math.round(p.body.w * px), h: Math.round(p.body.h * px)}]));
+    const people = shown.map(([a, p]) => {
+      const hot = a.id === highlight || a.id === hoverId, full = tagText(a.d, hot), t = tagYs(p.top, p.y + p.h);
       const short = cut(a.d.kind === "agent" ? a.d.role : a.d.idea || a.d.project || "?", 10);
       // a lounger's middle is its left tile's right edge; someone seated is tagged under the chair, never above, where the desk is
-      const cx = p.s.lie ? a.x * T : a.x * T + T / 2, cands = [], legs = [], hips = Math.round((p.y + p.h - 11) * px);
-      for (const label of short === full ? [full] : [full, short]) {
-        const t = tagBoxes(cx, p.top, p.y + p.h, label, p.sit ? p.y + p.h - 18 : p.top + 10), shift = d => Object.assign({}, t.under, {x: t.under.x + d});
-        const below = [t.under, shift(-(t.under.w >> 1)), shift(t.under.w >> 1)];
-        for (const b of p.sit ? below.concat(t.right, t.left) : [t.above, t.up].concat(below, t.right, t.left))
-          cands.push(Object.assign(b, {label}));
-        legs.push(Object.assign({}, t.under, {y: hips - t.under.h, label}));
-      }
-      let b = pick(cands, taken);
-      // then over a standing person's own hips and legs, ending 8 px above the tile's foot, where the art of the row
-      // below reaches up: only if every tile under it is floor, so it covers no furniture; it may cover its own face box
-      if (!b && !p.sit && !p.s.lie) {
-        const others = taken.filter(o => o.a !== a), wt = T * px, floor = c => {
-          for (let y = Math.floor(c.y / wt); y <= Math.floor((c.y + c.h - 1) / wt); y++)
-            for (let x = Math.floor(c.x / wt); x <= Math.floor((c.x + c.w - 1) / wt); x++) if (!passable(x, y)) return false;
-          return true;
-        };
-        b = legs.find(c => fits(c) && floor(c) && !hits(c, others));
-      }
-      if (!b) {  // the clear spot that covers the least art and fewest faces
-        const cover = c => taken.reduce((n, o) => n + Math.max(0, Math.min(c.x + c.w, o.x + o.w) - Math.max(c.x, o.x)) * Math.max(0, Math.min(c.y + c.h, o.y + o.h) - Math.max(c.y, o.y)), 0);
-        forced++;
-        b = cands.filter(c => fits(c) && !hits(c, hard)).sort((m, n) => cover(m) - cover(n))[0] || cands[0];
-      }
+      return {id: a.id, rank: hot ? 0 : a.d.kind === "lead" ? 1 : 2, hot, cx: Math.round((p.s.lie ? a.x * T : a.x * T + T / 2) * px),
+        ys: p.sit ? [t.under] : [t.above, t.up, t.under], body: bodies.get(a.id), hh: t.hh,
+        labels: (short === full ? [full] : [full, short]).map(label => ({label, w: tagWidth(label)}))};
+    });
+    const tags = placeTags(people, hard.concat(walls), canvas.width, canvas.height, 2 * Math.max(1, Math.round(tu)), T / 2 * px);
+    let drawn = 0, hover = [], over = 0;
+    for (const [a] of shown) {
+      const b = tags.get(a.id), hot = a.id === highlight || a.id === hoverId;
+      if (!b) { hover.push(a.id); continue; }
       drawTag(b, b.label, a.look.pal.c, hot);
       put(b);
-      tagged++;
+      drawn++;
+      if (!hot) for (const o of bodies.values()) if (o.x < b.x + b.w && b.x < o.x + o.w && o.y < b.y + b.h && b.y < o.y + o.h) over++;
     }
-    // demo self-check: every visible character has a tag (forced ones may sit on art)
+    // demo self-check: drawn and hover-only tags add up to the people shown, and no drawn tag covers a body
     if (demo) {
-      canvas.dataset.tags = tagged + "/" + shown.length + " forced " + forced;
-      if (tagged !== shown.length) console.error("rooms: " + tagged + " tags for " + shown.length + " characters");
+      canvas.dataset.tags = drawn + " drawn " + hover.length + " hover-only of " + shown.length + ", " + over + " on bodies";
+      canvas.dataset.hoverOnly = hover.join(" ");
+      if (drawn + hover.length !== shown.length || over) console.error("rooms: tags " + canvas.dataset.tags);
     }
     for (const [a, p] of shown) {
       if (!wanders(a)) continue;  // the chief's talk dots are decoration: only where there is room
