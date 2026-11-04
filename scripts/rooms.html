@@ -1,0 +1,1072 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>imp rooms</title><style>
+:root{--bg:#111217;--panel:#181b1f;--border:#2c3235;--text:#d8d9da;--muted:#8e9297;--head:#1f2226;
+--red:#f2495c;--amber:#ff9830;--blue:#5794f2;--green:#73bf69;--grey:#6e7680}
+@media (prefers-color-scheme:light){:root{--bg:#f4f5f5;--panel:#fff;--border:#d8dadd;--text:#24292e;
+--muted:#6a737d;--head:#f0f1f3;--red:#d4374a;--amber:#e07b00;--blue:#3871dc;--green:#3d9a37;--grey:#8a9099}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:13px system-ui,sans-serif}
+.top{display:flex;flex-wrap:wrap;gap:16px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--panel)}
+.top b{font-size:15px}.top span{color:var(--muted)}#ts{font-family:ui-monospace,monospace;color:var(--text)}
+.top a{color:var(--blue)}#status{color:var(--amber)}
+.top button{background:var(--head);color:var(--text);border:1px solid var(--border);border-radius:3px;padding:2px 10px;font:inherit;cursor:pointer}
+#wrap{position:relative;padding:8px;overflow-x:auto}
+#scene{display:block;margin:0 auto;image-rendering:pixelated;border:1px solid var(--border);border-radius:3px;background:#2e323d}
+#tip{position:absolute;pointer-events:none;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:3px;
+padding:4px 8px;font-size:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:3px;margin:0 8px 8px}
+.panel h3{margin:0;padding:6px 10px;font-size:12px;font-weight:500;color:var(--muted);border-bottom:1px solid var(--border);background:var(--head)}
+table{border-collapse:collapse;width:100%}th,td{padding:5px 10px;text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}
+th{color:var(--muted);font-weight:500}.empty{padding:10px;color:var(--muted)}
+tbody tr{cursor:default}tbody tr:hover,tbody tr:focus,tbody tr.hl{background:var(--head)}
+tbody tr:focus{outline:2px solid var(--amber);outline-offset:-2px}
+.chip{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+</style></head><body>
+<noscript><p class="empty">The rooms page needs JavaScript. The <a href="/">dashboard</a> works without it.</p></noscript>
+<div class="top"><b>imp rooms</b><a href="/">Dashboard</a><span>last refreshed <span id="ts">-</span></span>
+<span id="status"></span><button id="pause" type="button" aria-pressed="false">Pause</button></div>
+<div id="wrap"><canvas id="scene" aria-hidden="true"></canvas><div id="tip" hidden></div></div>
+<div class="panel"><h3 id="roster-title">Who is where</h3><table aria-labelledby="roster-title"><thead><tr>
+<th scope="col">Name / role</th><th scope="col">Project</th><th scope="col">Idea</th><th scope="col">Room</th><th scope="col">State</th>
+</tr></thead><tbody id="roster"></tbody></table><div id="nobody" class="empty" hidden>Nobody is in yet.</div></div>
+<script>
+"use strict";
+// The part up to the end-pure marker touches no DOM or window, so a node test can slice it out and run it.
+const T = 16;
+// One letter per tile. Walls: # plain, W whiteboard, N window, Q pegboard, = kitchen cabinets.
+// Floor: . room floor, + door, E campus door, , grass, _ rug. Work spots: * stage rooms, k kitchen.
+// Seats, walkable only as a path's end: c couch, b beanbag, l lounger (j is its backrest).
+// Props: P plant, T table, R reading table, H fume hood, Z sink, G glass cabinet, L lab bench, B workbench,
+// J drill press, X crate, S bookshelf, i lamp, h armchair, D desk, C filing cabinet, U water cooler, F fridge,
+// K counter, M coffee machine, O stove, I island, Y coffee table, V TV, A arcade, @ umbrella, & palm, % hedge, ~ water.
+const MAP = [
+  "###WWWWW####NN###NN##QQQQ##NN#############",
+  "#P..*.*..P#HH..Z..GG#BBBB..JXX#SSSS..SSSS#",
+  "#.........#.*..*..*.#.*.*.*..X#.*.*..*.*.#",
+  "#..*.*.*..#.LLL.LLL.#.........#..........#",
+  "#.*TTTTT*.#.*.*.*.*.#.*.*.*.*.#S.RRRRRR.S#",
+  "#.*TTTTT*.#.........#..BB.BB..#S.*.*.*..S#",
+  "#..*.*.*..#.*.*.*.*.#.*.*.*.*.#S........S#",
+  "#P.......P#.LLL.LLL.#XX.......#Sih....hiS#",
+  "#####+#########+#########+#########+######",
+  "E........................................#",
+  "#.........P...................P..........#",
+  "##NN#+#NN##=====+===##NN+NN########+######",
+  "#CC.....UP#FKMKK.OKKA.......P#&,,,,.,,,,&%",
+  "#.*..*..*.#.k.k...k..........#jl.jl.jl.jl%",
+  "#.DD.DD.DD#...........ccccc..#...........%",
+  "#.........#.IIII.TT.b_______b#.~~~~~~~~~.%",
+  "#.*..*..*.#.k.k..k...__YYY__.#.~~~~~~~~~.%",
+  "#.DD.DD.DD#.........b_______b#.~~~~~~~~~.%",
+  "#.........#..TTT.....__VVV__.#...........%",
+  "#P.*...*.P#..................#jl.jl@jl.jl%",
+  "#.........#P.......P....A...P#,,,,,,,,,,,%",
+  "##############################%%%%%%%%%%%%",
+];
+const MAP_W = MAP[0].length, MAP_H = MAP.length;
+const ROOMS = {
+  meeting: {name: "Meeting room", x: 1, y: 1, w: 9, h: 7},
+  lab: {name: "Lab", x: 11, y: 1, w: 9, h: 7},
+  workshop: {name: "Workshop", x: 21, y: 1, w: 9, h: 7},
+  library: {name: "Library", x: 31, y: 1, w: 10, h: 7},
+  office: {name: "Office", x: 1, y: 12, w: 9, h: 9},
+  lounge: {name: "Kitchen-living room", x: 11, y: 12, w: 18, h: 9},
+  pool: {name: "Pool", x: 30, y: 12, w: 11, h: 9},
+};
+const ROOM_KEYS = Object.keys(ROOMS);
+const KITCHEN_END = 19;  // lounge columns up to here are the kitchen side
+const WALK = ".+E*k,_", SEATS = "cbl", WALLS = "#WNQ=";
+
+function tileAt(x, y) { return (MAP[y] || "")[x] || "#"; }
+function roomAt(x, y) {
+  for (const k of ROOM_KEYS) {
+    const r = ROOMS[k];
+    if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return k;
+  }
+  return "";
+}
+const DOORS = [], SPOTS = [];
+MAP.forEach((row, y) => [...row].forEach((ch, x) => {
+  if (ch === "+" || ch === "E") DOORS.push({x, y, campus: ch === "E"});
+  if (ch === "*" || ch === "k" || SEATS.includes(ch)) SPOTS.push({x, y, kind: ch, room: roomAt(x, y)});
+}));
+const CAMPUS_DOOR = DOORS.find(d => d.campus);
+function passable(x, y) { return WALK.includes(tileAt(x, y)); }
+
+// 4-connected BFS; the goal may be a seat, so nobody walks across a couch on the way elsewhere
+function bfs(sx, sy, gx, gy) {
+  const start = sy * MAP_W + sx, goal = gy * MAP_W + gx, prev = new Map([[start, -1]]), queue = [start];
+  for (let i = 0; i < queue.length; i++) {
+    const cur = queue[i];
+    if (cur === goal) {
+      const path = [];
+      for (let p = cur; p !== -1; p = prev.get(p)) path.push([p % MAP_W, Math.floor(p / MAP_W)]);
+      return path.reverse();
+    }
+    const cx = cur % MAP_W, cy = Math.floor(cur / MAP_W);
+    for (const [dx, dy] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) {
+      const nx = cx + dx, ny = cy + dy, n = ny * MAP_W + nx;
+      if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H || prev.has(n)) continue;
+      if (n !== goal && !passable(nx, ny)) continue;
+      prev.set(n, cur);
+      queue.push(n);
+    }
+  }
+  return null;
+}
+
+function spotGroup(s) { return s.room + ":" + (s.kind === "b" ? "c" : s.kind); }
+function charGroup(c) {
+  if (c.room === "pool") return "pool:l";
+  if (c.room === "lounge") return c.activity === "wait" ? "lounge:k" : "lounge:c";
+  return c.room + ":*";
+}
+function ideaKey(id) { return id.split("#")[0]; }
+// want: [{id, group}], prev: Map id -> spot index. Returns Map id -> spot index, -1 when the group is full.
+// Spots stick between polls, and a new character takes the free spot nearest someone of its idea.
+function assignSpots(want, prev) {
+  const out = new Map(), taken = new Set();
+  const list = want.slice().sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  for (const w of list) {
+    const p = prev.get(w.id);
+    if (p >= 0 && SPOTS[p] && spotGroup(SPOTS[p]) === w.group && !taken.has(p)) { out.set(w.id, p); taken.add(p); }
+  }
+  for (const w of list) {
+    if (out.has(w.id)) continue;
+    const mate = list.find(m => m.group === w.group && ideaKey(m.id) === ideaKey(w.id) && out.get(m.id) >= 0);
+    const near = mate && SPOTS[out.get(mate.id)];
+    let best = -1, bestD = Infinity;
+    SPOTS.forEach((s, i) => {
+      if (taken.has(i) || spotGroup(s) !== w.group) return;
+      const d = near ? Math.abs(s.x - near.x) + Math.abs(s.y - near.y) : i;
+      if (d < bestD) { bestD = d; best = i; }
+    });
+    out.set(w.id, best);
+    if (best >= 0) taken.add(best);
+  }
+  return out;
+}
+
+const ACTIVITIES = ["work", "wait", "reply", "idle"];
+function clip(v, n) { return typeof v === "string" ? v.slice(0, n) : ""; }
+function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+// the server is trusted, but a bad field must not break the scene
+function normalize(j) {
+  if (!j || !Array.isArray(j.characters)) return null;
+  const seen = new Set(), out = [];
+  for (const c of j.characters) {
+    if (!c || typeof c.id !== "string" || !c.id || c.id.length > 200 || seen.has(c.id) || out.length >= 300) continue;
+    seen.add(c.id);
+    out.push({
+      id: c.id, kind: c.kind === "agent" ? "agent" : "lead", role: clip(c.role, 40) || "unknown",
+      room: own(ROOMS, c.room) ? c.room : "office", activity: ACTIVITIES.includes(c.activity) ? c.activity : "idle",
+      project: clip(c.project, 60), idea: clip(c.idea, 80), title: clip(c.title, 160), note: clip(c.note, 60),
+    });
+  }
+  return {ts: typeof j.ts === "number" ? j.ts : 0, characters: out};
+}
+
+function hashStr(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+function projectColour(p) {
+  const hue = (hashStr(p || "?") % 12) * 30;
+  return ["hsl(" + hue + ",62%,56%)", "hsl(" + hue + ",55%,40%)"];
+}
+const ROLE_POSE = {
+  chief: "talk", builder: "hammer", "tech-researcher": "read", "business-researcher": "read", researcher: "read",
+  "code-investigator": "magnify", "data-analyst": "laptop", verifier: "clipboard", reviewer: "pen", "claim-checker": "pen",
+  presenter: "board",
+};
+function poseFor(c) {
+  if (c.room === "pool") return "sunbathe";
+  if (c.room === "lounge") return c.activity === "wait" ? "coffee" : hashStr(c.id) % 3 ? "games" : "couch";
+  if (c.activity === "reply" || c.activity === "idle") return "stand";
+  return own(ROLE_POSE, c.role) ? ROLE_POSE[c.role] : "laptop";
+}
+function roomText(c) {
+  return ROOMS[c.room].name + (c.room === "lounge" ? (c.activity === "wait" ? ", kitchen side" : ", couch side") : "");
+}
+function stateText(c) {
+  if (c.activity === "wait") return "waiting on you: " + (c.note || "you");
+  if (c.activity === "reply") return "replied, your turn";
+  if (c.activity === "work") return "working";
+  return c.room === "pool" ? "backlog" : "idle";
+}
+function rowCells(c) { return [c.role, c.project || "-", c.idea || "-", roomText(c), stateText(c)]; }
+
+// ---- sprites: one character per palette letter, "." is see-through ----
+// o outline, e eyes; h/H hair, s/S skin, c/C shirt (project colour), p/P trousers come from the character
+const PAL = {
+  o: "#241c2c", e: "#1c1824", w: "#f7f5ee", g: "#c4c8d0", G: "#8b919d", d: "#4c5160", k: "#1d1f26",
+  b: "#c08a52", B: "#7d5332", r: "#e2463e", R: "#9a2c2c", y: "#f6d04b", Y: "#cf982b", l: "#a3dcff",
+  L: "#3c7bd1", n: "#5db35a", N: "#347a3b", u: "#f1e9d2", f: "#3a2c28",
+};
+const HEAD = {
+  d: [
+    "................",
+    "................",
+    "................",
+    "................",
+    ".....oooooo.....",
+    "....ohhhhhho....",
+    "...ohhhhhhhho...",
+    "...oHhhhhhhHo...",
+    "...ohhsssshho...",
+    "...ossessesso...",
+    "...ossessesso...",
+    "...oSssssssSo...",
+    "....oossssoo....",
+  ],
+  u: [
+    "................",
+    "................",
+    "................",
+    "................",
+    ".....oooooo.....",
+    "....ohhhhhho....",
+    "...ohhhhhhhho...",
+    "...ohhhhhhhho...",
+    "...ohhhhhhhho...",
+    "...ohhhhhhhho...",
+    "...oHhhhhhhHo...",
+    "...oHHhhhhHHo...",
+    "....ooSSSSoo....",
+  ],
+  r: [
+    "................",
+    "................",
+    "................",
+    "................",
+    ".....oooooo.....",
+    "....ohhhhhho....",
+    "...ohhhhhhhho...",
+    "...ohhhhhhhho...",
+    "...ohhhhhssso...",
+    "...ohhhhssseso..",
+    "...ohhhSssssso..",
+    "...oHhhssssso...",
+    "....ooSsssoo....",
+  ],
+};
+const TORSO = ["....occcccco....", "...oCccccccCo...", "...oCccccccCo...", "...osCccccCso...", "....oppppppo...."];
+const SIDE = [".....occcco.....", "....occcccco....", "....occCccco....", "....occsccco....", ".....oppppo....."];
+const SIT = ["....occcccco....", "...oCccccccCo...", "...osCccccCso...", "...oppppppppo...", "...oPppppppPo...", "....opo..opo....", "....ofo..ofo...."];
+const BODY = {
+  d0: TORSO.concat(["....opPooPpo....", "....offooffo...."]),
+  d1: TORSO.concat(["....offooPpo....", "........offo...."]),
+  d2: TORSO.concat(["....opPooffo....", "....offo........"]),
+  u0: TORSO.concat(["....opPooPpo....", "....offooffo...."]),
+  u1: TORSO.concat(["....offooPpo....", "........offo...."]),
+  u2: TORSO.concat(["....opPooffo....", "....offo........"]),
+  r0: SIDE.concat([".....oPppo......", ".....offffo....."]),
+  r1: SIDE.concat(["....oppoopPo....", "...offo..offo..."]),
+  r2: SIDE.concat(["....oPpoopPo....", "...offo..offo..."]),
+};
+const HAIR = {
+  long: {
+    d: [[3, 9, ["oh......ho", "oh......ho", "oh......ho", "oh......ho", "oh......ho", "oo......oo"]]],
+    u: [[3, 12, ["ohhhhhhhho", ".ohhhhhho.", "..oooooo.."]]],
+    r: [[3, 11, ["oHh", "ohh", "oho", ".oo"]]],
+  },
+  bun: {
+    d: [[6, 2, ["oooo"]], [5, 3, ["ohhhho"]]],
+    u: [[6, 2, ["oooo"]], [5, 3, ["ohhhho"]]],
+    r: [[2, 5, ["oo", "ohh", "oo"]]],
+  },
+};
+const BENCH = ["obbbbbbbbbbbbo", "obbbbGGgbbbbbo", "oBBBBBBBBBBBBo", "oBBYBBBBBBYBBo", "oooooooooooooo"];
+const DESK = ["obbbbbbbbbbbbo", "oBBBBBBBBBBBBo", "oooooooooooooo"];
+const SWIM = ["....occcccco....", "...osccccccso...", "...osSssssSso...", "...osCccccCso...", "....osssssso....", "....osSooSso....", "....oSsooSso...."];
+function front(body, items, sit) {
+  return {head: "d", body: body || BODY.d0, items: items || [], sit: !!sit};
+}
+const POSES = {
+  walk: (f, dir) => ({head: dir, body: BODY[dir + f]}),
+  stand: () => front(),
+  talk: f => front(f ? BODY.d0 : TORSO.slice(0, 1).concat(["...oCccccccCoo..", "...oCcccccccCso.", "...osCccccco....", "....oppppppo....", "....opPooPpo....", "....offooffo...."]),
+    f ? [] : [[7, 11, "RR"]]),
+  hammer: f => front(null, [[1, 15, BENCH], [5, 15, "s"]].concat(f
+    ? [[11, 13, "cs"], [9, 14, "bb"], [7, 15, "dd"], [7, 13, "y"], [5, 13, "y.y"], [4, 14, "y"]]
+    : [[13, 7, ["ddd", "dGd", ".b.", ".b.", ".s.", "c.."]]])),
+  read: f => front(null, [[3, 14, f
+    ? ["s..wu...s", "RuGu.uuGR", "RuuuRuuuR", "RRRRRRRRR"]
+    : ["swwwRwwws", "RGGuRuGGR", "RuuuRuuuR", "RRRRRRRRR"]]]),
+  magnify: f => front(null, f
+    ? [[10, 10, [".GGG.", "GllwG", "GlllG", ".GGG."]], [11, 14, "B"], [11, 15, "s"]]
+    : [[10, 8, [".GGG.", "GlwlG", "GlllG", ".GGG."]], [12, 12, "B"], [12, 13, "s"]]),
+  laptop: f => front(null, [[5, 13, ["oooooo", "oGGGGo", "oGwGGo", "oGGGGo"]], [1, 17, DESK],
+    [3, 15, f ? "s......." : "s.......s"], [12, 16, f ? "s" : "."]]),
+  clipboard: f => front(null, [[4, 13, ["bbGGbb", "buuuub", "bGGGub", "buuuub", "bGGuub", "bbbbbb"]], [3, 15, "s"],
+    [10, 14, f ? ".L" : "L"], [11, 15, "s"]].concat(f ? [[6, 16, "n.n"], [7, 17, "n"]] : [])),
+  pen: f => front(null, [[4, 13, ["uuuuuu", "ugGgGu", "uuuuuu", "uGgGgu", "uuuuuu"]], [3, 15, "s"]].concat(f
+    ? [[10, 14, "rs"], [9, 15, "R"], [5, 16, "rrr"]]
+    : [[11, 11, ["r", "r", "R"]], [11, 14, "s"]])),
+  board: f => ({head: "d", body: BODY.d0, ox: 8, w: 24, ax: 16, items: [
+    [0, 4, ["oooooooooo", "owwwwwwwwo", "owLLwwwwwo", "owwwwwRwwo", "owwwRRRwwo", "owwRRRRRwo", "owwwwwwwwo", "oooooooooo", ".G......G.",
+      ".G......G.", ".G......G.", ".G......G.", ".G......G.", ".G......G.", "oG......Go", "oo......oo"]],
+    [10, 13, f ? ["sccc", "..oC"] : ["....", "sccc"]], [9, f ? 12 : 13, "L"]].concat(f ? [[3, 6, "LLL"]] : [])}),
+  coffee: f => front(null, [[11, 14, ["wkw.", "wwwg", "www."]], [10, 15, "s"], [3, 15, "s"],
+    [12, 11, f ? [".g", "g.", ".g"] : ["g.", ".g", "g."]]]),
+  couch: f => front(SIT, [[1, 6, ["oo..........oo", "oco........oco", ".oCo......oCo.", ".oCo......oCo.", "..oCo....oCo..",
+    "..oCo....oCo.."]]].concat(f ? [[6, 9, "s..s"], [6, 10, "o..o"]] : []), true),
+  games: f => front(SIT, [[4, f ? 13 : 14, ["sddddddds", ".dyddrd.."]]], true),
+  sunbathe: f => ({head: "d", body: SWIM, lie: 3, items: [[4, 9, f ? "kkwk.kkkk" : "kkkk.kkkk"]]}),
+};
+// a quarter turn anticlockwise: the top row becomes the left column
+function rotate(rows) {
+  const w = rows[0].length;
+  return Array.from({length: w}, (_, r) => rows.map(row => row[w - 1 - r]).join(""));
+}
+function blank(w, h) { return Array.from({length: h}, () => ".".repeat(w)); }
+function stamp(rows, x, y, part) {
+  [].concat(part).forEach((line, dy) => {
+    const row = rows[y + dy];
+    if (row === undefined) return;
+    const out = row.split("");
+    [...line].forEach((ch, dx) => { if (ch !== "." && x + dx >= 0 && x + dx < out.length) out[x + dx] = ch; });
+    rows[y + dy] = out.join("");
+  });
+}
+// a pose frame as palette rows; ax is the column that stands on the tile centre
+function spriteRows(pose, frame, dir, style) {
+  const p = POSES[pose](frame, dir), w = p.w || 16, rows = blank(w, p.h || 20), ox = p.ox || 0;
+  if (p.head) stamp(rows, ox, 0, HEAD[p.head]);
+  if (p.body) stamp(rows, ox, 13, p.body);
+  if (p.head && own(HAIR, style)) HAIR[style][p.head].forEach(([x, y, part]) => stamp(rows, ox + x, y, part));
+  (p.items || []).forEach(([x, y, part]) => stamp(rows, x, y, part));
+  if (p.lie === undefined) return {rows, ax: p.ax || w / 2};
+  const lying = blank(32, 16);  // two lounger tiles; the seat tile is the right one
+  stamp(lying, p.lie, 0, rotate(rows));
+  return {rows: lying, ax: 24};
+}
+const SKIN = [["#f6d2b0", "#dfae8a"], ["#e8b88f", "#c99469"], ["#c98c5f", "#a66f47"], ["#9a6440", "#7a4d30"], ["#6b432b", "#53321f"]];
+const HAIRS = [["#2a211e", "#171210"], ["#5b3820", "#3e2615"], ["#a8602b", "#7d441c"], ["#e0b85c", "#b88f3c"], ["#8d8f99", "#6a6c75"], ["#b8473f", "#8a2f2a"]];
+const PANTS = [["#36456a", "#28334f"], ["#45484f", "#33353b"], ["#5d4a38", "#45362a"], ["#2f4a42", "#223630"]];
+const STYLES = ["short", "long", "bun", "short"];
+function looksFor(c) {
+  const h = hashStr(c.id), sk = SKIN[h % 5], hr = HAIRS[(h >>> 4) % 6], pa = PANTS[(h >>> 8) % 4], sh = projectColour(c.project);
+  return {key: c.project + "|" + h, style: STYLES[(h >>> 12) % 4],
+    pal: {s: sk[0], S: sk[1], h: hr[0], H: hr[1], p: pa[0], P: pa[1], c: sh[0], C: sh[1]}};
+}
+
+// ---- demo fixture: every role, every room, several projects ----
+function lead(project, idea, title, room, activity, note) {
+  return {id: project + "/" + idea, kind: "lead", role: "chief", room, activity, project, idea, title, note: note || ""};
+}
+function agent(project, idea, n, role, room) {
+  return {id: project + "/" + idea + "#a" + n, kind: "agent", role, room, activity: "work", project, idea, title: "", note: ""};
+}
+const DEMO = [
+  lead("imp", "agent-rooms", "Animated agent rooms page", "lab", "work"),
+  agent("imp", "agent-rooms", 1, "builder", "lab"),
+  agent("imp", "agent-rooms", 2, "data-analyst", "lab"),
+  lead("imp", "task-dashboard", "Task dashboard", "workshop", "work"),
+  agent("imp", "task-dashboard", 1, "builder", "workshop"),
+  agent("imp", "task-dashboard", 2, "verifier", "workshop"),
+  lead("aiur", "churn-model", "Churn model pitch", "meeting", "work"),
+  agent("aiur", "churn-model", 1, "presenter", "meeting"),
+  agent("aiur", "churn-model", 2, "business-researcher", "meeting"),
+  lead("imp", "guide-refresh", "Refresh the guide", "library", "reply"),
+  agent("imp", "guide-refresh", 1, "tech-researcher", "library"),
+  agent("imp", "guide-refresh", 2, "claim-checker", "library"),
+  lead("dotfiles", "zsh-speedup", "Faster zsh start", "office", "work"),
+  agent("dotfiles", "zsh-speedup", 1, "code-investigator", "office"),
+  agent("dotfiles", "zsh-speedup", 2, "reviewer", "office"),
+  {id: "s1", kind: "lead", role: "chief", room: "office", activity: "work", project: "scratch", idea: "", title: "", note: ""},
+  {id: "s1#1", kind: "agent", role: "general-purpose", room: "office", activity: "work", project: "scratch", idea: "", title: "", note: ""},
+  lead("aiur", "feature-store", "Feature store", "lounge", "wait", "G1 Plan"),
+  lead("imp", "no-push", "No-push guard", "lounge", "wait", "permission"),
+  agent("imp", "no-push", 1, "builder", "lab"),  // its lead waits in the kitchen, the agent keeps the lab
+  lead("imp", "idea-groups", "Idea groups", "lounge", "idle"),
+  lead("aiur", "old-etl", "Old ETL cleanup", "lounge", "idle"),
+  lead("dotfiles", "nvim-lsp", "Neovim LSP", "lounge", "idle"),
+  lead("imp", "sound-fx", "Sound effects", "pool", "idle"),
+  lead("imp", "themes", "Page themes", "pool", "idle"),
+  lead("aiur", "ab-tests", "A/B test kit", "pool", "idle"),
+  lead("aiur", "forecast", "Demand forecast", "pool", "idle"),
+  lead("dotfiles", "tmux-theme", "tmux theme", "pool", "idle"),
+  lead("dotfiles", "brewfile", "Brewfile", "pool", "idle"),
+  lead("blog", "rss-feed", "RSS feed", "pool", "idle"),
+  lead("blog", "dark-mode", "Dark mode", "pool", "idle"),
+  lead("imp", "mobile-view", "Mobile view", "pool", "idle"),
+  lead("aiur", "data-catalog", "Data catalog", "pool", "idle"),
+];
+// four demo polls in a loop, so entering, leaving and changing rooms all show
+function demoState(n, ts) {
+  const step = n % 4, chars = DEMO.map(c => Object.assign({}, c));
+  if (step === 1 || step === 2) chars.push(agent("imp", "agent-rooms", 3, "verifier", "lab"));
+  if (step >= 2) Object.assign(chars.find(c => c.id === "aiur/churn-model"), {room: "lounge", activity: "wait", note: "G2 Review"});
+  return {ts, characters: step === 3 ? chars.filter(c => c.id !== "imp/task-dashboard#a1") : chars};
+}
+// ---- end pure ----
+
+(function () {
+  const $ = id => document.getElementById(id);
+  const canvas = $("scene"), ctx = canvas.getContext("2d"), tip = $("tip"), roster = $("roster"), pauseBtn = $("pause");
+  const LW = MAP_W * T, LH = MAP_H * T, SPEED = 4;  // tiles per second
+  const demo = new URLSearchParams(location.search).get("demo") === "1";
+  const motion = matchMedia("(prefers-reduced-motion: reduce)");
+  const actors = new Map(), sprites = new Map();
+  let reduced = motion.matches, paused = false, scale = 1, px = 1, raf = 0, timer = 0, lastTs = 0, tick = 0;
+  let highlight = "", hoverId = "", demoStep = 0, loaded = false, inflight = false, rosterKey = "", overflow = new Map();
+  const base = document.createElement("canvas");
+  base.width = LW;
+  base.height = LH;
+  const backdrop = document.createElement("canvas");
+
+  function still() { return reduced || paused || document.hidden; }
+
+  // ---- static art: floors and props, drawn once ----
+  function drawStatic(g) {
+    for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) drawFloor(g, x, y);
+    for (let y = 0; y < MAP_H; y++) for (let x = 0; x < MAP_W; x++) drawThing(g, x, y);
+  }
+  function painter(g, x, y) {
+    return (c, dx, dy, w, h) => { g.fillStyle = c; g.fillRect(x * T + dx, y * T + dy, w || 1, h || 1); };
+  }
+  function tileHash(x, y) { return hashStr(x + "," + y); }
+  function floorKind(x, y) {
+    const ch = tileAt(x, y);
+    if (",%&".includes(ch)) return "grass";
+    let room = roomAt(x, y);
+    if (ch === "+") room = roomAt(x, y - 1) || roomAt(x, y + 1);
+    if (!room) return "hall";
+    if (room === "lounge") return x <= KITCHEN_END ? "kitchen" : "living";
+    return room;
+  }
+  function drawFloor(g, x, y) {
+    const ch = tileAt(x, y), r = painter(g, x, y), h = tileHash(x, y);
+    if (WALLS.includes(ch)) return;
+    if (ch === "~") return drawWater(g, x, y);
+    const kind = floorKind(x, y);
+    if (kind === "hall") {
+      r("#cdc6b8", 0, 0, 16, 16); r("#d9d3c7", 0, 0, 15, 1); r("#b7af9f", 0, 15, 16, 1); r("#b7af9f", 15, 0, 1, 16);
+    } else if (kind === "meeting") {
+      r("#3f5788", 0, 0, 16, 16);
+      for (let i = 0; i < 16; i += 4) for (let j = (i / 4) % 2 * 2; j < 16; j += 4) r("#4a6497", j, i);
+    } else if (kind === "lab") {
+      r("#e4eaed", 0, 0, 16, 16); r("#c9d3d8", 0, 7, 16, 1); r("#c9d3d8", 7, 0, 1, 16); r("#c9d3d8", 0, 15, 16, 1); r("#c9d3d8", 15, 0, 1, 16);
+    } else if (kind === "workshop") {
+      r("#a0998c", 0, 0, 16, 16);
+      for (let i = 0; i < 6; i++) r(i % 2 ? "#948d80" : "#ada79b", (h >>> (i * 4)) % 16, (h >>> (i * 4 + 2)) % 16);
+      if (h % 7 === 0) r("#8c8578", (h >>> 3) % 10 + 2, (h >>> 7) % 10 + 2, 3, 2);
+    } else if (kind === "library") {
+      r("#7b5233", 0, 0, 16, 16);
+      for (let i = 0; i < 4; i++) { r("#68442a", 0, i * 4 + 3, 16, 1); r("#68442a", ((y * 4 + i) * 7 + x * 5) % 16, i * 4, 1, 3); }
+    } else if (kind === "office") {
+      r("#5d7c84", 0, 0, 16, 16);
+      for (let i = 0; i < 16; i += 2) for (let j = (i / 2) % 2; j < 16; j += 4) r("#67868e", j, i);
+    } else if (kind === "kitchen") {
+      for (let i = 0; i < 2; i++) for (let j = 0; j < 2; j++) r((i + j) % 2 ? "#d4bf98" : "#efe4cc", j * 8, i * 8, 8, 8);
+    } else if (kind === "living") {
+      r("#b27a4a", 0, 0, 16, 16);
+      for (let i = 0; i < 4; i++) { r("#9c693d", 0, i * 4 + 3, 16, 1); r("#9c693d", ((y * 4 + i) * 9 + x * 3) % 16, i * 4, 1, 3); }
+      if ("_YV".includes(ch)) drawRug(r, x, y);
+    } else if (kind === "pool") {
+      r("#dcc9a0", 0, 0, 16, 16);
+      for (let i = 0; i < 4; i++) { r("#c8b48a", i * 4 + 3, 0, 1, 16); r("#c8b48a", i * 4, ((x * 4 + i) * 7 + y * 5) % 16, 3, 1); }
+    } else if (kind === "grass") {
+      r("#69a84d", 0, 0, 16, 16);
+      for (let i = 0; i < 8; i++) r(i % 3 ? "#5c9643" : "#82bf62", (h >>> (i * 3)) % 15, (h >>> (i * 3 + 1)) % 15, 1, 2);
+    }
+  }
+  function drawRug(r, x, y) {
+    const rug = (dx, dy) => "_YV".includes(tileAt(x + dx, y + dy));
+    r("#a33f4f", 0, 0, 16, 16);
+    for (let i = 2; i < 16; i += 4) r("#b8566a", i, (i + y * 3) % 16, 2, 2);
+    if (!rug(0, -1)) { r("#e0c070", 0, 1, 16, 1); r("#7d2c3a", 0, 0, 16, 1); }
+    if (!rug(0, 1)) { r("#e0c070", 0, 14, 16, 1); r("#7d2c3a", 0, 15, 16, 1); }
+    if (!rug(-1, 0)) { r("#e0c070", 1, 0, 1, 16); r("#7d2c3a", 0, 0, 1, 16); }
+    if (!rug(1, 0)) { r("#e0c070", 14, 0, 1, 16); r("#7d2c3a", 15, 0, 1, 16); }
+  }
+  function drawWater(g, x, y) {
+    const r = painter(g, x, y), h = tileHash(x, y), wet = (dx, dy) => tileAt(x + dx, y + dy) === "~";
+    r("#3a9ad3", 0, 0, 16, 16);
+    r("#5bb5e3", 0, 8, 16, 8);
+    for (let i = 0; i < 3; i++) r("#9adcf5", (h >>> (i * 5)) % 12, (h >>> (i * 5 + 2)) % 14 + 1, 3, 1);
+    if (!wet(0, -1)) { r("#eef0f1", 0, 0, 16, 3); r("#2b78ad", 0, 3, 16, 2); }
+    if (!wet(0, 1)) r("#eef0f1", 0, 14, 16, 2);
+    if (!wet(-1, 0)) { r("#eef0f1", 0, 0, 2, 16); r("#2b78ad", 2, 3, 1, 13); }
+    if (!wet(1, 0)) r("#eef0f1", 14, 0, 2, 16);
+  }
+  const FACE = {meeting: "#8ea3c6", lab: "#d3e0e6", workshop: "#9a5c45", library: "#4d6a4b", office: "#cbbfa6",
+    lounge: "#e3c58f", pool: "#c78d6a", hall: "#a9a398"};
+  function drawWall(g, x, y, ch) {
+    const r = painter(g, x, y), below = tileAt(x, y + 1), same = dx => tileAt(x + dx, y) === ch;
+    r("#2e323d", 0, 0, 16, 16);
+    if (y + 1 >= MAP_H || WALLS.includes(below)) { r("#3a3f4c", 0, 0, 16, 1); return; }
+    const room = roomAt(x, y + 1) || "hall", face = FACE[room];
+    r(face, 0, 4, 16, 12); r("rgba(255,255,255,.22)", 0, 4, 16, 1); r("rgba(0,0,0,.28)", 0, 14, 16, 2);
+    if (room === "workshop" || room === "pool") for (let i = 0; i < 3; i++) {
+      r("rgba(0,0,0,.18)", 0, 7 + i * 3, 16, 1);
+      r("rgba(0,0,0,.18)", (i % 2) * 4 + 3, 8 + i * 3 - 3, 1, 3); r("rgba(0,0,0,.18)", (i % 2) * 4 + 11, 8 + i * 3 - 3, 1, 3);
+    }
+    if (room === "library") for (let i = 2; i < 16; i += 5) r("rgba(0,0,0,.2)", i, 5, 1, 9);
+    if (ch === "W") {
+      r("#9aa0a8", 0, 5, 16, 9); r("#f4f6f8", same(-1) ? 0 : 1, 6, 16 - (same(-1) ? 0 : 1) - (same(1) ? 0 : 1), 7);
+      if (!same(-1)) r("#9aa0a8", 0, 5, 1, 9);
+      const hh = tileHash(x, y);
+      r(hh % 2 ? "#3c7bd1" : "#e2463e", 3, 8, 6 + hh % 5, 1); r("#3c7bd1", 2, 10, 4 + (hh >>> 3) % 8, 1);
+      if (!same(1)) r("#d0d4da", 10, 13, 5, 1);
+    } else if (ch === "N") {
+      r("#eef0f1", 1, 5, 14, 9); r("#9ed3ef", 2, 6, 12, 7); r("#c6e8f8", 3, 7, 3, 2); r("#eef0f1", 7, 6, 1, 7); r("#d8dcdf", 1, 13, 14, 1);
+    } else if (ch === "Q") {
+      r("#c39a63", 0, 5, 16, 9);
+      for (let i = 1; i < 16; i += 3) for (let j = 6; j < 14; j += 3) r("#a47e4d", i, j);
+      const k = x % 4;
+      if (k === 0) { r("#5f636c", 3, 6, 1, 6); r("#5f636c", 1, 6, 5, 2); }
+      if (k === 1) { r("#5f636c", 6, 6, 2, 7); r("#5f636c", 5, 6, 4, 2); }
+      if (k === 2) { r("#b8bcc4", 2, 7, 10, 3); r("#7d5332", 12, 7, 3, 3); }
+      if (k === 3) { r("#e2463e", 4, 6, 2, 4); r("#5f636c", 4, 10, 2, 3); r("#5f636c", 9, 7, 1, 6); }
+    } else if (ch === "=") {
+      r("#a87a4e", 0, 5, 16, 8); r("#8a613b", same(-1) ? 0 : 0, 5, 1, 8); r("#8a613b", 8, 5, 1, 8);
+      r("#e0c99d", 6, 9, 1, 1); r("#e0c99d", 10, 9, 1, 1); r("#7a5434", 0, 12, 16, 1);
+    }
+  }
+  function drawThing(g, x, y) {
+    const ch = tileAt(x, y), r = painter(g, x, y), h = tileHash(x, y), same = (dx, dy) => tileAt(x + dx, y + dy) === ch;
+    if (WALLS.includes(ch)) return drawWall(g, x, y, ch);
+    if (ch === "+") {
+      r("rgba(0,0,0,.25)", 0, 0, 16, 2); r("#5a3d27", 0, 0, 2, 16); r("#5a3d27", 14, 0, 2, 16); r("#d7b98a", 2, 14, 12, 2);
+      return;
+    }
+    if (ch === "E") { r("#5a3d27", 0, 0, 16, 2); r("#5a3d27", 0, 14, 16, 2); r("#a8443c", 3, 3, 11, 10); r("#c45a4f", 4, 4, 9, 8); r("#e0c070", 5, 7, 7, 2); return; }
+    switch (ch) {
+      case "P":
+        r("#2f6b33", 3, 2, 10, 8); r("#3f8a40", 4, 1, 8, 7); r("#5cad55", 5, 2, 3, 3); r("#5cad55", 9, 4, 2, 2);
+        r("#8d4b2c", 4, 10, 8, 5); r("#b0603a", 4, 10, 8, 1); r("#6e3a22", 5, 15, 6, 1);
+        break;
+      case "T": case "R": {
+        const top = ch === "T" ? "#8a5a35" : "#a4703f", edge = ch === "T" ? "#5e3c22" : "#6f4a28";
+        r(top, 0, 0, 16, 16);
+        if (!same(0, -1)) r(edge, 0, 0, 16, 1);
+        if (!same(0, 1)) { r(edge, 0, 13, 16, 3); r("rgba(0,0,0,.2)", 0, 15, 16, 1); }
+        if (!same(-1, 0)) r(edge, 0, 0, 1, 16);
+        if (!same(1, 0)) r(edge, 15, 0, 1, 16);
+        if (h % 3 === 0) { r("#f1e9d2", 4, 4, 6, 7); r("#c4c8d0", 5, 6, 4, 1); r("#c4c8d0", 5, 8, 3, 1); }
+        if (h % 3 === 1 && ch === "T") { r("#4c5160", 4, 5, 8, 5); r("#a3dcff", 5, 6, 6, 3); }
+        if (h % 3 === 1 && ch === "R") { r("#3c7bd1", 3, 4, 5, 7); r("#f1e9d2", 8, 4, 5, 7); r("#9a2c2c", 7, 4, 1, 7); }
+        break;
+      }
+      case "H":
+        r("#9aa3ad", 0, 0, 16, 16); r("#c7ccd3", 1, 0, 14, 15); r("#8fc7de", 2, 2, 12, 7); r("#c8ecf7", 3, 3, 3, 2);
+        r("#5db35a", 7 + (x % 2) * 2, 5, 3, 3); r("#e2e5e9", 2, 10, 12, 4); r("#8b919d", 7, 11, 2, 1);
+        break;
+      case "Z":
+        r("#9aa3ad", 0, 2, 16, 14); r("#e8ecef", 0, 2, 16, 6); r("#b8c0c8", 3, 3, 10, 4); r("#8b919d", 7, 1, 2, 3); r("#7d8794", 0, 8, 16, 8); r("#c4c8d0", 7, 11, 2, 1);
+        break;
+      case "G":
+        r("#6d7784", 0, 0, 16, 16); r("#b9dbe6", 1, 1, 14, 14);
+        for (let i = 0; i < 3; i++) { r("#6d7784", 1, 5 + i * 5, 14, 1); r(["#e2463e", "#5db35a", "#f6d04b"][(i + x) % 3], 3 + i * 3, 2 + i * 5, 2, 3); }
+        break;
+      case "L": {
+        r("#7f8a97", 0, 0, 16, 16); r("#eef2f4", 0, 2, 16, 7); r("#c3ccd3", 0, 8, 16, 1);
+        if (!same(-1, 0)) r("#5f6976", 0, 0, 1, 16);
+        if (!same(1, 0)) r("#5f6976", 15, 0, 1, 16);
+        r("#6c7683", 7, 10, 1, 6); r("#c4c8d0", 5, 12, 1, 1); r("#c4c8d0", 9, 12, 1, 1);
+        const kit = (x + y) % 3;
+        if (kit === 0) { r("#cfe8f0", 3, 1, 4, 6); r("#3c7bd1", 3, 4, 4, 3); r("#cfe8f0", 9, 2, 3, 5); r("#5db35a", 9, 4, 3, 3); }
+        if (kit === 1) { r("#4c5160", 5, 0, 3, 7); r("#2b2f3a", 4, 6, 7, 2); r("#c4c8d0", 7, 1, 3, 2); }
+        if (kit === 2) for (let i = 0; i < 4; i++) { r("#cfe8f0", 3 + i * 3, 1, 2, 6); r(["#e2463e", "#f6d04b", "#5db35a", "#a36fd6"][i], 3 + i * 3, 4, 2, 3); }
+        break;
+      }
+      case "B": {
+        r("#6d4a2c", 0, 0, 16, 16); r("#b9874f", 0, 1, 16, 8); r("#d3a46b", 0, 1, 16, 1);
+        if (!same(-1, 0)) r("#4e3420", 0, 0, 1, 16);
+        if (!same(1, 0)) r("#4e3420", 15, 0, 1, 16);
+        r("#5a3d24", 2, 11, 12, 1); r("#c4c8d0", 7, 12, 2, 1);
+        const kit = x % 3;
+        if (kit === 0) { r("#8b919d", 3, 2, 6, 4); r("#4c5160", 4, 3, 4, 2); }
+        if (kit === 1) { r("#d8dcdf", 2, 4, 10, 2); r("#7d5332", 12, 3, 3, 4); }
+        if (kit === 2) { r("#c0392b", 4, 2, 8, 5); r("#e2463e", 4, 2, 8, 1); r("#4c5160", 7, 3, 2, 1); }
+        break;
+      }
+      case "J":
+        r("#5f636c", 3, 13, 10, 3); r("#8b919d", 7, 2, 2, 11); r("#c0392b", 4, 1, 8, 5); r("#e2463e", 4, 1, 8, 1); r("#c4c8d0", 7, 6, 2, 3); r("#4c5160", 5, 10, 6, 2);
+        break;
+      case "X":
+        r("#7d5332", 1, 1, 14, 14); r("#b88a4a", 2, 2, 12, 12); r("#9c7038", 2, 5, 12, 1); r("#9c7038", 2, 10, 12, 1);
+        r("#7d5332", 2, 2, 2, 12); r("#7d5332", 12, 2, 2, 12);
+        break;
+      case "S": {
+        r("#4a2f1c", 0, 0, 16, 16); r("#5e3c24", 1, 0, 14, 15);
+        for (let s = 0; s < 3; s++) {
+          let bx = 1;
+          for (let i = 0; bx < 15; i++) {
+            const bh = hashStr(x + ":" + y + ":" + s + ":" + i), w = 1 + bh % 2;
+            r(["#9a2c2c", "#3c7bd1", "#347a3b", "#cf982b", "#7d4f9e", "#c4c8d0", "#b0603a"][bh % 7], bx, s * 5 + 1 + bh % 2, Math.min(w, 15 - bx), 4 - bh % 2);
+            bx += w;
+          }
+          r("#3a2414", 0, s * 5 + 5, 16, 1);
+        }
+        break;
+      }
+      case "i":
+        r("#4c5160", 7, 6, 2, 9); r("#4c5160", 5, 14, 6, 2); r("#f6d04b", 4, 1, 8, 5); r("#fbe79a", 5, 2, 6, 2);
+        break;
+      case "h":
+        r("#5c2a2a", 2, 2, 12, 13); r("#8c3b3b", 3, 3, 10, 6); r("#a44c4c", 4, 9, 8, 4); r("#5c2a2a", 2, 8, 2, 7); r("#5c2a2a", 12, 8, 2, 7);
+        break;
+      case "D": {
+        r("#9d978a", 0, 3, 16, 13); r("#e2dccd", 0, 3, 16, 7); r("#c7c0b0", 0, 9, 16, 1);
+        if (!same(-1, 0)) r("#7d776b", 0, 3, 1, 13);
+        if (!same(1, 0)) r("#7d776b", 15, 3, 1, 13);
+        if (!same(-1, 0)) { r("#2b2f3a", 3, 0, 11, 7); r("#4b8bd6", 4, 1, 9, 5); r("#a3dcff", 5, 2, 5, 1); r("#a3dcff", 5, 4, 3, 1); r("#4c5160", 8, 7, 2, 2); }
+        else { r("#f1e9d2", 3, 4, 6, 4); r("#c4c8d0", 4, 5, 4, 1); r("#f7f5ee", 11, 4, 3, 3); r("#7d5332", 12, 5, 1, 1); }
+        break;
+      }
+      case "C":
+        r("#6d7784", 2, 0, 12, 16); r("#9aa1ab", 3, 1, 10, 14);
+        for (let i = 0; i < 3; i++) { r("#6d7784", 3, 5 + i * 5, 10, 1); r("#d8dcdf", 7, 2 + i * 5, 2, 1); }
+        break;
+      case "U":
+        r("#d8dcdf", 4, 7, 8, 9); r("#b8bec5", 4, 15, 8, 1); r("#8fd0f0", 5, 0, 6, 7); r("#c8ecf7", 6, 1, 2, 4); r("#3c7bd1", 7, 10, 2, 1);
+        break;
+      case "F":
+        r("#9aa3ad", 1, 0, 14, 16); r("#eef1f3", 2, 0, 12, 15); r("#9aa3ad", 2, 6, 12, 1); r("#8b919d", 11, 2, 1, 3); r("#8b919d", 11, 8, 1, 5);
+        r("#f6d04b", 4, 9, 2, 2); r("#e2463e", 6, 3, 2, 2);
+        break;
+      case "K": case "M": case "O": {
+        r("#8a5f3a", 0, 0, 16, 16); r("#e2d8c2", 0, 1, 16, 7); r("#c9bea6", 0, 7, 16, 1);
+        r("#a8784a", 1, 9, 14, 6); r("#8a5f3a", 7, 9, 1, 6); r("#e0c99d", 5, 11, 1, 1); r("#e0c99d", 10, 11, 1, 1);
+        if (ch === "M") { r("#2b2b30", 3, 0, 10, 7); r("#4a4a52", 4, 1, 8, 2); r("#e2463e", 11, 1, 1, 1); r("#f7f5ee", 6, 4, 4, 3); r("#5b3820", 7, 4, 2, 1); }
+        if (ch === "O") { r("#2b2b30", 1, 1, 14, 7); for (const [cx, cy] of [[4, 3], [10, 3]]) { r("#5f636c", cx - 2, cy - 1, 4, 3); r("#e2463e", cx - 1, cy, 2, 1); } r("#2b2b30", 2, 9, 12, 6); r("#ff9830", 4, 11, 8, 2); }
+        if (ch === "K" && h % 3 === 0) { r("#d8b47a", 3, 2, 7, 4); r("#e2463e", 5, 3, 2, 2); }
+        if (ch === "K" && h % 3 === 1) { r("#3c7bd1", 9, 2, 4, 4); r("#a3dcff", 10, 2, 2, 1); }
+        break;
+      }
+      case "I":
+        r("#5f6c7a", 0, 0, 16, 16); r("#d6d0c6", 0, 1, 16, 9); r("#ebe7e0", 0, 1, 16, 1); r("#4d5866", 0, 15, 16, 1);
+        if (!same(-1, 0)) r("#4d5866", 0, 0, 1, 16);
+        if (!same(1, 0)) r("#4d5866", 15, 0, 1, 16);
+        if (h % 2) { r("#f7f5ee", 5, 3, 5, 4); r("#5b3820", 6, 3, 3, 1); }
+        break;
+      case "c": {
+        r("#2c5e63", 0, 0, 16, 16); r("#3d8086", 0, 1, 16, 6); r("#4c9aa0", 0, 7, 16, 7); r("#5fb1b6", 0, 7, 16, 1); r("#245055", 0, 14, 16, 2);
+        if (same(-1, 0)) r("#2c5e63", 0, 2, 1, 12); else { r("#245055", 0, 1, 4, 15); r("#3d8086", 1, 5, 2, 8); }
+        if (!same(1, 0)) { r("#245055", 12, 1, 4, 15); r("#3d8086", 13, 5, 2, 8); }
+        break;
+      }
+      case "b":
+        r("#a8521f", 2, 4, 12, 11); r("#e07b39", 3, 3, 10, 10); r("#f29a5b", 4, 4, 4, 3); r("#a8521f", 3, 13, 10, 2);
+        break;
+      case "Y":
+        r("#5e3c22", 0, 3, 16, 10); r("#8a5a35", 0, 3, 16, 8);
+        if (!same(-1, 0)) r("#5e3c22", 0, 3, 1, 10);
+        if (!same(1, 0)) r("#5e3c22", 15, 3, 1, 10);
+        if (x % 3 === 0) { r("#f7f5ee", 6, 4, 3, 3); r("#5b3820", 7, 4, 1, 1); }
+        if (x % 3 === 1) { r("#3c7bd1", 3, 5, 7, 4); r("#e2463e", 4, 6, 3, 1); }
+        if (x % 3 === 2) { r("#2b2b30", 4, 5, 7, 3); r("#e2463e", 5, 6, 1, 1); r("#3c7bd1", 9, 6, 1, 1); }
+        break;
+      case "V":
+        r("#5e3c22", 0, 9, 16, 7); r("#7d5332", 0, 9, 16, 2);
+        if (!same(-1, 0)) r("#4a2f1c", 0, 9, 1, 7);
+        if (!same(1, 0)) r("#4a2f1c", 15, 9, 1, 7);
+        r("#1d1f26", same(-1, 0) ? 0 : 2, 2, 16 - (same(-1, 0) ? 0 : 2) - (same(1, 0) ? 0 : 2), 7); r("#6fc3ff", same(-1, 0) ? 0 : 2, 1, 16 - (same(-1, 0) ? 0 : 2) - (same(1, 0) ? 0 : 2), 1);
+        r("#3a3d47", 5, 4, 6, 1);
+        break;
+      case "A":
+        r("#3b2766", 2, 0, 12, 16); r("#5a3b8c", 3, 1, 10, 14); r("#f6d04b", 3, 1, 10, 2); r("#1d1f26", 4, 4, 8, 5); r("#7fe0ff", 5, 5, 6, 3);
+        r("#e2463e", 5, 10, 2, 2); r("#f6d04b", 9, 10, 2, 2); r("#2b1c4a", 3, 13, 10, 2);
+        break;
+      case "j": case "l": {
+        const left = ch === "j", x0 = left ? 5 : 0, w = left ? 11 : 13;
+        r("rgba(0,0,0,.15)", x0 + 1, 13, w, 2);
+        r("#8b919d", x0, 3, w, 11);
+        r("#f2f2f2", x0 + (left ? 1 : 0), 4, w - 1, 9);
+        for (let i = x0 + (left ? 2 : 1); i < x0 + w - 1; i += 3) r("#3c7bd1", i, 4, 1, 9);
+        if (left) { r("#d8dcdf", 6, 4, 4, 9); r("#b8bec5", 6, 12, 4, 1); }
+        else { r("#6d7784", 11, 13, 2, 2); r("#6d7784", 1, 13, 1, 2); }
+        break;
+      }
+      case "@":
+        r("rgba(0,0,0,.18)", 1, 9, 14, 6);
+        r("#c4c8d0", 7, 6, 2, 9);
+        r("#e2463e", 1, 0, 14, 7); r("#f7f5ee", 4, 0, 3, 7); r("#f7f5ee", 10, 0, 3, 7); r("#9a2c2c", 1, 6, 14, 1);
+        break;
+      case "&":
+        r("#7d5332", 7, 6, 3, 10); r("#9c6a3a", 7, 8, 3, 1); r("#9c6a3a", 7, 12, 3, 1);
+        r("#347a3b", 1, 2, 14, 4); r("#5db35a", 3, 0, 10, 4); r("#5db35a", 0, 4, 4, 2); r("#5db35a", 12, 4, 4, 2); r("#7fd07a", 6, 1, 4, 1);
+        break;
+      case "%":
+        r("#2f6b33", 0, 1, 16, 15); r("#3f8a40", 1, 0, 14, 12); r("#52a24f", 3, 2, 4, 3); r("#52a24f", 9, 5, 4, 3);
+        break;
+    }
+  }
+  function labels(g) {
+    const f = Math.round((8 + scale) * px / scale);
+    g.font = "600 " + f + "px system-ui, sans-serif";
+    g.textBaseline = "middle";
+    const tag = (text, tx, ty) => {
+      const w = g.measureText(text).width + f;
+      g.fillStyle = "rgba(17,18,23,.72)";
+      g.fillRect(Math.round(tx * T * px + 2 * px), Math.round((ty * T + 5) * px), Math.ceil(w), Math.round(f * 1.5));
+      g.fillStyle = "#f0f0f0";
+      g.fillText(text, Math.round(tx * T * px + 2 * px + f / 2), Math.round((ty * T + 5) * px + f * 0.78));
+    };
+    for (const k of ROOM_KEYS) if (k !== "lounge") tag(ROOMS[k].name, ROOMS[k].x, ROOMS[k].y - 1);
+    tag("Kitchen", ROOMS.lounge.x, ROOMS.lounge.y - 1);
+    tag("Living room", KITCHEN_END + 1, ROOMS.lounge.y - 1);
+  }
+
+  // ---- sizing: an integer scale that fits the window, then the device pixel ratio on top ----
+  function resize() {
+    const avail = Math.max(LW, canvas.parentElement.clientWidth - 18);
+    scale = Math.max(1, Math.min(4, Math.floor(avail / LW)));
+    px = Math.max(1, Math.round(scale * (window.devicePixelRatio || 1)));
+    canvas.width = LW * px;
+    canvas.height = LH * px;
+    canvas.style.width = LW * scale + "px";
+    canvas.style.height = LH * scale + "px";
+    backdrop.width = canvas.width;
+    backdrop.height = canvas.height;
+    const g = backdrop.getContext("2d");
+    g.imageSmoothingEnabled = false;
+    g.drawImage(base, 0, 0, backdrop.width, backdrop.height);
+    labels(g);
+    draw();
+  }
+
+  // ---- characters ----
+  function sprite(a, pose, frame, dir) {
+    const flip = dir === "l", d = flip ? "r" : dir, key = a.look.key + "|" + a.look.style + "|" + pose + frame + d;
+    let s = sprites.get(key);
+    if (!s) {
+      const spec = spriteRows(pose, frame, d, a.look.style), c = document.createElement("canvas"), g = c.getContext("2d");
+      c.width = spec.rows[0].length;
+      c.height = spec.rows.length;
+      spec.rows.forEach((row, y) => [...row].forEach((ch, x) => {
+        if (ch === ".") return;
+        g.fillStyle = a.look.pal[ch] || PAL[ch];
+        g.fillRect(x, y, 1, 1);
+      }));
+      s = {c, ax: spec.ax};
+      sprites.set(key, s);
+    }
+    return {c: s.c, ax: flip ? s.c.width - s.ax : s.ax, flip};
+  }
+  function tileOf(a) { return a.path.length ? a.path[0] : [Math.round(a.x), Math.round(a.y)]; }
+  function goTo(a, gx, gy) {
+    if (still()) { a.x = gx; a.y = gy; a.path = []; return; }
+    const [sx, sy] = tileOf(a);
+    a.path = bfs(sx, sy, gx, gy) || [[gx, gy]];
+  }
+  function home(a) { return a.spot >= 0 ? SPOTS[a.spot] : null; }
+
+  function apply(data) {
+    const now = performance.now(), seen = new Set();
+    for (const d of data.characters) {
+      seen.add(d.id);
+      let a = actors.get(d.id);
+      if (!a) {
+        // the first load places everyone; later arrivals come in by the campus door
+        const at = loaded ? CAMPUS_DOOR : null;
+        a = {id: d.id, d, x: at ? at.x : 0, y: at ? at.y : 0, path: [], dir: "d", walked: 0, spot: -1, leaving: false,
+          look: looksFor(d), wanderAt: now + 2000, placed: !!at};
+        actors.set(d.id, a);
+      }
+      a.d = d;
+      a.leaving = false;
+      a.look = looksFor(d);
+    }
+    for (const a of actors.values()) if (!seen.has(a.id) && !a.leaving) {
+      a.leaving = true;
+      a.spot = -1;
+      if (still()) actors.delete(a.id); else goTo(a, CAMPUS_DOOR.x, CAMPUS_DOOR.y);
+    }
+    const stay = [...actors.values()].filter(a => !a.leaving), prev = new Map(stay.map(a => [a.id, a.spot]));
+    const spots = assignSpots(stay.map(a => ({id: a.id, group: charGroup(a.d)})), prev);
+    overflow = new Map();
+    for (const a of stay) {
+      const s = spots.get(a.id), moved = s !== a.spot;
+      a.spot = s;
+      if (s < 0) {
+        const g = charGroup(a.d);
+        overflow.set(g, (overflow.get(g) || 0) + 1);
+        a.x = CAMPUS_DOOR.x; a.y = CAMPUS_DOOR.y; a.path = []; a.placed = true;
+        continue;
+      }
+      if (!a.placed) { a.x = SPOTS[s].x; a.y = SPOTS[s].y; a.placed = true; }
+      else if (moved || !a.path.length && (a.x !== SPOTS[s].x || a.y !== SPOTS[s].y) && !wanders(a)) goTo(a, SPOTS[s].x, SPOTS[s].y);
+    }
+    loaded = true;
+    fillRoster();
+    kick();
+    draw();
+  }
+  function wanders(a) { return a.d.role === "chief" && a.d.activity === "work" && a.d.room !== "lounge" && a.d.room !== "pool"; }
+  // WALK while a path is left, WORK at a spot while live work goes on, IDLE otherwise
+  function stateOf(a) { return a.path.length ? "walk" : a.spot >= 0 && a.d.activity === "work" ? "work" : "idle"; }
+  function busy() {
+    for (const a of actors.values()) if (stateOf(a) !== "idle") return true;
+    return false;
+  }
+  function walking() {
+    for (const a of actors.values()) if (a.path.length) return true;
+    return false;
+  }
+  function step(dt, now) {
+    let moved = false;
+    for (const a of [...actors.values()]) {
+      if (!a.path.length) {
+        // the chief walks and talks around its room between rests
+        if (a.spot >= 0 && wanders(a) && now > a.wanderAt) {
+          const h = home(a), atHome = a.x === h.x && a.y === h.y, r = ROOMS[a.d.room];
+          let gx = h.x, gy = h.y;
+          if (atHome) for (let i = 0; i < 12; i++) {
+            const tx = r.x + Math.floor(Math.random() * r.w), ty = r.y + Math.floor(Math.random() * r.h);
+            if (tileAt(tx, ty) === "." && Math.abs(tx - h.x) + Math.abs(ty - h.y) <= 4) { gx = tx; gy = ty; break; }
+          }
+          a.wanderAt = now + 1500 + Math.random() * 3500;
+          if (gx !== a.x || gy !== a.y) goTo(a, gx, gy);
+        }
+        continue;
+      }
+      const [nx, ny] = a.path[0], dx = nx - a.x, dy = ny - a.y, dist = Math.abs(dx) + Math.abs(dy), go = SPEED * dt;
+      if (dist > 0) a.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "r" : "l") : (dy > 0 ? "d" : "u");
+      if (dist <= go) { a.x = nx; a.y = ny; a.path.shift(); a.walked += dist; }
+      else { a.x += Math.sign(dx) * Math.min(go, Math.abs(dx)); a.y += Math.sign(dy) * Math.min(go, Math.abs(dy)); a.walked += go; }
+      moved = true;
+      if (!a.path.length) {
+        a.dir = "d";
+        if (a.leaving) actors.delete(a.id);
+      }
+    }
+    return moved;
+  }
+  // snap everyone to where they are going: used for reduced motion, Pause and a returning tab
+  function settle() {
+    for (const a of [...actors.values()]) {
+      if (a.leaving) { actors.delete(a.id); continue; }
+      const h = home(a);
+      if (h) { a.x = h.x; a.y = h.y; }
+      a.path = [];
+      a.dir = "d";
+    }
+  }
+  function visible() {
+    return [...actors.values()].filter(a => a.spot >= 0 || a.leaving).sort((p, q) => p.y - q.y || p.x - q.x);
+  }
+  function frameOf(a) {
+    const st = stateOf(a);
+    if (st === "walk") return {pose: "walk", frame: [0, 1, 0, 2][Math.floor(a.walked * 4) % 4], dir: a.dir};
+    return {pose: poseFor(a.d), frame: st === "work" && !still() ? tick % 2 : 0, dir: "d"};
+  }
+  function place(a) {
+    const f = frameOf(a), s = sprite(a, f.pose, f.frame, f.dir);
+    const x = Math.round(a.x * T + T / 2 - s.ax), y = Math.round(a.y * T + T - s.c.height);
+    return {f, s, x, y, w: s.c.width, h: s.c.height};
+  }
+
+  // ---- drawing ----
+  function text(size, weight) { ctx.font = (weight || 500) + " " + Math.round(size * px / scale) + "px system-ui, sans-serif"; }
+  function pill(x, y, label, bg, fg, chip) {  // x is the centre, y the top, in logical pixels
+    text(9 + scale);
+    const tw = ctx.measureText(label).width, u = px, pad = 3 * u / scale * 2, cw = chip ? 6 * px / scale : 0;
+    const w = Math.ceil(tw + pad * 2 + cw), hgt = Math.round((12 + scale * 1.5) * px / scale);
+    const X = Math.max(0, Math.min(canvas.width - w, Math.round(x * px - w / 2))), Y = Math.round(y * px);
+    ctx.fillStyle = bg;
+    ctx.fillRect(X, Y, w, hgt);
+    if (chip) { ctx.fillStyle = chip; ctx.fillRect(X + pad * 0.6, Y + hgt / 2 - cw / 2, cw, cw); }
+    ctx.fillStyle = fg;
+    ctx.textBaseline = "middle";
+    ctx.fillText(label, X + pad + cw, Y + hgt / 2 + px / scale);
+    return {x: X, y: Y, w, h: hgt};
+  }
+  function bubble(cx, bottom, mark, note, colour, taken, dots) {  // a pixel speech bubble above a head
+    text(10 + scale, 700);
+    const label = note ? mark + " " + note : mark, u = Math.max(1, Math.round(px / scale));
+    const w = dots ? 13 * u : Math.ceil(ctx.measureText(label).width + 8 * u), hgt = dots ? 7 * u : Math.round((13 + scale) * u);
+    const X = Math.round(cx * px - w / 2);
+    const Y0 = Math.round(bottom * px - hgt - 3 * u);
+    let Y = Y0;
+    while (taken.some(b => b.x < X + w + 2 * u && X < b.x + b.w + 2 * u && b.y < Y + hgt + 2 * u && Y < b.y + b.h + 2 * u)) Y -= hgt + 3 * u;
+    taken.push({x: X, y: Y, w, h: hgt});
+    ctx.fillStyle = "#241c2c";
+    ctx.fillRect(X - u, Y - u, w + 2 * u, hgt + 2 * u);
+    ctx.fillRect(Math.round(cx * px) - 2 * u, Y + hgt, 4 * u, 3 * u + Y0 - Y);
+    ctx.fillStyle = "#fbfaf6";
+    ctx.fillRect(X, Y, w, hgt);
+    ctx.fillRect(Math.round(cx * px) - u, Y + hgt, 2 * u, 2 * u + Y0 - Y);
+    if (dots) {
+      ctx.fillStyle = colour;
+      for (let i = 0; i < dots; i++) ctx.fillRect(X + (2 + i * 4) * u, Y + 3 * u, 2 * u, 2 * u);
+      return;
+    }
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = colour;
+    ctx.fillText(mark, X + 4 * u, Y + hgt / 2 + u);
+    if (note) { ctx.fillStyle = "#241c2c"; ctx.fillText(" " + note, X + 4 * u + ctx.measureText(mark).width, Y + hgt / 2 + u); }
+  }
+  function draw() {
+    if (!backdrop.width) return;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(backdrop, 0, 0);
+    const list = visible(), placed = list.map(a => [a, place(a)]);
+    for (const [a, p] of placed) {
+      if (a.id === highlight || a.id === hoverId) {
+        ctx.fillStyle = "rgba(255,152,48,.55)";
+        ctx.fillRect(Math.round((a.x * T + 2) * px), Math.round((a.y * T + 13) * px), 12 * px, 3 * px);
+      }
+      if (p.s.flip) {
+        ctx.save();
+        ctx.translate((p.x + p.w) * px, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(p.s.c, 0, p.y * px, p.w * px, p.h * px);
+        ctx.restore();
+      } else ctx.drawImage(p.s.c, p.x * px, p.y * px, p.w * px, p.h * px);
+    }
+    // a name tag on everyone: idea and project on a lead, the role on an agent; nudged down when it would cover another
+    const boxes = [];
+    for (const [a] of placed.slice().sort((p, q) => (p[0].d.kind === "lead" ? 0 : 1) - (q[0].d.kind === "lead" ? 0 : 1))) {
+      if (a.leaving) continue;
+      const label = a.d.kind === "agent" ? a.d.role.slice(0, 20)
+        : (a.d.idea ? a.d.idea.slice(0, 18) + " · " : "") + (a.d.project || "?").slice(0, 12);
+      let y = a.y * T + T + 1, box;
+      for (let i = 0; i < 4; i++) {
+        text(9 + scale);
+        const w = ctx.measureText(label).width + 12 * px / scale, X = (a.x * T + T / 2) * px - w / 2, Y = y * px, H = (12 + scale * 1.5) * px / scale;
+        box = {x: X, y: Y, w, h: H};
+        if (!boxes.some(b => b.x < box.x + box.w && box.x < b.x + b.w && b.y < box.y + box.h && box.y < b.y + b.h)) break;
+        y += (13 + scale * 1.5) / scale;
+      }
+      boxes.push(pill(a.x * T + T / 2, y, label, a.id === highlight || a.id === hoverId ? "rgba(255,152,48,.92)" : "rgba(17,18,23,.78)", "#f2f2f2", a.look.pal.c));
+    }
+    // shortcut: a room shows only as many characters as it has spots and then a "+k" sign, add spots when rooms overflow often
+    for (const [g, k] of overflow) {
+      const s = SPOTS.filter(sp => spotGroup(sp) === g);
+      if (!s.length) continue;
+      const x = Math.max(...s.map(sp => sp.x)), y = Math.min(...s.map(sp => sp.y));
+      pill(x * T + T / 2, y * T - 12, "+" + k, "#ff9830", "#1d1f26");
+    }
+    const taken = [];
+    for (const [a, p] of placed.slice().reverse()) {
+      if (a.leaving) continue;
+      const cx = a.x * T + T / 2 - (p.f.pose === "sunbathe" ? 8 : 0), top = p.y + (p.f.pose === "sunbathe" ? 3 : 4);
+      if (a.d.activity === "wait") bubble(cx, top, "!", a.d.note || "you", "#e07b00", taken);
+      else if (a.d.activity === "reply") bubble(cx, top, "?", "", "#3871dc", taken);
+      else if (wanders(a)) bubble(cx, top, "", "", "#241c2c", taken, still() ? 3 : 1 + tick % 3);
+    }
+  }
+  function frame(ts) {
+    raf = 0;
+    const dt = lastTs ? Math.min(0.1, (ts - lastTs) / 1000) : 0;
+    lastTs = ts;
+    const moved = step(dt, ts), t = Math.floor(ts / 160);
+    if (moved || t !== tick) { tick = t; draw(); }
+    if (!busy() || still()) { lastTs = 0; return; }
+    // full frame rate only while someone walks; work poses need one frame per 160 ms tick
+    if (walking()) raf = requestAnimationFrame(frame);
+    else { lastTs = 0; timer = setTimeout(() => { timer = 0; raf = requestAnimationFrame(frame); }, 160); }
+  }
+  function kick() {
+    if (raf || still() || !busy()) return;
+    clearTimeout(timer);
+    timer = 0;
+    raf = requestAnimationFrame(frame);
+  }
+  function stop() { cancelAnimationFrame(raf); clearTimeout(timer); raf = timer = lastTs = 0; }
+  function motionChanged() {
+    if (still()) { stop(); settle(); }
+    pauseBtn.textContent = paused ? "Play" : "Pause";
+    pauseBtn.setAttribute("aria-pressed", paused ? "true" : "false");
+    draw();
+    kick();
+  }
+
+  // ---- roster: the same facts as text, and the way to find a sprite ----
+  function fillRoster() {
+    const list = [...actors.values()].filter(a => !a.leaving).sort((p, q) => p.id < q.id ? -1 : 1);
+    const key = JSON.stringify(list.map(a => [a.id, rowCells(a.d)]));
+    $("nobody").hidden = list.length > 0;
+    if (key === rosterKey) return;
+    rosterKey = key;
+    const focused = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.id : "";
+    roster.replaceChildren();
+    for (const a of list) {
+      const tr = document.createElement("tr");
+      tr.tabIndex = 0;
+      tr.dataset.id = a.id;
+      tr.classList.toggle("hl", a.id === highlight);
+      rowCells(a.d).forEach((cell, i) => {
+        const td = document.createElement("td");
+        if (i === 1) {
+          const chip = document.createElement("span");
+          chip.className = "chip";
+          chip.style.background = a.look.pal.c;
+          td.appendChild(chip);
+        }
+        td.appendChild(document.createTextNode(cell));
+        if (i === 2 && a.d.title) td.title = a.d.title;
+        tr.appendChild(td);
+      });
+      const on = () => setHighlight(a.id), off = () => setHighlight("");
+      tr.addEventListener("focus", on);
+      tr.addEventListener("mouseenter", on);
+      tr.addEventListener("blur", off);
+      tr.addEventListener("mouseleave", off);
+      roster.appendChild(tr);
+      if (a.id === focused) tr.focus();
+    }
+  }
+  function setHighlight(id) {
+    if (highlight === id) return;
+    highlight = id;
+    for (const tr of roster.children) tr.classList.toggle("hl", tr.dataset.id === id);
+    draw();
+  }
+  canvas.addEventListener("mousemove", ev => {
+    const lx = ev.offsetX / scale, ly = ev.offsetY / scale;
+    let hit = null;
+    for (const a of visible().reverse()) {
+      if (a.leaving) continue;
+      const p = place(a);
+      if (lx >= p.x && lx < p.x + p.w && ly >= p.y + 3 && ly < p.y + p.h) { hit = a; break; }
+    }
+    const id = hit ? hit.id : "";
+    if (hit) {
+      tip.textContent = rowCells(hit.d).join(" · ");
+      tip.hidden = false;
+      const wrap = canvas.parentElement.getBoundingClientRect(), c = canvas.getBoundingClientRect();
+      tip.style.left = Math.min(c.left - wrap.left + ev.offsetX + 14, wrap.width - tip.offsetWidth - 4) + "px";
+      tip.style.top = c.top - wrap.top + ev.offsetY + 16 + "px";
+    } else tip.hidden = true;
+    if (id !== hoverId) { hoverId = id; draw(); }
+  });
+  canvas.addEventListener("mouseleave", () => { tip.hidden = true; if (hoverId) { hoverId = ""; draw(); } });
+
+  // ---- data ----
+  function shown(ok) {
+    $("status").textContent = demo ? "demo data" : ok ? "" : "no answer from /api/rooms, retrying";
+    if (ok) $("ts").textContent = new Date().toLocaleTimeString();
+  }
+  function poll() {
+    if (document.hidden) return;
+    if (demo) { apply(normalize(demoState(demoStep++, Math.floor(Date.now() / 1000)))); shown(true); return; }
+    if (inflight) return;
+    inflight = true;
+    fetch("/api/rooms", {cache: "no-store"})
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(j => { const data = normalize(j); if (!data) throw new Error("bad shape"); apply(data); shown(true); })
+      .catch(() => shown(false))  // keep the last scene
+      .finally(() => { inflight = false; });
+  }
+
+  pauseBtn.addEventListener("click", () => { paused = !paused; motionChanged(); });
+  motion.addEventListener("change", ev => { reduced = ev.matches; motionChanged(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) { stop(); return; }
+    settle();  // no replay of walks missed while away
+    poll();
+    motionChanged();
+  });
+  window.addEventListener("resize", resize);
+  drawStatic(base.getContext("2d"));
+  resize();
+  poll();
+  setInterval(poll, 5000);
+})();
+</script></body></html>
