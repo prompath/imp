@@ -61,9 +61,13 @@ class TestReducer(unittest.TestCase):
 
     def test_idea_from_paths_and_briefs(self):
         read = ev("PreToolUse", tool_name="Read", tool_input={"file_path": IDEAS + "/offer-timing/STATUS.md"})
-        self.assertEqual(run(read)["idea"], IDEAS + "/offer-timing")
+        self.assertEqual(run(read)["idea"], IDEAS + "/offer-timing/STATUS.md")
         bash = ev("PreToolUse", tool_name="Bash", tool_input={"command": "cat ideas/returns/plan.md"})
-        self.assertEqual(run(bash)["idea"], IDEAS + "/returns")
+        self.assertEqual(run(bash)["idea"], IDEAS + "/returns/plan.md")
+        spaced = ev("PreToolUse", tool_name="Read", tool_input={"file_path": IDEAS + "/pitch/Big Idea/plan.md"})
+        self.assertEqual(run(spaced)["idea"], IDEAS + "/pitch/Big Idea/plan.md")
+        quoted = ev("PreToolUse", tool_name="Bash", tool_input={"command": 'cat "ideas/pitch/Big Idea/plan.md" | wc'})
+        self.assertEqual(run(quoted)["idea"], IDEAS + "/pitch/Big Idea/plan.md")
         other = ev("PreToolUse", tool_name="Bash", tool_input={"command": "cat myideas/x/plan.md ideas/local/y"})
         self.assertNotIn("idea", run(other))
         brief = ev("PreToolUse", tool_name="Agent", tool_input={"prompt": "# Brief: builder for task-dashboard\n\n**Goal:** x"})
@@ -76,14 +80,14 @@ class TestReducer(unittest.TestCase):
         del bash["cwd"]
         s = run(ev("SessionStart"), sub)
         self.assertEqual(s["cwd"], "/p")
-        self.assertEqual(run(bash, state=s)["idea"], IDEAS + "/returns")
+        self.assertEqual(run(bash, state=s)["idea"], IDEAS + "/returns/plan.md")
 
     def test_subagent_reads_do_not_relink_the_session(self):
         read = lambda **kw: ev("PreToolUse", tool_name="Read", tool_input={"file_path": IDEAS + "/other/plan.md"}, **kw)
         main = run(ev("SessionStart"), ev("PreToolUse", tool_name="Read", tool_input={"file_path": IDEAS + "/mine/plan.md"}))
         s = run(read(agent_id="a1", agent_type="imp:tech-researcher"), state=main)
-        self.assertEqual((s["idea"], s["agents"]), (IDEAS + "/mine", {"a1": "imp:tech-researcher"}))
-        self.assertEqual(run(read(), state=main)["idea"], IDEAS + "/other")  # the main session still relinks
+        self.assertEqual((s["idea"], s["agents"]), (IDEAS + "/mine/plan.md", {"a1": "imp:tech-researcher"}))
+        self.assertEqual(run(read(), state=main)["idea"], IDEAS + "/other/plan.md")  # the main session still relinks
 
     def test_registered_for_every_event(self):
         hooks = json.loads((ROOT / "hooks" / "hooks.json").read_text())["hooks"]
@@ -205,6 +209,20 @@ class TestDashboard(unittest.TestCase):
         done = impctl.render(rows, True, NOW)
         self.assertIn("Done (1)", done)
         self.assertIn('value="1" checked', done)
+
+    def test_flat_notes_link_only_their_own_session(self):
+        p = Path(self.tmp.name).resolve() / "proj" / "ideas"
+        (p / "research").mkdir()
+        for id_ in ("a", "b"):
+            (p / "research" / f"{id_}.md").write_text(f"---\nid: {id_}\nwaiting_on: user\nlast_update: {TODAY}\n---\n")
+        (self.act / "flat.json").write_text(json.dumps(
+            {"idea": str(p / "research" / "a.md"), "state": "working", "last_seen": NOW, "agents": {"r": "imp:reviewer"}}))
+        (self.act / "brief.json").write_text(json.dumps(
+            {"idea": str(p / "b"), "state": "working", "last_seen": NOW, "agents": {}}))
+        rows = {r[2]["id"]: r[3] for r in impctl.dashboard_rows(NOW)}
+        self.assertEqual([s["_sid"] for s in rows["a"]], ["flat"])
+        self.assertEqual([s["_sid"] for s in rows["b"]], ["brief"])  # a brief links by id
+        self.assertEqual([s["_sid"] for s in rows["evil"]], ["live"])  # a folder idea still matches by prefix
 
     def get(self, path, host=HOST):
         return impctl.route(path, host, 8765)

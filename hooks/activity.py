@@ -34,8 +34,11 @@ def _brief_idea(prompt: str) -> str:
     return ""
 
 
+PATH_KEYS = ("file_path", "path", "notebook_path")
+
+
 def idea_from_tool(tool_name: str, tool_input: dict, ideas_dir: str, cwd: str) -> str:
-    """Idea folder (absolute) a tool call touches, or ''."""
+    """Path (absolute) under the ideas root a tool call touches, or ''. The dashboard maps it to an idea."""
     if not ideas_dir or not isinstance(tool_input, dict):
         return ""
     if tool_name in ("Agent", "Task"):
@@ -46,7 +49,7 @@ def idea_from_tool(tool_name: str, tool_input: dict, ideas_dir: str, cwd: str) -
     rel = os.path.relpath(ideas_dir, cwd) if cwd else ".."
     if not rel.startswith("."):
         prefixes.append((rel + "/", True))
-    for value in tool_input.values():
+    for key, value in tool_input.items():
         if not isinstance(value, str):
             continue
         for p, relative in prefixes:
@@ -56,13 +59,19 @@ def idea_from_tool(tool_name: str, tool_input: dict, ideas_dir: str, cwd: str) -
                 i = value.find(p, i + 1)
             if i < 0:
                 continue
-            seg = value[i + len(p):]
-            for j, c in enumerate(seg):
-                if c in "/ \t\n'\"`;)|&":
-                    seg = seg[:j]
-                    break
-            if seg and not seg.startswith(".") and seg != "local":
-                return os.path.join(ideas_dir, seg)
+            rest = value[i + len(p):]
+            # the whole path: a path argument as is, a quoted one up to its quote (folder names have spaces)
+            if not (key in PATH_KEYS and i == 0):
+                q = value[i - 1] if i > 0 and value[i - 1] in "'\"" else ""
+                stops = q or " \t\n'\"`;)|&"
+                for j, c in enumerate(rest):
+                    if c in stops:
+                        rest = rest[:j]
+                        break
+            rest = rest.rstrip("/")
+            first = rest.split("/", 1)[0]
+            if first and not first.startswith(".") and first != "local":
+                return os.path.join(ideas_dir, rest)
     return ""
 
 

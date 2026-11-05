@@ -267,9 +267,15 @@ def dashboard_rows(now: float, sessions=None) -> list:
         if not (root / PROJECT_FILE).is_file():
             continue
         name = project_config(root)["name"]
+        ideas_dir = str(root / project_config(root)["ideas_root"])
         for idea in find_ideas(root):
-            folder = str((root / idea["_path"]).parent)
-            mine = [s for s in sessions if s.get("idea") == folder]
+            path = root / idea["_path"]
+            folder = str(path.parent)
+            # a STATUS.md idea owns its folder; a flat note (`research/<id>.md`) owns only itself
+            anchor = folder if path.name == "STATUS.md" else str(path)
+            by_id = os.path.join(ideas_dir, idea["id"]) if idea.get("id") else None  # from a brief
+            mine = [s for s in sessions if s.get("idea") and (
+                s["idea"] in (anchor, by_id) or s["idea"].startswith(anchor + "/"))]
             group, note = classify(idea, mine, now)
             rows.append((group, note, dict(idea, project=name, _folder=folder), mine))
     return rows
@@ -706,7 +712,7 @@ STATE_COLOR = {"working": "blue", "needs_permission": "red", "waiting_reply": "a
 
 def _timeline_panel(rows: list, sessions: list, now: float) -> str:
     e = html.escape
-    labels = {r[2]["_folder"]: f"{r[2]['project']}/{r[2].get('id') or '-'}" for r in rows}
+    labels = {id(s): f"{r[2]['project']}/{r[2].get('id') or '-'}" for r in rows for s in r[3]}
     start = now - SPAN
     lines = []
     for s in sorted(sessions, key=lambda s: s.get("last_seen") or 0, reverse=True):
@@ -714,7 +720,7 @@ def _timeline_panel(rows: list, sessions: list, now: float) -> str:
             continue
         end = now if _live(s, now) else min(now, s.get("last_seen") or now)
         segs = timeline(s.get("changes") or [], start, end)
-        label = labels.get(s.get("idea")) or os.path.basename(s.get("cwd") or "") or "?"
+        label = labels.get(id(s)) or os.path.basename(s.get("cwd") or "") or "?"
         rects = "".join(
             f'<rect x="{t0 - start:.0f}" width="{t1 - t0:.0f}" height="10" fill="var(--{STATE_COLOR.get(st, "grey")})">'
             f"<title>{e(st)}</title></rect>" for t0, t1, st in segs)
