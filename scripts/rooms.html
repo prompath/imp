@@ -26,14 +26,20 @@ background:var(--panel);border:1px solid var(--border);border-radius:3px;padding
 #ideas-body fieldset{margin:8px 0;padding:4px 10px;border:1px solid var(--border);border-radius:3px}
 #ideas-body legend{padding:0 4px;color:var(--muted)}#ideas-body label{display:block;padding:2px 0;white-space:nowrap}
 #ideas-body .empty{padding:4px 0 0;font-size:12px}
+#say{position:absolute;z-index:4;max-width:320px;background:#fbfaf6;color:#2a2233;border:2px solid #2a2233;border-radius:4px;
+padding:6px 9px;font-size:13px;line-height:1.35;box-shadow:0 2px 8px rgba(0,0,0,.35);pointer-events:none}#say b{display:block;font-size:12px}
+#wrap:fullscreen{background:var(--bg)}#wrap.max{position:fixed;inset:0;z-index:10;max-height:none!important;background:var(--bg)}
+#wrap:-webkit-full-screen{background:var(--bg)}
 .chip{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
 </style></head><body>
 <noscript><p class="empty">The rooms page needs JavaScript. The <a href="/">dashboard</a> works without it.</p></noscript>
 <div class="top"><b>imp rooms</b><a href="/">Dashboard</a><span>last refreshed <span id="ts">-</span></span>
 <span id="status"></span><button id="pause" type="button" aria-pressed="false">Pause</button>
 <button id="zoom" type="button" aria-pressed="false" title="Show the art pixels twice as large; scroll to pan">Zoom</button>
+<button id="ceo" type="button" aria-pressed="false" title="Walk with the arrow keys or WASD; E or Space talks to whoever is next to you">Walk as CEO</button>
+<button id="full" type="button" title="Fill the screen with the campus; Esc leaves">Full screen</button>
 <details id="ideas"><summary id="ideas-sum">Ideas</summary><div id="ideas-body"></div></details></div>
-<div id="wrap"><canvas id="scene" aria-hidden="true"></canvas><div id="tip" hidden></div></div>
+<div id="wrap"><canvas id="scene" aria-hidden="true"></canvas><div id="tip" hidden></div><div id="say" role="status" hidden></div></div>
 <div class="panel"><h3 id="roster-title">Who is where</h3><table aria-labelledby="roster-title"><thead><tr>
 <th scope="col">Name / role</th><th scope="col">Project</th><th scope="col">Idea</th><th scope="col">Room</th><th scope="col">State</th>
 </tr></thead><tbody id="roster"></tbody></table><div id="nobody" class="empty" hidden>Nobody is in yet.</div></div>
@@ -189,6 +195,7 @@ function normalize(j) {
       id: c.id, kind: c.kind === "agent" ? "agent" : "lead", role: clip(c.role, 40) || "unknown",
       room: own(ROOMS, c.room) ? c.room : "office", activity: ACTIVITIES.includes(c.activity) ? c.activity : "idle",
       project: clip(c.project, 60), idea: clip(c.idea, 80), title: clip(c.title, 160), note: clip(c.note, 60), live: c.live === true,
+      says: clip(c.says, 400),
     });
   }
   return {ts: typeof j.ts === "number" ? j.ts : 0, characters: out};
@@ -511,6 +518,7 @@ const ACC = {
     ["L", 29, 64, 6, 2], ["g", 29, 67, 6, 1], ["g", 29, 69, 4, 1]]},
 };
 ACC.headphones.u = ACC.headphones.d.slice(0, 7);
+ACC.tie = {d: [["w", 28, 47, 8, 4], ["R", 30, 49, 4, 3], ["r", 31, 52, 2, 11], ["R", 31, 63, 2, 2]]};  // the CEO's, never by seed
 const ACCS = ["", "glasses", "headphones", "lanyard"];
 // a round lens about 15 art px across: a frame ring, glass and a glint, centred on (cx, cy)
 function lensRing(cx, cy) {
@@ -669,7 +677,7 @@ function demoState(n, ts) {
 (function () {
   const $ = id => document.getElementById(id);
   const canvas = $("scene"), ctx = canvas.getContext("2d"), tip = $("tip"), roster = $("roster"), pauseBtn = $("pause");
-  const zoomBtn = $("zoom"), wrap = $("wrap");
+  const zoomBtn = $("zoom"), wrap = $("wrap"), ceoBtn = $("ceo"), fullBtn = $("full"), say = $("say");
   let last = null;  // the last poll, unfiltered, so a change of the filter applies at once
   const LW = MAP_W * T, LH = MAP_H * T, SPEED = 3;  // tiles per second
   const query = new URLSearchParams(location.search), demo = query.get("demo") === "1";
@@ -694,6 +702,14 @@ function demoState(n, ts) {
   }));
 
   function still() { return reduced || paused || document.hidden; }
+  // the CEO is you: walked with the keys, outside actors, so it has no spot and the others neither seat nor avoid it
+  const CEO_D = {id: "ceo:you", kind: "lead", role: "CEO", room: "office", activity: "idle", project: "you", idea: "", title: "", note: "",
+    live: true, says: ""};
+  const CEO_LOOK = {key: "ceo", style: "short", acc: "tie", pal: Object.assign(tones(SKIN[1], "ASsa"), tones(HAIRS[4], "JHhj"),
+    tones("#2b2d33", "ZPpz"), tones("#2f3a56", "XCcx"), {f: SHOES[0], F: ramp(SHOES[0])[3]})};
+  const KEYS = {ArrowUp: "u", w: "u", ArrowDown: "d", s: "d", ArrowLeft: "l", a: "l", ArrowRight: "r", d: "r"};
+  const STEPS = {u: [0, -1], d: [0, 1], l: [-1, 0], r: [1, 0]};
+  let ceo = null, held = "", queued = [], talkId = "";  // queued: up to 3 taps made mid-step, walked in turn
 
   // ---- static art: floors, light, walls and props, drawn once into base at S art px per world px ----
   function drawStatic(g) {
@@ -2082,7 +2098,7 @@ function demoState(n, ts) {
   // ---- sizing: a whole number a of device px per art px, so k = a*S device px per world px and every blit is crisp ----
   const MAX_AREA = 16e6;  // backing px; bigger canvases fail on some browsers (pqina.nl, canvas area limit)
   function resize() {
-    const dpr = window.devicePixelRatio || 1, top = wrap.getBoundingClientRect().top + window.scrollY;
+    const dpr = window.devicePixelRatio || 1, top = fullscreen() ? 0 : wrap.getBoundingClientRect().top + window.scrollY;
     const roomW = wrap.clientWidth - 18, roomH = window.innerHeight - top - 20;
     const wide = k => LW * k / dpr <= roomW, fits = k => wide(k) && LH * k / dpr <= roomH, small = k => LW * k * LH * k <= MAX_AREA;
     let a = 1;
@@ -2246,16 +2262,19 @@ function demoState(n, ts) {
   // WALK while a path is left, WORK at a spot while live work goes on, IDLE otherwise
   function stateOf(a) { return a.path.length ? "walk" : a.spot >= 0 && a.d.activity === "work" ? "work" : "idle"; }
   function busy() {
+    if (ceo && (held || queued.length || ceo.path.length)) return true;
     for (const a of actors.values()) if (stateOf(a) !== "idle") return true;
     return false;
   }
   function walking() {
+    if (ceo && (held || queued.length || ceo.path.length)) return true;
     for (const a of actors.values()) if (a.path.length) return true;
     return false;
   }
   function step(dt, now) {
     let moved = false;
-    for (const a of [...actors.values()]) {
+    if (ceo && (queued.length || held) && !ceo.path.length) ceoStep();
+    for (const a of [...actors.values()].concat(ceo ? [ceo] : [])) {
       if (!a.path.length) {
         // the chief walks and talks around its room between rests
         if (a.spot >= 0 && wanders(a) && now > a.wanderAt) {
@@ -2280,7 +2299,7 @@ function demoState(n, ts) {
       if (dist <= go) { a.x = nx; a.y = ny; a.path.shift(); a.walked += dist; }
       else { a.x += Math.sign(dx) * Math.min(go, Math.abs(dx)); a.y += Math.sign(dy) * Math.min(go, Math.abs(dy)); a.walked += go; }
       moved = true;
-      if (!a.path.length) {
+      if (!a.path.length && !a.ceo) {
         a.dir = "d";
         if (a.leaving) actors.delete(a.id);
       }
@@ -2289,6 +2308,7 @@ function demoState(n, ts) {
   }
   // snap everyone to where they are going: used for reduced motion, Pause and a returning tab
   function settle() {
+    if (ceo && ceo.path.length) { [ceo.x, ceo.y] = ceo.path[ceo.path.length - 1]; ceo.path = []; }
     for (const a of [...actors.values()]) {
       if (a.leaving) { actors.delete(a.id); continue; }
       const h = home(a);
@@ -2298,7 +2318,7 @@ function demoState(n, ts) {
     }
   }
   function visible() {
-    return [...actors.values()].filter(a => a.spot >= 0 || a.leaving).sort((p, q) => p.y - q.y || p.x - q.x);
+    return [...actors.values()].filter(a => a.spot >= 0 || a.leaving).concat(ceo ? [ceo] : []).sort((p, q) => p.y - q.y || p.x - q.x);
   }
   // in place at a chair spot: the side its table is on; N sits with its back to the viewer, E and W side on
   function seated(a) { const h = home(a); return !a.path.length && h && a.x === h.x && a.y === h.y ? chairSide(h.x, h.y) : ""; }
@@ -2502,6 +2522,15 @@ function demoState(n, ts) {
       const b = pick(bubbleBoxes(a.x * T + T / 2, p.top, "", 1), taken);
       if (b) { drawBubble(b, "", "", "#2a2233", still() ? 3 : 1 + tick % 3); put(b); }
     }
+    if (ceo) {  // the talk hint over your head, when someone is close enough and not already talking
+      const n = near(), p = place(ceo);
+      if (n && n.id !== talkId) {
+        const t = tagBoxes(ceo.x * T + T / 2, p.top, p.y + p.h, "E: talk to " + cut(n.d.kind === "agent" ? n.d.role : n.d.idea || "chief", 18));
+        drawTag(pick([t.up, t.under, t.above], hard) || t.up, "E: talk to " + cut(n.d.kind === "agent" ? n.d.role : n.d.idea || "chief", 18), "", true);
+      }
+    }
+    showSay();
+    if (demo) canvas.dataset.ceo = ceo ? ceo.x + "," + ceo.y + (talkId ? " talking to " + talkId : "") : "";
     if (perf && walking()) {
       drawTimes.push(performance.now() - t0);
       if (drawTimes.length > 300) drawTimes.shift();
@@ -2703,6 +2732,95 @@ function demoState(n, ts) {
       .finally(() => { inflight = false; });
   }
 
+  // ---- the CEO: one tile per key press or held key, on walkable tiles only; talk to the nearest within 1.5 tiles ----
+  function ceoStep() {
+    const dir = queued.shift() || held, [dx, dy] = STEPS[dir], nx = Math.round(ceo.x) + dx, ny = Math.round(ceo.y) + dy;
+    ceo.dir = dir;
+    if (!passable(nx, ny)) return false;
+    if (still()) { ceo.x = nx; ceo.y = ny; } else ceo.path = [[nx, ny]];
+    return true;
+  }
+  function near() {
+    let best = null, bd = 1.5;
+    for (const a of actors.values()) {
+      if (a.leaving || a.spot < 0) continue;
+      const d = Math.hypot(a.x - ceo.x, a.y - ceo.y);
+      if (d <= bd) { bd = d; best = a; }
+    }
+    return best;
+  }
+  // the speech bubble is a DOM box over the canvas, so two sentences wrap and stay crisp; it closes when you walk off
+  function showSay() {
+    const a = ceo && talkId ? actors.get(talkId) : null;
+    if (!a || a.leaving || a.spot < 0 || Math.hypot(a.x - ceo.x, a.y - ceo.y) > 2.5) {
+      talkId = "";
+      say.hidden = true;
+      return;
+    }
+    const who = a.d.kind === "agent" ? a.d.role + (a.d.idea ? " \u00b7 " + a.d.idea : "") : "chief \u00b7 " + (a.d.idea || a.d.project || "?");
+    const text = a.d.says || "I'm the " + a.d.role + (a.d.idea ? " on " + a.d.idea : "") + ".";
+    if (say.dataset.key !== who + "|" + text) {
+      say.dataset.key = who + "|" + text;
+      const b = document.createElement("b");
+      b.textContent = who;
+      say.replaceChildren(b, document.createTextNode(text));
+    }
+    say.hidden = false;
+    const p = place(a), x = canvas.offsetLeft + (a.x * T + T / 2) * scale, y = canvas.offsetTop + p.top * scale;
+    say.style.left = Math.max(wrap.scrollLeft + 4, Math.min(x - say.offsetWidth / 2, wrap.scrollLeft + wrap.clientWidth - say.offsetWidth - 4)) + "px";
+    say.style.top = Math.max(wrap.scrollTop + 4, y - say.offsetHeight - 8) + "px";
+  }
+  ceoBtn.addEventListener("click", () => {
+    ceo = ceo ? null : {id: CEO_D.id, ceo: true, d: CEO_D, x: CAMPUS_DOOR.x, y: CAMPUS_DOOR.y, path: [], dir: "u", walked: 0, spot: -1,
+      leaving: false, look: CEO_LOOK, placed: true};
+    held = talkId = "";
+    queued = [];
+    ceoBtn.textContent = ceo ? "Stop walking" : "Walk as CEO";
+    ceoBtn.setAttribute("aria-pressed", ceo ? "true" : "false");
+    ceoBtn.blur();  // or Space would press the button again instead of talking
+    draw();
+  });
+  document.addEventListener("keydown", ev => {
+    if (!ceo || ev.ctrlKey || ev.metaKey || ev.altKey || /^(INPUT|SELECT|TEXTAREA|BUTTON|SUMMARY)$/.test(ev.target.tagName)) return;
+    const key = ev.key.length === 1 ? ev.key.toLowerCase() : ev.key, dir = KEYS[key];
+    if (dir) {
+      ev.preventDefault();  // arrows and Space would scroll the page
+      if (ev.repeat) return;  // a held key walks on in step(); auto-repeat would only fill the queue
+      held = dir;
+      if (still()) { ceoStep(); held = ""; draw(); return; }
+      if (ceo.path.length) queued = queued.concat(dir).slice(-3); else ceoStep();  // a tap moves one tile even when the key is up before the next frame
+      kick();
+    } else if (key === "e" || key === " ") {
+      ev.preventDefault();
+      const n = near();
+      talkId = n && n.id !== talkId ? n.id : "";
+      draw();
+    } else if (key === "Escape" && talkId) {
+      ev.preventDefault();  // this Esc only closes the bubble, not the full window
+      talkId = "";
+      draw();
+    }
+  });
+  document.addEventListener("keyup", ev => {
+    if (KEYS[ev.key.length === 1 ? ev.key.toLowerCase() : ev.key] === held) held = "";
+  });
+  window.addEventListener("blur", () => { held = ""; });
+  // ---- full screen: the campus alone; the browser's Esc leaves it ----
+  // where the browser refuses (no API, or not a real click), the campus fills the window instead (.max), and Esc leaves that too
+  function fullscreen() { return document.fullscreenElement || document.webkitFullscreenElement || wrap.classList.contains("max"); }
+  function fullChanged() {
+    fullBtn.textContent = fullscreen() ? "Leave full screen" : "Full screen";
+    resize();
+  }
+  function setMax(on) { wrap.classList.toggle("max", on); fullChanged(); }
+  fullBtn.addEventListener("click", () => {
+    if (wrap.classList.contains("max")) return setMax(false);
+    if (fullscreen()) return (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    const ask = wrap.requestFullscreen || wrap.webkitRequestFullscreen;
+    Promise.resolve(ask ? ask.call(wrap) : Promise.reject()).catch(() => setMax(true));
+  });
+  for (const name of ["fullscreenchange", "webkitfullscreenchange"]) document.addEventListener(name, fullChanged);
+  document.addEventListener("keydown", ev => { if (ev.key === "Escape" && wrap.classList.contains("max") && !ev.defaultPrevented) setMax(false); });
   pauseBtn.addEventListener("click", () => { paused = !paused; motionChanged(); });
   zoomBtn.addEventListener("click", toggleZoom);
   motion.addEventListener("change", ev => { reduced = ev.matches; motionChanged(); });

@@ -74,6 +74,33 @@ class TestReducer(unittest.TestCase):
         self.assertEqual(run(brief)["idea"], IDEAS + "/task-dashboard")
         self.assertNotIn("idea", run(read, state={"ideas_dir": ""}))
 
+    def test_brief_goal_and_latest_action(self):
+        brief = ev("PreToolUse", tool_name="Agent", tool_input={
+            "subagent_type": "imp:reviewer", "prompt": "# Brief: reviewer for x\n\n**Goal:** Check the plan. Then more.\n"})
+        start = ev("SubagentStart", agent_id="a1", agent_type="imp:reviewer")
+        read = ev("PreToolUse", agent_id="a1", agent_type="imp:reviewer", tool_name="Read",
+                  tool_input={"file_path": "/secret/dir/plan.md"})
+        s = run(brief, start, read)
+        self.assertEqual(s["work"]["a1"], {"goal": "Check the plan", "act": "reading plan.md", "at": NOW})
+        self.assertEqual(s["briefs"], [])
+        bash = ev("PreToolUse", agent_id="a1", agent_type="imp:reviewer", tool_name="Bash",
+                  tool_input={"command": "pytest /secret", "description": "Run the tests"})
+        self.assertEqual(run(bash, state=s)["work"]["a1"]["act"], "running: run the tests")
+        self.assertNotIn("a1", run(ev("SubagentStop", agent_id="a1"), state=s)["work"])
+        other = run(ev("SubagentStart", agent_id="a2", agent_type="imp:builder"), state=run(brief))
+        self.assertEqual(other["work"]["a2"], {"goal": ""})  # a brief goes only to its own agent type
+
+    def test_says(self):
+        work = {"goal": "Check the plan", "act": "reading plan.md", "at": NOW - 20}
+        self.assertEqual(impctl.agent_says("reviewer", "on x", work, NOW),
+                         "I'm the reviewer on x: check the plan. Right now I'm reading plan.md (20s ago).")
+        self.assertEqual(impctl.agent_says("builder", "in p", {}, NOW), "I'm the builder in p. I'm just getting started.")
+        idea = {"id": "x", "stage": "experiment", "round": 1, "waiting_on": "user", "next_step": "Run the probe."}
+        self.assertEqual(impctl.lead_says(idea, "wait", "G1 Plan"),
+                         "I'm running x, experiment round 1, and waiting for you at G1 Plan. Next: Run the probe.")
+        self.assertEqual(impctl.lead_says({"id": "y"}, "work", ""), "I'm running y, no stage, and my agents are at work.")
+        self.assertEqual(impctl.lead_says({"id": "z", "waiting_on": "-"}, "idle", ""), "I'm running z, no stage, and waiting on nobody.")
+
     def test_subagent_cwd_keeps_session_cwd(self):
         sub = ev("PreToolUse", tool_name="Read", agent_id="a1", agent_type="imp:builder", cwd="/p/ideas/x", tool_input={})
         bash = ev("PreToolUse", tool_name="Bash", tool_input={"command": "cat ideas/returns/plan.md"})
@@ -236,7 +263,7 @@ class TestDashboard(unittest.TestCase):
         self.assertNotIn("Access-Control-Allow-Origin", headers)
         data = json.loads(body)
         self.assertEqual(set(data), {"ts", "characters"})
-        keys = {"id", "kind", "role", "room", "activity", "project", "idea", "title", "note", "live"}
+        keys = {"id", "kind", "role", "room", "activity", "project", "idea", "title", "note", "live", "says"}
         self.assertEqual([(c["id"], c["room"], c["activity"], c["role"]) for c in data["characters"]],
                          [("proj/evil", "office", "work", "chief"), ("proj/evil#" + h8("a"), "office", "work", "builder")])
         self.assertTrue(all(set(c) == keys for c in data["characters"]))

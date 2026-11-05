@@ -792,19 +792,51 @@ def _h8(text) -> str:
 STAGE_ROOM = {"pitch": "meeting", "experiment": "lab", "ship": "workshop", "document": "library"}
 
 
+def _ago(at, now: float) -> str:
+    secs = max(0, int(now - (at or now)))
+    return f"{secs}s ago" if secs < 60 else f"{secs // 60}m ago"
+
+
+def agent_says(role: str, where: str, work: dict, now: float) -> str:
+    """Two sentences for the rooms page: who and why (the brief's goal), then the latest action."""
+    goal = (work or {}).get("goal") or ""
+    first = f"I'm the {role} {where}" + (f": {goal[0].lower() + goal[1:]}." if goal else ".")
+    act = (work or {}).get("act")
+    return first + (f" Right now I'm {act} ({_ago(work.get('at'), now)})." if act else " I'm just getting started.")
+
+
+def lead_says(idea: dict, activity: str, note: str) -> str:
+    """Two sentences for an idea's chief, from its STATUS."""
+    stage = (idea.get("stage") or "no stage") + (f" round {idea['round']}" if idea.get("round") else "")
+    if activity == "work":
+        how = "my agents are at work"
+    elif note == "permission":
+        how = "a permission prompt is waiting for you"
+    elif note:
+        how = f"waiting for you at {note}"
+    else:
+        how = f"waiting on {idea.get('waiting_on')}" if (idea.get("waiting_on") or "-") != "-" else "waiting on nobody"
+    nxt = idea.get("next_step") or ""
+    return f"I'm running {idea.get('id') or 'this idea'}, {stage}, and {how}." + (f" Next: {nxt.rstrip('.')}." if nxt else "")
+
+
 def rooms_state(rows: list, sessions: list, now: float) -> dict:
     """The API contract of /api/rooms: one character per visible idea, one per live subagent.
 
     Rows apply in the order of the plan's room table; the first match wins. Output has no absolute paths."""
     chars = []
 
-    def add(id_, kind, role, room, activity, project, idea="", title="", note="", live=True):
+    def add(id_, kind, role, room, activity, project, idea="", title="", note="", live=True, says=""):
         chars.append({"id": id_, "kind": kind, "role": role, "room": room, "activity": activity,
-                      "project": project, "idea": idea, "title": title, "note": note, "live": live})
+                      "project": project, "idea": idea, "title": title, "note": note, "live": live, "says": says})
 
     def add_agents(key, live, room, project, idea="", title=""):  # agents come only from live sessions
-        for aid, t in [a for s in live for a in sorted((s.get("agents") or {}).items())]:
-            add(f"{key}#{_h8(aid)}", "agent", t.split(":")[-1], room, "work", project, idea, title)
+        for s in live:
+            for aid, t in sorted((s.get("agents") or {}).items()):
+                role = t.split(":")[-1]
+                says = agent_says(role, f"on {idea}" if idea else f"in {project or 'this session'}",
+                                  (s.get("work") or {}).get(aid) or {}, now)
+                add(f"{key}#{_h8(aid)}", "agent", role, room, "work", project, idea, title, says=says)
 
     linked = {id(s) for r in rows for s in r[3]}  # includes sessions on hidden ideas: those stay hidden
     for group, _, idea, mine in rows:
@@ -825,7 +857,7 @@ def rooms_state(rows: list, sessions: list, now: float) -> dict:
         else:
             room, activity, note = "lounge", "idle", ""
         add(key, "lead", "chief", room, activity, idea["project"], idea.get("id") or "", idea.get("title") or "", note,
-            bool(live))
+            bool(live), lead_says(idea, activity, note))
         add_agents(key, live, STAGE_ROOM.get(stage, "office"), idea["project"], idea.get("id") or "", idea.get("title") or "")
     for i, s in enumerate(sessions):
         if not _live(s, now) or id(s) in linked:
@@ -833,8 +865,10 @@ def rooms_state(rows: list, sessions: list, now: float) -> dict:
         project = Path(s.get("cwd") or "").name
         perm = s.get("state") == "needs_permission"
         sid = f"s{_h8(s['_sid'])}" if s.get("_sid") else f"s{i}"  # no file name: the index
+        doing = "waiting on a permission prompt" if perm else "working" if s.get("state") == "working" else "waiting for your reply"
         add(sid, "lead", "chief", "lounge" if perm else "office",
-            "wait" if perm else "work" if s.get("state") == "working" else "reply", project, note="permission" if perm else "")
+            "wait" if perm else "work" if s.get("state") == "working" else "reply", project, note="permission" if perm else "",
+            says=f"I'm a session in {project or 'a project'} that isn't on an idea yet. Right now I'm {doing}.")
         add_agents(sid, [s], "office", project)
     return {"ts": int(now), "characters": chars}
 
@@ -863,7 +897,7 @@ def route(path: str, host: str, port: int) -> tuple:
 
 
 def serve(port: int):
-    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -879,7 +913,10 @@ def serve(port: int):
             pass
 
     print(f"imp dashboard: http://127.0.0.1:{port}/  rooms: http://127.0.0.1:{port}/rooms", flush=True)
-    HTTPServer(("127.0.0.1", port), Handler).serve_forever()
+    # threads: a browser's idle preconnected socket would otherwise hold every other request
+    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    server.daemon_threads = True
+    server.serve_forever()
 
 
 def main(argv=None) -> int:

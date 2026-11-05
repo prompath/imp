@@ -75,10 +75,45 @@ def idea_from_tool(tool_name: str, tool_input: dict, ideas_dir: str, cwd: str) -
     return ""
 
 
+def _goal(prompt: str) -> str:
+    """First sentence of the brief's `**Goal:**` line, or ''."""
+    for line in prompt.splitlines():
+        line = line.strip().lstrip("-* ")
+        if line.lower().startswith("goal:**") or line.lower().startswith("goal:"):
+            g = line.split(":", 1)[1].strip().strip("*").strip()
+            return g.split(". ", 1)[0].rstrip(".")[:160]
+    return ""
+
+
+VERBS = {"Read": "reading", "Edit": "editing", "Write": "writing", "NotebookEdit": "editing"}
+
+
+def _action(tool: str, inp: dict) -> str:
+    """What a subagent's tool call does, in a few words. File names only, never full paths."""
+    inp = inp if isinstance(inp, dict) else {}
+    path = str(inp.get("file_path") or inp.get("notebook_path") or "")
+    if tool in VERBS and path:
+        return f"{VERBS[tool]} {os.path.basename(path)}"
+    if tool == "Bash":
+        desc = str(inp.get("description") or "").strip()
+        return ("running: " + desc[0].lower() + desc[1:]) if desc else "running a command"
+    if tool in ("Grep", "Glob"):
+        return f"searching for {str(inp.get('pattern') or '')[:40]}".rstrip()
+    if tool == "WebSearch":
+        return f"searching the web for {str(inp.get('query') or '')[:40]}".rstrip()
+    if tool == "WebFetch":
+        host = str(inp.get("url") or "").split("//", 1)[-1].split("/", 1)[0]
+        return f"reading {host}" if host else "reading a web page"
+    return f"using {tool}" if tool else ""
+
+
 def reduce(state: dict, event: dict, now: float) -> dict:
     """Pure: previous session state + one hook payload -> new state. `state['ideas_dir']` must be set."""
     s = dict(state)
     s["agents"] = dict(state.get("agents") or {})
+    # work: agent id -> {goal, act, at} for the rooms page; briefs: [agent type, goal] not yet started
+    s["work"] = {k: dict(v) for k, v in (state.get("work") or {}).items()}
+    s["briefs"] = [list(b) for b in state.get("briefs") or []]
     s.setdefault("state", "working")
     name = event.get("hook_event_name")
     agent_id, agent_type = event.get("agent_id"), event.get("agent_type") or ""
@@ -89,6 +124,7 @@ def reduce(state: dict, event: dict, now: float) -> dict:
         s["state"] = "ended"
     elif name == "SubagentStop":
         s["agents"].pop(agent_id, None)
+        s["work"].pop(agent_id, None)
     elif name == "Stop":
         # a main-session Stop with background work still running isn't waiting on you yet
         if not agent_id and not event.get("background_tasks"):
@@ -103,6 +139,17 @@ def reduce(state: dict, event: dict, now: float) -> dict:
         s["state"] = "working"
         if agent_id and agent_type:
             s["agents"].setdefault(agent_id, agent_type)
+            if agent_id not in s["work"]:  # its brief was queued when the main session dispatched it
+                i = next((i for i, b in enumerate(s["briefs"]) if b[0] == agent_type), -1)
+                s["work"][agent_id] = {"goal": s["briefs"].pop(i)[1] if i >= 0 else ""}
+        if name == "PreToolUse" and agent_id and agent_id in s["work"]:
+            act = _action(event.get("tool_name") or "", event.get("tool_input") or {})
+            if act:
+                s["work"][agent_id].update(act=act, at=now)
+        if name == "PreToolUse" and not agent_id and event.get("tool_name") in ("Agent", "Task"):
+            inp = event.get("tool_input") or {}
+            if isinstance(inp, dict) and inp.get("subagent_type"):
+                s["briefs"] = (s["briefs"] + [[str(inp["subagent_type"]), _goal(str(inp.get("prompt") or ""))]])[-10:]
         if name in ("PreToolUse", "PostToolUse") and not agent_id:  # a subagent's reads must not relink the session
             idea = idea_from_tool(event.get("tool_name") or "", event.get("tool_input") or {},
                                   s.get("ideas_dir") or "", s.get("cwd") or "")
