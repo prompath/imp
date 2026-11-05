@@ -43,6 +43,7 @@ Maintainers: raise `version` in `.claude-plugin/plugin.json` for each release.
 | `/investigate <case>` | Check whether a result is a misunderstanding, a code bug or a rulebook gap |
 | `/imp:push [note]` | Commit the repo's changes, summarize everything unpushed, and push once you say yes |
 | `/imp-init` | Connect the current project |
+| `/imp:retro [session]` | Run a retrospective on a coding session (this one by default) and suggest changes to the agent's environment, most severe first: navigation, automated checks, coding standards, steering files, tool economy, information access. Adapted from [mattpocock/skills](https://github.com/mattpocock/skills) |
 | `/imp:dashboard [--port N]` | Open a live local page (`http://127.0.0.1:8765/`) of every registered project's ideas: waiting on you, in progress, idle, done. `/rooms` on the same server (`http://127.0.0.1:8765/rooms`) shows a pixel campus of who works where, with a Zoom button and an Ideas chooser: live ideas and the ones you tick are in the building, the rest lounge at the pool |
 
 The commands are called `/ideas` and `/notes` because Claude Code's built-ins already use `/status` and `/feedback`.

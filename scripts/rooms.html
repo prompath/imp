@@ -28,8 +28,8 @@ background:var(--panel);border:1px solid var(--border);border-radius:3px;padding
 #ideas-body .empty{padding:4px 0 0;font-size:12px}
 #say{position:absolute;z-index:4;max-width:320px;background:#fbfaf6;color:#2a2233;border:2px solid #2a2233;border-radius:4px;
 padding:6px 9px;font-size:13px;line-height:1.35;box-shadow:0 2px 8px rgba(0,0,0,.35);pointer-events:none}#say b{display:block;font-size:12px}
-#wrap:fullscreen{background:var(--bg)}#wrap.max{position:fixed;inset:0;z-index:10;max-height:none!important;background:var(--bg)}
-#wrap:-webkit-full-screen{background:var(--bg)}
+#wrap:fullscreen{background:var(--bg);display:flex;align-items:center}#wrap.max{display:flex;align-items:center;position:fixed;inset:0;z-index:10;max-height:none!important;background:var(--bg)}
+#wrap:-webkit-full-screen{background:var(--bg);display:flex;align-items:center}
 .chip{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
 </style></head><body>
 <noscript><p class="empty">The rooms page needs JavaScript. The <a href="/">dashboard</a> works without it.</p></noscript>
@@ -2112,15 +2112,23 @@ function demoState(n, ts) {
     if (zoomBtn.disabled) zoomed = false;
     zoomBtn.setAttribute("aria-pressed", zoomed ? "true" : "false");
     if (zoomed) k = zk;
+    // full screen fills the screen: shown at any size that fits, drawn at the next whole k up so it is scaled down, not blurred up
+    let cssW = LW * k / dpr, cssH = LH * k / dpr;
+    if (fullscreen() && !zoomed) {
+      const f = Math.min(roomW / LW, roomH / LH);
+      cssW = Math.floor(LW * f);  // whole CSS px, so rounding never adds a scrollbar
+      cssH = cssW * LH / LW;
+      while (LW * k < cssW * dpr && small(k + S)) k += S;
+    }
     px = k;
-    scale = k / dpr;  // CSS px per world px; px / scale is the DPR, so text stays at device resolution
+    scale = cssW / LW;  // CSS px per world px
     // device px per CSS px of text: text shrinks with the scene when the scene can't grow (125%, 150%),
     // and Zoom magnifies it with the art, so every tag and bubble keeps its place
     tu = Math.min(dpr, fit) * k / fit;
     canvas.width = LW * k;
     canvas.height = LH * k;
-    canvas.style.width = LW * k / dpr + "px";
-    canvas.style.height = LH * k / dpr + "px";
+    canvas.style.width = cssW + "px";
+    canvas.style.height = cssH + "px";
     wrap.style.maxHeight = Math.max(240, window.innerHeight - top) + "px";
     // put the canvas corner on a whole device px, so a fractional DPR does not resample it
     canvas.style.left = canvas.style.top = "0px";
