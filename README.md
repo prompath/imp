@@ -1,6 +1,6 @@
 # imp
 
-imp (Idea-to-Merge Pipeline) is a Claude Code plugin, a home for agents and workflows: a **chief-of-staff** plans the work, hands it to specialist agents, and stops at fixed checkpoints for your go-ahead. Ideas move through **pitch → experiment rounds → ship → document**, and their state lives in each project's idea folders. Projects extend the base with a `.imp/project.md` settings file and, if needed, their own agents and workflows.
+imp (Idea-to-Merge Pipeline) is a Claude Code plugin, a home for agents and workflows: a **chief-of-staff** plans the work, hands it to specialist agents, and stops at fixed checkpoints for your go-ahead. Ideas move through **pitch → experiment rounds → ship → monitor → document**, and their state lives in each project's idea folders. Projects extend the base with a `.imp/project.md` settings file and, if needed, their own agents and workflows.
 
 Full guide: [`docs/site/index.html`](docs/site/index.html).
 
@@ -40,7 +40,8 @@ Maintainers: raise `version` in `.claude-plugin/plugin.json` for each release.
 | `/continue [id]` | Resume an idea where it stopped |
 | `/notes [id] <notes>` | File your meeting notes and propose the next round |
 | `/ideas [--all] [--<stage>] [--waiting W] [--group G] [--projects] [--scan DIR]` | List open ideas in this project, or every project with `--projects`. Done and shelved ideas are hidden unless you pass `--all` or a stage flag (`--done`, `--pitch`, ...). Output is nested by domain and use-case if the project sets `Idea groups` |
-| `/investigate <case>` | Check whether a result is a misunderstanding, a code bug or a rulebook gap |
+| `/investigate <case>` | Check whether a result is a misunderstanding, a code bug or a rulebook gap. A plain question about the data goes to the analysis workflow instead |
+| `/save [id]` | Save progress on the idea this session is working on: update STATUS with the open decisions, commit only that idea's files, and print the `/imp:continue <id>` line. With no id, it works out the idea from this session's activity, or from idea files with uncommitted changes |
 | `/imp:push [note]` | Commit the repo's changes, summarize everything unpushed, and push once you say yes |
 | `/imp-init` | Connect the current project |
 | `/imp:retro [session]` | Run a retrospective on a coding session (this one by default) and suggest changes to the agent's environment, most severe first: navigation, automated checks, coding standards, steering files, tool economy, information access. Adapted from [mattpocock/skills](https://github.com/mattpocock/skills) |

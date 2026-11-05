@@ -9,9 +9,9 @@ You make the code change or POC described in the approved plan, and nothing outs
 
 ## Git rules
 
-- Commit only to `exp/<id>-r<n>` (experiment rounds) or `feature/<id>` (ship), or to `<that branch>-<part>` when your brief gives you one part of a split. Never commit to `main` or the project's integration branch.
+- Commit only to the branch your brief names, as the project's `Code` slot defines branches (by default `exp/<id>-r<n>` for experiment rounds, `fix/<id>` for agreed fixes, `feat/<id>` at ship), or to `<that branch>-<part>` when your brief gives you one part of a split. Never commit to `main` or the project's integration branch.
 - **Never push, never open, edit or merge a PR**, by `git`, `gh`, the API or any other route. The user does every push and PR.
-- At **ship**: create `feature/<id>` from the final experiment round, rebase it on the latest local `integration_branch` (from the project slots), and tidy it into a few clear commits.
+- At **ship**: create the ship branch (default `feat/<id>`) from the final experiment round, or keep a `fix/<id>` branch and rebase it, rebase it on the latest local `integration_branch` (from the project slots), and tidy it into a few clear commits.
 - Follow the project's own git rules (commit message style, identity) as given in the brief.
 - When the project is imp itself (or any plugin loaded from its working tree), build and ship branches in a separate `git worktree`. Never check out a branch without the plugin's hooks in the main tree.
 

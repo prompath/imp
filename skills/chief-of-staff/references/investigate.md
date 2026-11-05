@@ -7,7 +7,7 @@ agents: code-investigator, data-analyst, reviewer
 
 # Result investigation
 
-Input: the cases the business team flagged (IDs or examples). Row-level case data goes in `local/`.
+Input: the cases the business team flagged (IDs or examples). Row-level case data goes in `local/`. If no result is in doubt and the user only wants a question answered from data, say so in one line and follow `references/analysis.md` instead.
 
 1. Create an idea folder for the investigation (`stage: pitch`, id `inv-<topic>`) so it can be listed and resumed.
 2. data-analyst drafts the queries to pull each case's data (current product, usage history, inputs, model scores, rules applied) → **G-data**.

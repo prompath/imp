@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -186,6 +187,9 @@ class TestRegistryAndCli(unittest.TestCase):
         self.assertEqual(ids(), ["live-one"])
         self.assertEqual(ids("--all"), ["live-one", "old-one", "parked"])
         self.assertEqual(ids("--done"), ["old-one"])
+        write(p / "ideas" / "d" / "STATUS.md", status("watched", stage="monitor"))
+        self.assertIn("watched", self.cli("ideas", cwd=p).stdout)
+        self.assertEqual(self.cli("ideas", "--monitor", cwd=p).stdout.count("\n"), 1)
         self.assertEqual(ids("--done", "--shelved"), ["old-one", "parked"])
         self.assertEqual(ids("--stage", "pitch"), ["live-one"])
         self.assertEqual(ids("--all", "--waiting", "agents"), ["old-one", "parked"])
@@ -212,6 +216,78 @@ class TestRegistryAndCli(unittest.TestCase):
         self.assertEqual(amb.returncode, 2)
         self.assertIn("offer-mix", amb.stderr)
         self.assertEqual(self.cli("resolve", "zzz", cwd=p).returncode, 1)
+
+
+class TestCurrentAndCodes(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self.act = self.base / "activity"
+        self.act.mkdir()
+        self._old = os.environ.get("IMP_ACTIVITY")
+        os.environ["IMP_ACTIVITY"] = str(self.act)
+        self.p = make_project(self.base, "proj")
+        write(self.p / "ideas" / "fix" / "STATUS.md", status("bill-fix"))
+        write(self.p / "ideas" / "research" / "inv-x.md", status("inv-x"))
+        write(self.p / "ideas" / "research" / "inv-x-y.md", status("inv-x-y"))
+
+    def tearDown(self):
+        if self._old is None:
+            os.environ.pop("IMP_ACTIVITY", None)
+        else:
+            os.environ["IMP_ACTIVITY"] = self._old
+        self.tmp.cleanup()
+
+    def session(self, sid, idea):
+        write(self.act / f"{sid}.json", json.dumps({"cwd": str(self.p), "idea": str(self.p / idea)}))
+
+    def ids(self, session=""):
+        return [i["id"] for i in impctl.current_ideas(self.p, session)]
+
+    def test_owner_folder_flat_note_and_side_files(self):
+        ideas = impctl.find_ideas(self.p)
+        own = lambda rel: (impctl.owner(self.p, ideas, str(self.p / rel)) or {}).get("id")
+        self.assertEqual(own("ideas/fix/rounds/r1/plan.md"), "bill-fix")
+        self.assertEqual(own("ideas/research/inv-x.md"), "inv-x")
+        self.assertEqual(own("ideas/research/inv-x-plan.md"), "inv-x")
+        self.assertEqual(own("ideas/research/inv-x-y-queries/01.py"), "inv-x-y")
+        self.assertIsNone(own("ideas/research"))
+
+    def test_current_from_session_link(self):
+        self.session("s1", "ideas/fix/plan.md")
+        self.session("s2", "ideas/research/inv-x-sizing.md")
+        self.assertEqual(self.ids("s1"), ["bill-fix"])
+        self.assertEqual(self.ids("s2"), ["inv-x"])
+
+    def test_current_falls_back_to_uncommitted_files(self):
+        subprocess.run(["git", "init", "-q", str(self.p)], check=True)
+        self.session("s3", "ideas/research")  # an old hook linked the stage folder only
+        self.assertEqual(sorted(self.ids("s3")), ["bill-fix", "inv-x", "inv-x-y"])
+        subprocess.run(["git", "-C", str(self.p), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(self.p), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "x"], check=True)
+        write(self.p / "ideas" / "research" / "inv-x-plan.md", "plan")
+        self.assertEqual(self.ids("s3"), ["inv-x"])
+        self.assertEqual(self.ids("missing"), ["inv-x"])
+
+    def test_undefined_codes(self):
+        slides = [("slide 1", "Sales by channel: MYA, WEB and NGCM (NGCM = campaign tool)"),
+                  ("slide 2", "ARPU rose. LTCG: long-term control group. Round R66, G1")]
+        self.assertEqual(impctl.undefined_codes(slides, "ARPU\naverage revenue"), [("slide 1", ["MYA", "WEB"])])
+
+    def test_codes_reads_pptx(self):
+        import zipfile
+        deck = self.base / "d.pptx"
+        with zipfile.ZipFile(deck, "w") as z:
+            for n, text in [(2, "QW &amp; MYA"), (10, "fine")]:
+                z.writestr(f"ppt/slides/slide{n}.xml", f"<p:sld><a:t>{text}</a:t></p:sld>")
+        self.assertEqual(impctl.deck_slides(deck), [("slide 2", "QW & MYA"), ("slide 10", "fine")])
+
+
+class TestBlockedBy(unittest.TestCase):
+    def test_blocked_by_replaces_waiting(self):
+        out = impctl.format_rows([{"id": "a", "waiting_on": "user", "blocked_by": "bill-fix"}])
+        self.assertIn("blocked by: bill-fix", out)
+        self.assertNotIn("waiting: user", out)
 
 
 if __name__ == "__main__":

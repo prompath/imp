@@ -191,6 +191,15 @@ class TestClassify(unittest.TestCase):
         self.assertEqual(c(idea(waiting_on="user", last_update="2027-01-09"), [], NOW)[0], "waiting")
         self.assertEqual(c(idea(stage="shelved"), [sess("working")], NOW)[0], "progress")
 
+    def test_monitor(self):
+        c = impctl.classify
+        old = "2026-12-01"  # long before TODAY: a monitored idea is never stale
+        due = idea(stage="monitor", next_check=TODAY, monitor_until="2027-02-01", last_update=old)
+        self.assertEqual(c(due, [], NOW), ("waiting", "monitoring check due"))
+        later = dict(due, next_check="2027-01-20")
+        self.assertEqual(c(later, [], NOW), ("idle", "monitoring until 2027-02-01"))
+        self.assertEqual(c(later, [sess("working")], NOW)[0], "progress")
+
 
 HOST = "127.0.0.1:8765"
 

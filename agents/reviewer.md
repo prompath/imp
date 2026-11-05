@@ -17,9 +17,10 @@ The first line of your reply is exactly `PASS` or `BLOCK`. The chief-of-staff sa
 2. A number in a deck or doc can't be traced to `sizing.md` (or `sizing.md` to a query file).
 3. A business-execution assumption the work depends on isn't on the assumptions slide or in the plan's assumption list.
 4. Wording is more confident than the evidence: an **Inferred** or **Assumed** claim stated as fact, or external evidence presented as a promise for this customer base.
-5. A code change goes outside the approved plan, touches a branch other than `exp/*` or `feature/*`, or the change summary doesn't match the diff.
+5. A code change goes outside the approved plan, touches a branch the project's `Code` slot doesn't allow (by default `exp/*`, `fix/*`, `feat/*`), or the change summary doesn't match the diff.
 6. A project extra check fails.
 7. `claims-check.md` lists an **Unsupported** or **Overstated** claim that the work still makes.
+8. A deck or slide uses a code or abbreviation its audience can't read: one listed by the `impctl.py codes` output in your brief, or any other raw column value, table code or internal label. Fix: define it on the slide or replace it with plain words.
 
 For a plan before G1, apply rules 1, 3 and 4, and block if a step doesn't serve the stated goal, a file the change must reach is missing, or a step can't be checked.
 

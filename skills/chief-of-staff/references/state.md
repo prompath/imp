@@ -4,12 +4,14 @@
 
 From `templates/STATUS.md`:
 - `group`: `<Domain> / <use-case>`, exactly one, from the `Idea groups` slot. An idea that spans domains goes under its cross-domain domain. If nothing fits, ask the user before adding to the slot. Blank if the slot lists none.
-- `stage`: `backlog | pitch | experiment | ship | document | done | shelved`
+- `stage`: `backlog | pitch | experiment | ship | monitor | document | done | shelved`
 - `waiting_on`: `user | marketing | agents`. `marketing` means whoever the `meeting` slot names; with `meeting: self` it's `user`.
 - `gate`: `G1 | G-data | G2 | G3 | meeting`. Set it when you stop at a gate; clear it (blank) once the user passes it. The dashboard shows it.
 - `round`: the experiment round
 - `branch`
+- `blocked_by`: the id of an idea that has to finish first, or blank. `impctl.py ideas` shows it in place of `waiting_on`. Clear it when that idea reaches `done`, and say so.
 - `last_update`: today's date, `YYYY-MM-DD`
+- `monitor_until`, `next_check`: dates for the `monitor` stage (`references/lifecycle.md`). The dashboard shows a monitored idea as waiting on you once `next_check` is today or earlier, and never marks it stale.
 - `next_step`: one line
 
 `impctl.py ideas` lists any `.md` under the ideas root whose frontmatter has `waiting_on`, nested by `group` once any idea has one.
@@ -20,6 +22,7 @@ Follow the `Ideas layout` slot. Default: `ideas/<id>/STATUS.md`.
 
 When a layout uses **flat files** for a stage (for example `ideas/inbox/<name>.md`):
 - the STATUS keys go in that note's own frontmatter
+- the note holds only its own text. When the idea gets its first other file (a plan, review, sizing, findings, queries or a deck), promote it to a folder in the same stage, named as the `Ideas layout` slot names folders, before writing that file: move the note into the folder, and update the links to it and the tracker
 - when the idea is promoted to a folder, move the keys into the folder's `STATUS.md` and remove them from the note, so the idea is listed once
 
 Existing ideas without STATUS get it the first time imp touches them. There's no up-front migration.
@@ -52,6 +55,21 @@ Goes in `<idea folder>/local/`, or `<stage dir>/local/<id>/` for a flat-file ide
 2. Append the notes verbatim under `## Feedback log` → `### YYYY-MM-DD meeting notes`.
 3. Turn them into decisions (`## Decisions`), assumption updates (confirmed or rejected), and new open questions.
 4. Decide the transition from `references/lifecycle.md` and propose the next plan as **G1**. Don't start work before the go-ahead.
+
+## Saving (`/save [id]`)
+
+1. Resolve the idea (SKILL.md section 5) and name it.
+2. Update its STATUS: `next_step`, `gate`, `waiting_on`, `last_update`, and the open decisions waiting on the user under `## Open questions`, each with its plan label.
+3. Commit only that idea's files (its folder, or a flat note and its `<id>-*` files) and the tracker the `Ideas layout` slot names, with a message saying what was saved. Leave everything else in the working tree as it is, and say that you did. Never push.
+4. End with: `Saved <id> (<sha>). Resume with: /imp:continue <id>`.
+
+## Housekeeping
+
+Ask before each change, then keep the tracker and every link in step:
+- **Rename**: new `id`, `title` and folder name (per the `Ideas layout` slot), the branch if it carries the id, and every mention in STATUS, plans and the tracker.
+- **Merge** A into B: copy A's decisions, open questions, assumptions and artifact links into B's STATUS under a dated note, set A `stage: shelved` with `next_step: merged into <B>`.
+- **Shelve**: `stage: shelved` and a one-line reason in `## Decisions`.
+- **Block**: set `blocked_by` (above).
 
 ## Listing (`/ideas`)
 

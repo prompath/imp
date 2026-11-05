@@ -76,9 +76,9 @@ class TestAgents(unittest.TestCase):
         self.assertNotIn("WebSearch", tools_of(parse_frontmatter(read("agents/claim-checker.md"))))
 
 
-COMMANDS = ["idea", "continue", "notes", "ideas", "investigate"]
-REFS = ["routing", "gates", "evidence", "lifecycle", "segment-treatment", "investigate", "explore", "state"]
-WORKFLOWS = ["lifecycle", "segment-treatment", "investigate", "explore"]
+COMMANDS = ["idea", "continue", "notes", "ideas", "investigate", "save"]
+REFS = ["routing", "gates", "evidence", "lifecycle", "segment-treatment", "investigate", "analysis", "explore", "state"]
+WORKFLOWS = ["lifecycle", "segment-treatment", "investigate", "analysis", "explore"]
 
 
 class TestSkillsAndCommands(unittest.TestCase):

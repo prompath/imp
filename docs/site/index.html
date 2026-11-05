@@ -138,7 +138,8 @@ footer { margin-top: 56px; color: var(--muted); font-size: 0.86rem; border-top: 
 <tr><td><code>/continue [id]</code></td><td>Resumes an idea at its current step. It never skips a gate.</td></tr>
 <tr><td><code>/notes [id] &lt;notes&gt;</code></td><td>Files your meeting notes into the feedback log, updates decisions and assumptions, and proposes the next plan.</td></tr>
 <tr><td><code>/ideas [--all] [--&lt;stage&gt;] [--waiting W] [--group G] [--projects] [--scan DIR]</code></td><td>Lists open ideas in this project, or in every project with <code>--projects</code>. Done and shelved ideas are hidden unless you pass <code>--all</code> or a stage flag such as <code>--done</code> or <code>--pitch</code>. <code>--waiting user</code> and <code>--group Pricing</code> narrow the list.</td></tr>
-<tr><td><code>/investigate &lt;case&gt;</code></td><td>Checks whether a result is a misunderstanding, a code bug or a rulebook gap.</td></tr>
+<tr><td><code>/investigate &lt;case&gt;</code></td><td>Checks whether a result is a misunderstanding, a code bug or a rulebook gap. A plain question about the data goes to the analysis workflow instead.</td></tr>
+<tr><td><code>/save [id]</code></td><td>Saves progress on the idea this session is working on: updates STATUS with the open decisions, commits only that idea's files, and prints the <code>/imp:continue &lt;id&gt;</code> line. With no id, it works out the idea from this session's activity, or from idea files with uncommitted changes.</td></tr>
 <tr><td><code>/imp:push [note]</code></td><td>Commits the repo's changes, summarizes everything unpushed, and pushes once you say yes. Under <code>push_forbidden</code> it commits and hands you the push command.</td></tr>
 <tr><td><code>/imp-init</code></td><td>Connects the current project.</td></tr>
 <tr><td><code>/imp:retro [session]</code></td><td>Runs a retrospective on a coding session (this one by default) and suggests changes to the agent's environment, most severe first: navigation, automated checks, coding standards, steering files, tool economy and information access. Adapted from <a href="https://github.com/mattpocock/skills">mattpocock/skills</a>.</td></tr>
@@ -149,7 +150,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 0.86rem; border-top: 
 
 <!-- 4 -->
 <h2 id="lifecycle">The idea lifecycle</h2>
-<p>This is how work moves with the business team: pitch at the weekly meeting, experiment in rounds, ship, document. A personal idea follows the same stages, with you as the meeting.</p>
+<p>This is how work moves with the business team: pitch at the weekly meeting, experiment in rounds, ship, monitor it in production when something needs watching (checks on set dates until a <code>monitor_until</code> date), document. A personal idea follows the same stages, with you as the meeting.</p>
 <figure>
 <svg viewBox="0 0 760 300" role="img" aria-labelledby="f2t">
   <title id="f2t">Lifecycle stages with gates and the meeting loop</title>
@@ -161,7 +162,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 0.86rem; border-top: 
   <text class="ts" x="290" y="88" text-anchor="middle">exp/&lt;id&gt;-rN, result per round</text>
   <rect class="box-accent" x="420" y="40" width="150" height="70" rx="10"/>
   <text class="t" x="495" y="68" text-anchor="middle">3 · Ship</text>
-  <text class="ts" x="495" y="88" text-anchor="middle">feature/&lt;id&gt; branch</text>
+  <text class="ts" x="495" y="88" text-anchor="middle">feat/&lt;id&gt; branch</text>
   <rect class="box-accent" x="620" y="40" width="130" height="70" rx="10"/>
   <text class="t" x="685" y="68" text-anchor="middle">4 · Document</text>
   <text class="ts" x="685" y="88" text-anchor="middle">notes, deployed slide</text>
@@ -247,7 +248,7 @@ Case 3  rulebook gap      members in their first 30 days: welcome-offer handling
 Open ideas? Case 1 → Experiment (fix), Case 3 → Pitch (needs a decision)
 <span class="you">you › yes case 1 only</span>
 New idea voucher-rule-fix at Experiment → G1 → exp/voucher-rule-fix-r1 → <span class="gate">G2</span> → you push and run → results deck → meeting
-→ /continue rule-fix → Ship: feature/voucher-rule-fix rebased on develop → <span class="gate">G2</span> → you merge to develop and open the PR
+→ /continue rule-fix → Ship: feat/voucher-rule-fix rebased on develop → <span class="gate">G2</span> → you merge to develop and open the PR
 → "tested fine" (<span class="gate">G3</span>) → Document: rulebook note, idea → archive/, INDEX.md updated</pre>
 
 <h3>3 · Explore an ML idea (personal)</h3>
@@ -320,7 +321,7 @@ gnn-vs-cf         experiment r1  waiting: user       2026-10-28</pre>
 <tr><td>tech-researcher</td><td>read, web, write</td><td><code>research-technical.md</code></td><td>papers, designs, trade-offs, a POC proposal</td></tr>
 <tr><td>code-investigator</td><td>read, read-only shell</td><td><code>code-findings.md</code> (saved by the chief)</td><td>locations, code vs rulebook, per-case verdicts</td></tr>
 <tr><td>data-analyst</td><td>read, write (no shell)</td><td><code>queries/</code>, <code>sizing.md</code></td><td>drafts only; you run everything</td></tr>
-<tr><td>builder</td><td>read, edit, shell</td><td>code, <code>change-summary.md</code></td><td>Sonnet, Opus for hard steps; commits to <code>exp/*</code> and <code>feature/*</code> only; never pushes</td></tr>
+<tr><td>builder</td><td>read, edit, shell</td><td>code, <code>change-summary.md</code></td><td>Sonnet, Opus for hard steps; commits to <code>exp/*</code>, <code>fix/*</code> and <code>feat/*</code> only; never pushes</td></tr>
 <tr><td>verifier</td><td>read, shell</td><td><code>verify.md</code> (saved by the chief)</td><td>runs local tests, reports failures only; fixes nothing; runs before the reviewer</td></tr>
 <tr><td>claim-checker</td><td>read, web fetch</td><td><code>claims-check.md</code> (saved by the chief)</td><td>opens each cited link and checks it supports the claim; the reviewer blocks on bad ones</td></tr>
 <tr><td>presenter</td><td>read, write, export</td><td><code>decks/</code></td><td>numbers only from <code>sizing.md</code>; wording follows evidence</td></tr>
@@ -344,7 +345,7 @@ id: cart-reminder
 title: Cart Reminder
 project: acme-analytics
 kind: company
-stage: experiment     # backlog | pitch | experiment | ship | document | done | shelved
+stage: experiment     # backlog | pitch | experiment | ship | monitor | document | done | shelved
 round: 2
 waiting_on: user      # user | marketing | agents
 gate:                 # G1 | G-data | G2 | G3 | meeting while stopped at it
@@ -380,7 +381,7 @@ last_update: 2026-10-21
 <tr><th>Slot</th><th>Default (personal)</th><th>acme-analytics</th></tr>
 <tr><td><code>kind</code></td><td>personal</td><td>company</td></tr>
 <tr><td><code>ideas_root</code></td><td><code>ideas</code> (one folder per idea)</td><td><code>ideas</code>: inbox → active → archive, with <code>ideas/INDEX.md</code> kept in sync</td></tr>
-<tr><td><code>integration_branch</code></td><td>main</td><td>develop (you merge <code>feature/&lt;id&gt;</code> into develop, then PR develop → main)</td></tr>
+<tr><td><code>integration_branch</code></td><td>main</td><td>develop (you merge <code>feat/&lt;id&gt;</code> into develop, then PR develop → main)</td></tr>
 <tr><td><code>push_forbidden</code></td><td>(none)</td><td><code>projects/*/service-*</code></td></tr>
 <tr><td><code>meeting</code></td><td>self</td><td>weekly review meeting</td></tr>
 <tr><td><code>deck</code></td><td>html-slides</td><td>pdf-slides (Acme brand theme)</td></tr>

@@ -10,8 +10,11 @@ import hashlib
 import html
 import json
 import os
+import re
+import subprocess
 import sys
 import time
+import zipfile
 from datetime import date
 from pathlib import Path
 
@@ -127,7 +130,8 @@ def format_rows(ideas: list) -> str:
         stage = i.get("stage") or "-"
         if i.get("round"):
             stage += f" r{i['round']}"
-        rows.append((i.get("id") or "-", stage, f"waiting: {i.get('waiting_on') or '-'}", i.get("last_update") or "-"))
+        wait = f"blocked by: {i['blocked_by']}" if i.get("blocked_by") else f"waiting: {i.get('waiting_on') or '-'}"
+        rows.append((i.get("id") or "-", stage, wait, i.get("last_update") or "-"))
     if not rows:
         return "  (no ideas)"
     widths = [max(len(r[c]) for r in rows) for c in range(3)]
@@ -150,7 +154,7 @@ def format_rows(ideas: list) -> str:
     return "\n".join(out)
 
 
-STAGES = ["backlog", "pitch", "experiment", "ship", "document", "done", "shelved"]
+STAGES = ["backlog", "pitch", "experiment", "ship", "monitor", "document", "done", "shelved"]
 HIDDEN = {"done", "shelved"}  # left out of /ideas unless --all or a stage filter asks for them
 
 
@@ -177,6 +181,97 @@ def resolve(ideas: list, query: str) -> dict:
     if not hits:
         raise UnknownIdea(query)
     raise AmbiguousIdea(query, [i.get("id") or i["_path"] for i in hits])
+
+
+def idea_anchor(root: Path, idea: dict) -> tuple:
+    """(anchor, by_id): a STATUS.md idea owns its folder; a flat note (`research/<id>.md`) owns only itself."""
+    path = root / idea["_path"]
+    anchor = str(path.parent) if path.name == "STATUS.md" else str(path)
+    by_id = os.path.join(str(root / project_config(root)["ideas_root"]), idea["id"]) if idea.get("id") else None
+    return anchor, by_id
+
+
+def owner(root: Path, ideas: list, path: str):
+    """The idea that owns an absolute path, or None. A flat note also owns its `<stem>-*` side files."""
+    best, best_len = None, 0
+    for idea in ideas:
+        anchor, by_id = idea_anchor(root, idea)
+        stem = anchor[:-3] if anchor.endswith(".md") else None
+        if path in (anchor, by_id) or path.startswith(anchor + "/") or (stem and path.startswith(stem + "-")):
+            if len(anchor) > best_len:  # longest anchor wins: inv-x-y over inv-x
+                best, best_len = idea, len(anchor)
+    return best
+
+
+def current_ideas(root: Path, session: str = "") -> list:
+    """Ideas this session works on: its activity link, else ideas with uncommitted files."""
+    ideas = find_ideas(root)
+    if session:
+        files = [activity_path() / f"{session}.json"]
+    else:  # newest session in this project: the one running this command
+        files = sorted(activity_path().glob("*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
+    for f in files:
+        try:
+            s = json.loads(f.read_text())
+        except (OSError, ValueError):
+            continue
+        cwd = str(s.get("cwd") or "")
+        if not session and not (cwd == str(root) or cwd.startswith(str(root) + "/")):
+            continue
+        hit = owner(root, ideas, s["idea"]) if s.get("idea") else None
+        if hit:
+            return [hit]
+        break
+    out = subprocess.run(["git", "-C", str(root), "status", "--porcelain", "-z", "--untracked-files=all", "--",
+                          project_config(root)["ideas_root"]], capture_output=True, text=True).stdout
+    hits, entries, k = {}, out.split("\0"), 0
+    while k < len(entries):
+        e, k = entries[k], k + 1
+        if len(e) < 4:
+            continue
+        if e[0] in "RC":
+            k += 1  # a rename's original path follows as its own entry
+        hit = owner(root, ideas, str(root / e[3:]))
+        if hit:
+            hits[hit["_path"]] = hit
+    return list(hits.values())
+
+
+CODE = re.compile(r"\b[A-Z][A-Z0-9]*[A-Z][A-Z0-9]*\b")  # two or more capitals, digits allowed: MYA, LTCG, NBO5
+
+
+def deck_slides(path: Path) -> list:
+    """(label, text) per slide of a .pptx; one entry for an .html or .md file."""
+    if path.suffix == ".pptx":
+        with zipfile.ZipFile(path) as z:
+            names = [n for n in z.namelist() if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)]
+            nums = sorted(int(re.search(r"\d+", n).group()) for n in names)
+            return [(f"slide {i}", html.unescape(" ".join(re.findall(r"<a:t>([^<]*)</a:t>",
+                                                                   z.read(f"ppt/slides/slide{i}.xml").decode("utf-8")))))
+                    for i in nums]
+    return [(path.name, re.sub(r"<[^>]+>", " ", path.read_text()))]
+
+
+def undefined_codes(slides: list, glossary: str) -> list:
+    """(label, codes) for slides using a code that neither the deck nor the glossary defines."""
+    deck = " ".join(t for _, t in slides)
+    def defined(c):
+        e = re.escape(c)
+        return bool(re.search(rf"\b{e}\b\s*(\(|:|=)|\(\s*{e}\s*\)", deck) or re.search(rf"\b{e}\b", glossary))
+    out = []
+    for label, text in slides:
+        codes = sorted(c for c in set(CODE.findall(text)) if not defined(c))
+        if codes:
+            out.append((label, codes))
+    return out
+
+
+def _glossary_text(paths: list) -> str:
+    parts = []
+    for p in map(Path, paths):
+        for f in ([p] if p.is_file() else sorted(p.rglob("*.md"))):
+            parts += [f.stem, f.read_text(errors="replace")]
+    return "\n".join(parts)
 
 
 def _scan(base: Path):
@@ -252,6 +347,10 @@ def classify(idea: dict, sessions: list, now: float) -> tuple:
         days = (date.fromtimestamp(now) - date.fromisoformat(idea.get("last_update") or "")).days
     except ValueError:
         days = 0
+    if stage == "monitor":  # quiet between checks by design, so never stale
+        if (idea.get("next_check") or "9999") <= date.fromtimestamp(now).isoformat():
+            return "waiting", "monitoring check due"
+        return "idle", f"monitoring until {idea.get('monitor_until') or '?'}"
     if stage in ("backlog", "shelved") or days >= STALE_DAYS:
         return "idle", stage if stage in ("backlog", "shelved") else f"{days}d without update"
     if idea.get("waiting_on") == "user":
@@ -267,13 +366,9 @@ def dashboard_rows(now: float, sessions=None) -> list:
         if not (root / PROJECT_FILE).is_file():
             continue
         name = project_config(root)["name"]
-        ideas_dir = str(root / project_config(root)["ideas_root"])
         for idea in find_ideas(root):
-            path = root / idea["_path"]
-            folder = str(path.parent)
-            # a STATUS.md idea owns its folder; a flat note (`research/<id>.md`) owns only itself
-            anchor = folder if path.name == "STATUS.md" else str(path)
-            by_id = os.path.join(ideas_dir, idea["id"]) if idea.get("id") else None  # from a brief
+            folder = str((root / idea["_path"]).parent)
+            anchor, by_id = idea_anchor(root, idea)  # by_id: the link a brief makes
             mine = [s for s in sessions if s.get("idea") and (
                 s["idea"] in (anchor, by_id) or s["idea"].startswith(anchor + "/"))]
             group, note = classify(idea, mine, now)
@@ -282,7 +377,7 @@ def dashboard_rows(now: float, sessions=None) -> list:
 
 
 TRACK = ["G1", "G-data", "G2", "G3"]
-NEXT_GATE = {"pitch": "G1", "experiment": "G2", "ship": "G3", "document": "G3"}
+NEXT_GATE = {"pitch": "G1", "experiment": "G2", "ship": "G3", "monitor": "G-data", "document": "G3"}
 SPAN = 3600  # timeline window, seconds
 
 
@@ -321,6 +416,7 @@ SEQ = {
                    ("chief", "you", "G2 diff"), ("you", "chief", "results / notes")],
     "ship": [("chief", "you", "G1 plan"), ("you", "chief", "go"), ("chief", "builder", "feature branch"),
              ("chief", "reviewer", "check"), ("chief", "you", "G2 merge"), ("you", "chief", "G3 tested")],
+    "monitor": [("chief", "you", "check (G-data)"), ("you", "chief", "results"), ("chief", "you", "holds / fix")],
     "document": [("chief", "presenter", "docs"), ("chief", "you", "done")],
 }
 ACTORS = ["you", "chief", "researcher", "builder", "reviewer", "presenter"]
@@ -789,7 +885,7 @@ def _h8(text) -> str:
     return hashlib.sha256(str(text).encode()).hexdigest()[:8]
 
 
-STAGE_ROOM = {"pitch": "meeting", "experiment": "lab", "ship": "workshop", "document": "library"}
+STAGE_ROOM = {"pitch": "meeting", "experiment": "lab", "ship": "workshop", "monitor": "workshop", "document": "library"}
 
 
 def _ago(at, now: float) -> str:
@@ -935,6 +1031,12 @@ def main(argv=None) -> int:
     p_res = sub.add_parser("resolve")
     p_res.add_argument("query")
     p_res.add_argument("--project")
+    p_cur = sub.add_parser("current")
+    p_cur.add_argument("--session", default="")
+    p_cur.add_argument("--project")
+    p_codes = sub.add_parser("codes")
+    p_codes.add_argument("deck")
+    p_codes.add_argument("--glossary", action="append", default=[])
     p_reg = sub.add_parser("register")
     p_reg.add_argument("dir", nargs="?")
     p_dash = sub.add_parser("dashboard")
@@ -949,6 +1051,21 @@ def main(argv=None) -> int:
     if args.cmd == "dashboard":
         serve(args.port)
         return 0
+
+    if args.cmd == "current":
+        root = _project_arg(args.project)
+        hits = current_ideas(root, "" if args.session.startswith("$") else args.session)  # unexpanded ${CLAUDE_SESSION_ID}
+        for i in hits:
+            print(f"{i.get('id') or '-'}\t{i['_path']}", file=sys.stdout if len(hits) == 1 else sys.stderr)
+        return 0 if len(hits) == 1 else (2 if hits else 1)
+
+    if args.cmd == "codes":
+        found = undefined_codes(deck_slides(Path(args.deck)), _glossary_text(args.glossary))
+        for label, codes in found:
+            print(f"{label}: {', '.join(codes)}")
+        if not found:
+            print("no undefined codes")
+        return 1 if found else 0
 
     if args.cmd == "resolve":
         try:

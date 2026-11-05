@@ -27,7 +27,12 @@ Look first in `README.md`, `CLAUDE.md` and `docs/`.
 
 ## Code
 
-The code is in the repo root. Agents commit only to `exp/<id>-r<n>` (experiment rounds) and `feature/<id>` (ship, rebased on `integration_branch`). Agents never push and never open PRs. The user does that.
+The code is in the repo root. Branches:
+- `exp/<id>-r<n>`: an experiment round, a change whose outcome is being tested
+- `fix/<id>`: a bug fix or a job or config change whose outcome is agreed, with no hypothesis to test. It is the final branch: no rename at ship
+- `feat/<id>`: ship, from the final experiment round, rebased on `integration_branch`
+
+Agents commit only to these branches. Agents never push and never open PRs. The user does that.
 
 ## Data execution
 

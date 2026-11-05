@@ -21,6 +21,8 @@
 **Alternatives:**
 - <alternative>: <why not chosen, or "worth raising">
 
+**Monitoring (ship plans; proposed, you're asked again after G3; leave out if nothing needs watching):** <what to watch>, <how to check it>, <pass rule>, checks on <dates>, `monitor_until` <date>
+
 **Data runs needed (each needs your approval of the exact script and command):**
 - <query file>: <what it answers>
 
