@@ -24,6 +24,11 @@ last_update: YYYY-MM-DD
 ### YYYY-MM-DD meeting notes
 <the user's notes, verbatim>
 
+## Rounds
+
+| Round | Hypothesis | Branch @ sha | Verdict | What we learned | Result |
+|---|---|---|---|---|---|
+
 ## Assumptions
 
 | # | Assumption | Category (business execution / data / technical) | Evidence level | Checked against knowledge? | Impact if wrong | Who confirms | Status |
@@ -36,6 +41,7 @@ last_update: YYYY-MM-DD
 ## Artifacts
 
 - Plan: plan.md
+- Rounds: rounds/r<n>/
 - Research:
 - Decks:
 - Branches:

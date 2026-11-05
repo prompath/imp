@@ -157,13 +157,13 @@ footer { margin-top: 56px; color: var(--muted); font-size: 0.86rem; border-top: 
   <text class="ts" x="85" y="88" text-anchor="middle">research, sizing, deck</text>
   <rect class="box-accent" x="210" y="40" width="160" height="70" rx="10"/>
   <text class="t" x="290" y="68" text-anchor="middle">2 · Experiment rN</text>
-  <text class="ts" x="290" y="88" text-anchor="middle">exp/&lt;id&gt;-rN, results deck</text>
+  <text class="ts" x="290" y="88" text-anchor="middle">exp/&lt;id&gt;-rN, result per round</text>
   <rect class="box-accent" x="420" y="40" width="150" height="70" rx="10"/>
   <text class="t" x="495" y="68" text-anchor="middle">3 · Ship</text>
   <text class="ts" x="495" y="88" text-anchor="middle">feature/&lt;id&gt; branch</text>
   <rect class="box-accent" x="620" y="40" width="130" height="70" rx="10"/>
   <text class="t" x="685" y="68" text-anchor="middle">4 · Document</text>
-  <text class="ts" x="685" y="88" text-anchor="middle">notes, final deck</text>
+  <text class="ts" x="685" y="88" text-anchor="middle">notes, deployed slide</text>
   <path class="arrow" d="M160,75 L208,75"/>
   <path class="arrow" d="M370,75 L418,75"/>
   <path class="arrow" d="M570,75 L618,75"/>
@@ -181,7 +181,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 0.86rem; border-top: 
   <text class="ts" x="445" y="186">or "it's right" → ship</text>
   <text class="ts" x="10" y="282">Dashed = waits for you or the business team. G-data applies whenever a query has to run.</text>
 </svg>
-<figcaption>Each experiment round keeps its own results deck, so you can show how the numbers moved between rounds.</figcaption>
+<figcaption>Every round gets its own folder and a <code>result.md</code> with a verdict, even when it didn't work. After each round you choose another round, the meeting or ship; the results deck covers every round since the last meeting.</figcaption>
 </figure>
 <div class="table"><table>
 <tr><th>Point</th><th>STATUS shows</th></tr>
@@ -198,7 +198,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 0.86rem; border-top: 
 <tr><td><span class="pill">G1 Plan</span></td><td>Before any work beyond read-only looking around</td><td>Plan, business-execution assumptions (their own section), other assumptions, risks, alternatives, data runs needed, outputs</td><td>Your go-ahead or edits</td></tr>
 <tr><td><span class="pill">G-data</span></td><td>Before every data or cluster run</td><td>The full script and the exact command</td><td>Approval of that exact version</td></tr>
 <tr><td><span class="pill">G2 Ready to push</span></td><td>Code committed locally, reviewer passed</td><td>Change summary, diff, results, branch</td><td>You push (or say yes to <code>/imp:push</code>) and test; agents never push on their own</td></tr>
-<tr><td><span class="pill">G3 Tested</span></td><td>Before docs and the final deck of a ship</td><td>-</td><td>You say it tested fine</td></tr>
+<tr><td><span class="pill">G3 Tested</span></td><td>Before docs and the deployed slide of a ship</td><td>-</td><td>You say it tested fine</td></tr>
 <tr><td><span class="pill">Meeting</span></td><td>Between stages</td><td>The deck</td><td>Your <code>/notes</code></td></tr>
 </table></div>
 

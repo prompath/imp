@@ -30,7 +30,7 @@ class TestTemplates(unittest.TestCase):
     def test_template_files(self):
         from impctl import parse_frontmatter
         for f in ["defaults/project.md", "templates/STATUS.md", "templates/plan.md",
-                  "templates/brief.md", "templates/deck-outlines.md"]:
+                  "templates/brief.md", "templates/deck-outlines.md", "templates/result.md"]:
             self.assertTrue((ROOT / f).is_file(), f)
         proj = parse_frontmatter(read("defaults/project.md"))
         for k in ["kind", "ideas_root", "integration_branch", "push_forbidden", "meeting", "deck", "agent_overrides"]:
@@ -38,7 +38,7 @@ class TestTemplates(unittest.TestCase):
         st = parse_frontmatter(read("templates/STATUS.md"))
         for k in ["id", "group", "stage", "round", "waiting_on", "gate", "last_update"]:
             self.assertIn(k, st)
-        self.assertEqual(read("templates/deck-outlines.md").count("Assumptions to confirm"), 3)
+        self.assertEqual(read("templates/deck-outlines.md").count("Assumptions to confirm"), 2)
 
 
 AGENTS = ["business-researcher", "tech-researcher", "code-investigator", "data-analyst",

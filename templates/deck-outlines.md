@@ -15,24 +15,19 @@ Every deck follows the project's `deck` slot for format and theme. Numbers come 
 9. Ask: what we need decided in this meeting
 10. Sources
 
-## Results deck (experiment round n)
+## Results deck (rounds since the last meeting)
 
-1. Title: <idea>, round n results
-2. What changed since round n-1 (and the feedback that drove it)
-3. Impact sizing: before vs after
-4. Who moved: segments that gained, lost or kept the same outcome
-5. Surprises and checks we ran
-6. Changes from round n-1 numbers (from round 2 on)
-7. Assumptions to confirm
-8. Ask: adjust (what), or ship
-9. Sources
+1. Title: <idea>, results up to round n
+2. What changed since the last meeting (and the feedback that drove it)
+3. What we tried: one line per round since the last meeting, with its verdict, from the `## Rounds` table
+4. Impact sizing of the latest round: before vs after
+5. Who moved: segments that gained, lost or kept the same outcome
+6. Surprises and checks we ran
+7. Changes from the numbers shown at the last meeting
+8. Assumptions to confirm
+9. Ask: adjust (what), or go
+10. Sources
 
-## Final deck
+## Deployed (one slide)
 
-1. Title: <idea>, shipped
-2. What we changed and why
-3. Final impact numbers
-4. How to read the new results (for the business team)
-5. What to monitor
-6. Assumptions to confirm
-7. Sources and links to notes
+1. <idea> is live from <deploy date>: what changed in one line, the headline impact number from the final round's `sizing.md`, what to monitor and who to ask, and links to the notes

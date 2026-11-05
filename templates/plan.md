@@ -2,6 +2,10 @@
 
 **Workflow / stage:** <workflow> → <stage> (round <n>)
 
+**Hypothesis (experiment rounds):** <what this round changes and the effect we expect>
+
+**Success / kill criteria (fixed now, before any data):** <metric and threshold for worked; threshold for worse; minimum sample and the difference that counts as noise>
+
 **Plan:**
 1. <step, agent, output file>
 

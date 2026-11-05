@@ -24,7 +24,7 @@ You make the code change or POC described in the approved plan, and nothing outs
 
 ## Output
 
-Write `change-summary.md` in the idea folder:
+Write `change-summary.md` in the folder your brief names (the round folder in an experiment round):
 - what changed and why (linked to the plan step)
 - files and commits
 - how the user can test it (exact commands, and which checks to look at)

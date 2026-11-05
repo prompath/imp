@@ -24,6 +24,24 @@ When a layout uses **flat files** for a stage (for example `ideas/inbox/<name>.m
 
 Existing ideas without STATUS get it the first time imp touches them. There's no up-front migration.
 
+## Experiment rounds
+
+Each round's files go in `<idea folder>/rounds/r<n>/`: `plan.md`, `review-plan.md`, `change-summary.md`, `verify.md`, `review.md`, `queries/`, `sizing.md` and `result.md` (from `templates/result.md`). Give agents that folder as their output path. Earlier rounds are never overwritten, so a results deck can compare rounds.
+
+### Verdict
+
+Propose it from the round's `sizing.md` against the criteria fixed in its `plan.md`, checking in this order, and stop at the first that applies:
+
+1. **broken**: the round didn't test the hypothesis: verifier `FAIL`, the change didn't do what the plan said, or the data-analyst flagged numbers that don't reconcile.
+2. **inconclusive**: it ran, but below the plan's minimum sample, or the difference is within what the plan called noise.
+3. **worse**: a kill criterion is met.
+4. **worked**: the success criterion is met.
+5. **no effect**: none of the above.
+
+Show the proposal with the numbers behind it. The user confirms or overrides. An override is kept in `result.md` with its reason. The criteria are never edited after the data is in.
+
+STATUS `## Rounds` gets one row per round when its `result.md` is written, whatever the verdict. Don't delete `exp/` branches before the idea is done; the commit sha in `result.md` ties the result to its code.
+
 ## Row-level data
 
 Goes in `<idea folder>/local/`, or `<stage dir>/local/<id>/` for a flat-file idea. This folder is git-ignored by `/imp-init`. Never commit row-level data.
