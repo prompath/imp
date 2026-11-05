@@ -1,6 +1,6 @@
 {
   "name": "imp",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Chief-of-staff, specialist agents and gated idea workflows that each project extends through .imp/project.md.",
   "author": {
     "name": "prompath"
