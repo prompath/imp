@@ -679,7 +679,7 @@ function demoState(n, ts) {
   const canvas = $("scene"), ctx = canvas.getContext("2d"), tip = $("tip"), roster = $("roster"), pauseBtn = $("pause");
   const zoomBtn = $("zoom"), wrap = $("wrap"), ceoBtn = $("ceo"), fullBtn = $("full"), say = $("say");
   let last = null;  // the last poll, unfiltered, so a change of the filter applies at once
-  const LW = MAP_W * T, LH = MAP_H * T, SPEED = 3;  // tiles per second
+  const LW = MAP_W * T, LH = MAP_H * T, SPEED = 3, CEO_SPEED = 6;  // tiles per second; you walk twice as fast as the agents
   const query = new URLSearchParams(location.search), demo = query.get("demo") === "1";
   const perf = query.get("perf") === "1", drawTimes = [];  // dev only: draw() p95 in the status line
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
@@ -2294,7 +2294,7 @@ function demoState(n, ts) {
         }
         continue;
       }
-      const [nx, ny] = a.path[0], dx = nx - a.x, dy = ny - a.y, dist = Math.abs(dx) + Math.abs(dy), go = SPEED * dt;
+      const [nx, ny] = a.path[0], dx = nx - a.x, dy = ny - a.y, dist = Math.abs(dx) + Math.abs(dy), go = (a.ceo ? CEO_SPEED : SPEED) * dt;
       if (dist > 0) a.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "r" : "l") : (dy > 0 ? "d" : "u");
       if (dist <= go) { a.x = nx; a.y = ny; a.path.shift(); a.walked += dist; }
       else { a.x += Math.sign(dx) * Math.min(go, Math.abs(dx)); a.y += Math.sign(dy) * Math.min(go, Math.abs(dy)); a.walked += go; }
@@ -2325,6 +2325,7 @@ function demoState(n, ts) {
   function frameOf(a) {
     const st = stateOf(a), frame = st === "work" && !still() ? tick % 2 : 0;
     if (st === "walk") return {pose: "walk", frame: [0, 1, 0, 2][Math.floor(a.walked * 4) % 4], dir: a.dir};
+    if (a.ceo) return {pose: "walk", frame: 0, dir: a.dir};  // between steps and at rest, the CEO keeps facing the way it last walked
     const side = seated(a), h = home(a);
     if (side === "N") return {pose: "desk", frame, dir: "u", side};
     if (side) return {pose: "side", frame, dir: side === "E" ? "r" : "l", side};
