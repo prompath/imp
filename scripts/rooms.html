@@ -2223,7 +2223,10 @@ function demoState(n, ts) {
       a.spot = s;
       if (s < 0) {
         const g = charGroup(a.d);
-        overflow.set(g, (overflow.get(g) || 0) + 1);
+        const o = overflow.get(g) || {k: 0, w: 0};
+        o.k++;
+        if (a.d.activity === "wait") o.w++;
+        overflow.set(g, o);
         a.x = CAMPUS_DOOR.x; a.y = CAMPUS_DOOR.y; a.path = []; a.placed = true;
         continue;
       }
@@ -2427,12 +2430,15 @@ function demoState(n, ts) {
       ({x: Math.round((a.x * T + T / 2 - 8) * px), y: Math.round(p.top * px), w: 16 * px, h: (p.sit || p.f.pose === "couch" || p.f.pose === "games" ? 30 : p.y + p.h - 3 - p.top) * px})));
     const put = b => { taken.push(b); hard.push(b); };
     // shortcut: a room shows only as many characters as it has spots and then a "+k" sign, add spots when rooms overflow often
-    for (const [g, k] of overflow) {
+    // the sign always shows, waits counted in it: it relaxes from clear art to bodies and labels, then to labels only
+    for (const [g, {k, w}] of overflow) {
       const s = SPOTS.filter(sp => spotGroup(sp) === g);
       if (!s.length) continue;
-      const x = Math.max(...s.map(sp => sp.x)), y = Math.min(...s.map(sp => sp.y));
-      const t = tagBoxes(x * T + T / 2, y * T + 6, y * T + T, "+" + k), b = pick([t.above, t.up, t.under], taken.concat([...bodies.values()]));
-      if (b) { drawTag(b, "+" + k, "", true); put(b); }
+      const x = Math.max(...s.map(sp => sp.x)), y = Math.min(...s.map(sp => sp.y)), label = "+" + k + (w ? " (" + w + " !)" : "");
+      const t = tagBoxes(x * T + T / 2, y * T + 6, y * T + T, label), c = [t.above, t.up, t.under], body = [...bodies.values()];
+      const b = pick(c, taken.concat(body)) || pick(c, hard.concat(body)) || pick(c, labelBoxes) || c.find(fits) || c[0];
+      drawTag(b, label, "", true);
+      put(b);
     }
     for (const [a, p] of shown) {
       const cx = a.x * T + T / 2, wait = a.d.activity === "wait", reply = a.d.activity === "reply";
@@ -2671,9 +2677,11 @@ function demoState(n, ts) {
     syncChooser(boxes.size);
     const kept = keep(last.characters, choice), pool = kept.filter(c => c.room === "pool");
     const waiting = pool.filter(c => c.activity === "wait").length;
-    // a wait at the pool is counted too, so it is never missed
-    $("roster-title").textContent = "Who is where" + (pool.length ? " (" + pool.length + " at the pool, " + waiting + " waiting on you)" : "");
     apply({ts: last.ts, characters: kept});
+    // a wait at the pool or past a full room's spots is counted too, so it is never missed
+    const lost = [...actors.values()].filter(a => !a.leaving && a.spot < 0), lw = lost.filter(a => a.d.activity === "wait").length;
+    const parts = (pool.length ? [pool.length + " at the pool, " + waiting + " waiting on you"] : []).concat(lost.length ? [lost.length + " not drawn, " + lw + " waiting"] : []);
+    $("roster-title").textContent = "Who is where" + (parts.length ? " (" + parts.join("; ") + ")" : "");
   }
 
   // ---- data ----
