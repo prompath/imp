@@ -792,11 +792,11 @@ def rooms_state(rows: list, sessions: list, now: float) -> dict:
     Rows apply in the order of the plan's room table; the first match wins. Output has no absolute paths."""
     chars = []
 
-    def add(id_, kind, role, room, activity, project, idea="", title="", note=""):
+    def add(id_, kind, role, room, activity, project, idea="", title="", note="", live=True):
         chars.append({"id": id_, "kind": kind, "role": role, "room": room, "activity": activity,
-                      "project": project, "idea": idea, "title": title, "note": note})
+                      "project": project, "idea": idea, "title": title, "note": note, "live": live})
 
-    def add_agents(key, live, room, project, idea="", title=""):
+    def add_agents(key, live, room, project, idea="", title=""):  # agents come only from live sessions
         for aid, t in [a for s in live for a in sorted((s.get("agents") or {}).items())]:
             add(f"{key}#{_h8(aid)}", "agent", t.split(":")[-1], room, "work", project, idea, title)
 
@@ -810,9 +810,7 @@ def rooms_state(rows: list, sessions: list, now: float) -> dict:
         gate = GATES.get(idea.get("gate") or "", idea.get("gate") or "")
         at_gate = bool(gate) or idea.get("waiting_on") == "user"
         key = f"{idea['project']}/{idea.get('id') or idea.get('_path', '')}"
-        if stage == "backlog":
-            room, activity, note = "pool", "idle", ""
-        elif "needs_permission" in states:
+        if "needs_permission" in states:
             room, activity, note = "lounge", "wait", "permission"
         elif "working" not in states and (at_gate if live else group == "waiting"):
             room, activity, note = "lounge", "wait", gate
@@ -820,7 +818,8 @@ def rooms_state(rows: list, sessions: list, now: float) -> dict:
             room, activity, note = STAGE_ROOM.get(stage, "office"), "work" if "working" in states else "reply", ""
         else:
             room, activity, note = "lounge", "idle", ""
-        add(key, "lead", "chief", room, activity, idea["project"], idea.get("id") or "", idea.get("title") or "", note)
+        add(key, "lead", "chief", room, activity, idea["project"], idea.get("id") or "", idea.get("title") or "", note,
+            bool(live))
         add_agents(key, live, STAGE_ROOM.get(stage, "office"), idea["project"], idea.get("id") or "", idea.get("title") or "")
     for i, s in enumerate(sessions):
         if not _live(s, now) or id(s) in linked:

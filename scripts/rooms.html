@@ -32,7 +32,7 @@ background:var(--panel);border:1px solid var(--border);border-radius:3px;padding
 <div class="top"><b>imp rooms</b><a href="/">Dashboard</a><span>last refreshed <span id="ts">-</span></span>
 <span id="status"></span><button id="pause" type="button" aria-pressed="false">Pause</button>
 <button id="zoom" type="button" aria-pressed="false" title="Show the art pixels twice as large; scroll to pan">Zoom</button>
-<details id="ideas"><summary id="ideas-sum">Ideas: all</summary><div id="ideas-body"></div></details></div>
+<details id="ideas"><summary id="ideas-sum">Ideas</summary><div id="ideas-body"></div></details></div>
 <div id="wrap"><canvas id="scene" aria-hidden="true"></canvas><div id="tip" hidden></div></div>
 <div class="panel"><h3 id="roster-title">Who is where</h3><table aria-labelledby="roster-title"><thead><tr>
 <th scope="col">Name / role</th><th scope="col">Project</th><th scope="col">Idea</th><th scope="col">Room</th><th scope="col">State</th>
@@ -43,7 +43,7 @@ background:var(--panel);border:1px solid var(--border);border-radius:3px;padding
 const T = 32;
 // One letter per tile. Walls: # plain, W whiteboard, N window, Q pegboard. A wall shows its face to the floor below it.
 // Floor: . floor, + doorway or zone entry, E campus door, , grass, : stone path, _ rug. Work spots: * stage rooms, k kitchen.
-// Seats, walkable only as a path's end: c couch, b beanbag, l lounger (j is its backrest).
+// Seats, walkable only as a path's end: c couch, b beanbag, l lounger (j is its backrest), t beach towel (u is its head end).
 // Props: P plant, i lamp, U water cooler, C filing cabinet, D desk, T meeting table, R reading table, S bookshelf,
 // h armchair, O gas cylinders, H fume hood, G glass cabinet, L lab bench, Z sink, B workbench, J drill press, X crate, F fridge,
 // K counter, M coffee machine, I island, Y coffee table, V TV, A arcade, @ umbrella, & tree, % bush, ~ water,
@@ -65,12 +65,12 @@ const MAP = [
   "######++##..*.*.J..k...k..#...~~~...",
   "#.*...*..#.BBBB.X...IIII.k#jl.~~~.jl",
   "#S.......#......+..k....k+#P...+...P",
-  "#S.*RRR*.#..*..*Xi......PA#,,,,:,,,,",
-  "#S..RRR..#.BBB.BB.ccccc...#&,,,,:,%,",
-  "#S..*.*..#.....qq.c_____b.#,,%,,:,,,",
-  "#S.......#.X.*....c_YY__b.#,,,,,:,&,",
-  "#S.hi.hiP#.XXBB.P.c_____..#&,,,,:,,,",
-  "#P......P#.ggg....P.VVV..P#,,%,,,,&,",
+  "#S.*RRR*.#..*..*Xi......PA#utut:utut",
+  "#S..RRR..#.BBB.BB.ccccc...#%,,,:,,,,",
+  "#S..*.*..#.....qq.c_____b.#utut:utut",
+  "#S.......#.X.*....c_YY__b.#,,,,:,,,%",
+  "#S.hi.hiP#.XXBB.P.c_____..#utut:utut",
+  "#P......P#.ggg....P.VVV..P#,,%,:,,,,",
   "###########################,&,,&,,%,",
 ];
 const MAP_W = MAP[0].length, MAP_H = MAP.length;
@@ -89,7 +89,7 @@ const OPEN_ZONES = ["office", "lab", "workshop", "lounge"];  // drawn as a floor
 // zone names sit inside their zone, on free floor: [text, centre x, centre y] in tiles
 const LABELS = [["Meeting room", 5, 6.5], ["Library", 5, 14.3], ["Office", 14, 2.4], ["Lab", 22.5, 7.45],
   ["Workshop", 14, 14.25], ["Kitchen", 19, 13.3], ["Living room", 23, 15.5], ["Pool", 31.5, 4.5]];
-const WALK = ".+E*k,_:", SEATS = "cbl", WALLS = "#WNQ";
+const WALK = ".+E*k,_:", SEATS = "cblt", WALLS = "#WNQ";
 
 function tileAt(x, y) { return (MAP[y] || "")[x] || "#"; }
 function roomAt(x, y) {
@@ -102,7 +102,8 @@ function roomAt(x, y) {
 const DOORS = [], SPOTS = [];
 MAP.forEach((row, y) => [...row].forEach((ch, x) => {
   if (ch === "+" || ch === "E") DOORS.push({x, y, campus: ch === "E"});
-  if (ch === "*" || ch === "k" || SEATS.includes(ch)) SPOTS.push({x, y, kind: ch, room: roomAt(x, y)});
+  // towels lie on the lawn, south of the pool's rect, but count as pool spots
+  if (ch === "*" || ch === "k" || SEATS.includes(ch)) SPOTS.push({x, y, kind: ch, room: ch === "t" ? "pool" : roomAt(x, y)});
 }));
 const CAMPUS_DOOR = DOORS.find(d => d.campus);
 function passable(x, y) { return WALK.includes(tileAt(x, y)); }
@@ -130,7 +131,7 @@ function bfs(sx, sy, gx, gy, avoid) {
   return null;
 }
 
-function spotGroup(s) { return s.room + ":" + (s.kind === "b" ? "c" : s.kind); }
+function spotGroup(s) { return s.room + ":" + (s.kind === "b" ? "c" : s.kind === "t" ? "l" : s.kind); }
 function charGroup(c) {
   if (c.room === "pool") return "pool:l";
   if (c.room === "lounge") return c.activity === "wait" ? "lounge:k" : "lounge:c";
@@ -187,24 +188,27 @@ function normalize(j) {
     out.push({
       id: c.id, kind: c.kind === "agent" ? "agent" : "lead", role: clip(c.role, 40) || "unknown",
       room: own(ROOMS, c.room) ? c.room : "office", activity: ACTIVITIES.includes(c.activity) ? c.activity : "idle",
-      project: clip(c.project, 60), idea: clip(c.idea, 80), title: clip(c.title, 160), note: clip(c.note, 60),
+      project: clip(c.project, 60), idea: clip(c.idea, 80), title: clip(c.title, 160), note: clip(c.note, 60), live: c.live === true,
     });
   }
   return {ts: typeof j.ts === "number" ? j.ts : 0, characters: out};
 }
 
-// ---- the idea filter: pick = {all, on: Set of idea keys, unlinked}; a key with a / is an idea, any other is an unlinked session ----
+// ---- who is in the building: pick = {all, on: Set of idea keys}. A lead whose idea is neither ticked nor live lounges
+// at the pool; one that waits on you keeps its wait and note there, so its ! bubble still shows. Nobody is dropped ----
+const STORE = "imp-rooms-ideas-v2";  // r2 saved under imp-rooms-ideas, where "all" was the default; that save is ignored
 function keep(chars, pick) {
   if (pick.all) return chars;
-  return chars.filter(c => { const k = ideaKey(c.id); return k.includes("/") ? pick.on.has(k) : pick.unlinked; });
+  return chars.map(c => c.kind !== "lead" || c.live || pick.on.has(ideaKey(c.id)) ? c
+    : Object.assign({}, c, {room: "pool", activity: c.activity === "wait" ? "wait" : "idle"}));
 }
 // saved choice -> pick, or null when the text is missing or not what this page wrote
 function parsePick(text) {
   let j;
   try { j = JSON.parse(text); } catch (e) { return null; }
-  if (!j || typeof j !== "object" || typeof j.all !== "boolean" || typeof j.unlinked !== "boolean") return null;
+  if (!j || typeof j !== "object" || typeof j.all !== "boolean") return null;
   if (!Array.isArray(j.on) || j.on.length > 500 || !j.on.every(k => typeof k === "string" && k.length <= 200)) return null;
-  return {all: j.all, on: new Set(j.on), unlinked: j.unlinked};
+  return {all: j.all, on: new Set(j.on)};
 }
 
 function hashStr(s) {
@@ -262,13 +266,14 @@ function poseFor(c) {
   return own(ROLE_POSE, c.role) ? ROLE_POSE[c.role] : "laptop";
 }
 function roomText(c) {
+  if (c.room === "pool") return "Pool (not ticked)";  // the server sends nobody to the pool: only keep does
   return ROOMS[c.room].name + (c.room === "lounge" ? (c.activity === "wait" ? ", kitchen side" : ", couch side") : "");
 }
 function stateText(c) {
   if (c.activity === "wait") return "waiting on you" + (c.note ? ": " + c.note : "");
   if (c.activity === "reply") return "replied, your turn";
   if (c.activity === "work") return "working";
-  return c.room === "pool" ? "backlog" : "idle";
+  return c.room === "pool" ? "not in the building" : "idle";
 }
 // the name tag: a lead shows idea and project, an agent its role; one hovered or focused also shows its idea
 function tagText(c, hot) {
@@ -599,12 +604,13 @@ function looksFor(c) {
       tones(projectColour(c.project)[0], "XCcx"), {f: shoe, F: ramp(shoe)[3]})};
 }
 
-// ---- demo fixture: every role, every room, several projects ----
-function lead(project, idea, title, room, activity, note) {
-  return {id: project + "/" + idea, kind: "lead", role: "chief", room, activity, project, idea, title, note: note || ""};
+// ---- demo fixture: every role, every room, several projects; a lead that works or replied is live unless told ----
+function lead(project, idea, title, room, activity, note, live) {
+  return {id: project + "/" + idea, kind: "lead", role: "chief", room, activity, project, idea, title, note: note || "",
+    live: live === undefined ? activity === "work" || activity === "reply" : live};
 }
 function agent(project, idea, n, role, room) {
-  return {id: project + "/" + idea + "#" + String(n).padStart(8, "0"), kind: "agent", role, room, activity: "work", project, idea, title: "", note: ""};
+  return {id: project + "/" + idea + "#" + String(n).padStart(8, "0"), kind: "agent", role, room, activity: "work", project, idea, title: "", note: "", live: true};
 }
 const DEMO = [
   lead("imp", "agent-rooms", "Animated agent rooms page", "lab", "work"),
@@ -624,24 +630,32 @@ const DEMO = [
   agent("dotfiles", "zsh-speedup", 2, "reviewer", "office"),
   agent("dotfiles", "zsh-speedup", 3, "tech-researcher", "office"),  // research ideas have no stage room, so they work in the office
   agent("imp", "agent-rooms", 4, "presenter", "lab"),
-  {id: "s1", kind: "lead", role: "chief", room: "office", activity: "work", project: "scratch", idea: "", title: "", note: ""},
-  {id: "s1#00000001", kind: "agent", role: "general-purpose", room: "office", activity: "work", project: "scratch", idea: "", title: "", note: ""},
-  lead("aiur", "feature-store", "Feature store", "lounge", "wait", "G1 Plan"),
-  lead("imp", "no-push", "No-push guard", "lounge", "wait", "permission"),
+  {id: "s1", kind: "lead", role: "chief", room: "office", activity: "work", project: "scratch", idea: "", title: "", note: "", live: true},
+  {id: "s1#00000001", kind: "agent", role: "general-purpose", room: "office", activity: "work", project: "scratch", idea: "", title: "", note: "", live: true},
+  lead("aiur", "feature-store", "Feature store", "lounge", "wait", "G1 Plan"),  // not live: it waits at the pool unless ticked
+  lead("blog", "comments", "Comments", "lounge", "wait", "G2 Review"),
+  lead("imp", "no-push", "No-push guard", "lounge", "wait", "permission", true),
   agent("imp", "no-push", 1, "builder", "lab"),  // its lead waits in the kitchen, the agent keeps the lab
   lead("imp", "idea-groups", "Idea groups", "lounge", "idle"),
   lead("aiur", "old-etl", "Old ETL cleanup", "lounge", "idle"),
   lead("dotfiles", "nvim-lsp", "Neovim LSP", "lounge", "idle"),
-  lead("imp", "sound-fx", "Sound effects", "pool", "idle"),
-  lead("imp", "themes", "Page themes", "pool", "idle"),
-  lead("aiur", "ab-tests", "A/B test kit", "pool", "idle"),
-  lead("aiur", "forecast", "Demand forecast", "pool", "idle"),
-  lead("dotfiles", "tmux-theme", "tmux theme", "pool", "idle"),
-  lead("dotfiles", "brewfile", "Brewfile", "pool", "idle"),
-  lead("blog", "rss-feed", "RSS feed", "pool", "idle"),
-  lead("blog", "dark-mode", "Dark mode", "pool", "idle"),
-  lead("imp", "mobile-view", "Mobile view", "pool", "idle"),
-  lead("aiur", "data-catalog", "Data catalog", "pool", "idle"),
+  // the server sends nobody to the pool: these sit on the couch when ticked
+  lead("imp", "sound-fx", "Sound effects", "lounge", "idle"),
+  lead("imp", "themes", "Page themes", "lounge", "idle"),
+  lead("aiur", "ab-tests", "A/B test kit", "lounge", "idle"),
+  lead("aiur", "forecast", "Demand forecast", "lounge", "idle"),
+  lead("dotfiles", "tmux-theme", "tmux theme", "lounge", "idle"),
+  lead("dotfiles", "brewfile", "Brewfile", "lounge", "idle"),
+  lead("blog", "rss-feed", "RSS feed", "lounge", "idle"),
+  lead("blog", "dark-mode", "Dark mode", "lounge", "idle"),
+  lead("imp", "mobile-view", "Mobile view", "lounge", "idle"),
+  lead("aiur", "data-catalog", "Data catalog", "lounge", "idle"),
+  lead("imp", "i18n", "Translations", "lounge", "idle"),
+  lead("aiur", "dq-checks", "Data quality checks", "lounge", "idle"),
+  lead("dotfiles", "git-aliases", "git aliases", "lounge", "idle"),
+  lead("blog", "search", "Site search", "lounge", "idle"),
+  lead("imp", "cli-colours", "CLI colours", "lounge", "idle"),
+  lead("aiur", "uplift", "Uplift model", "lounge", "idle"),
 ];
 // four demo polls in a loop, so entering, leaving and changing rooms all show
 function demoState(n, ts) {
@@ -751,7 +765,7 @@ function demoState(n, ts) {
   }
   function tileHash(x, y) { return hashStr(x + "," + y); }
   function floorKind(x, y) {
-    if (",&%:".includes(tileAt(x, y))) return "grass";
+    if (",&%:ut".includes(tileAt(x, y))) return "grass";
     let room = roomAt(x, y);
     if (!room && tileAt(x, y) === "+") room = roomAt(x, y - 1) || roomAt(x, y + 1);  // a doorway takes its room's floor
     if (!room) return "hall";
@@ -1934,6 +1948,17 @@ function demoState(n, ts) {
     for (let i = -R + 4; i < R - 2; i += 8) { const c = (i / 8 & 1) ? red : cream; a(c[1], cx + i, cy + V - 1, 6, 3); a(c[0], cx + i, cy + V + 2, 6, 1); }
     a.box("#e9e4da", cx - 2, cy - 3, 4, 4);
   }
+  // a beach towel on the lawn over its head tile and seat tile: wide stripes, a fringe at each end, and flip-flops or a
+  // sun hat beside some
+  function beachTowel(a, x, y) {
+    const h = tileHash(x, y), base = ["#3c9ad6", "#e07a5f", "#2f8a86", "#f2c14e", "#8e6bc4"][h % 5], t = ramp(base);
+    a.shadow(6, 12, 116, 42);
+    a.box("#f6f4ee", 6, 12, 116, 40);
+    for (let i = 10; i < 120; i += 16) { a(base, i, 12, 8, 40); a(t[1], i, 50, 8, 2); a(t[3], i, 12, 8, 1); }
+    for (let i = 8; i < 52; i += 4) { a("#f6f4ee", 2, i, 3, 2); a("#f6f4ee", 123, i, 3, 2); }
+    if (h % 3 === 0) for (const fx of [104, 114]) { a.box("#2b3a5a", fx, 54, 6, 8); a("#f6f4ee", fx + 2, 55, 2, 3); }
+    else if (h % 3 === 1) { a.oval(18, 58, 10, 3); a.box("#e9d3a0", 10, 52, 16, 5); a(ramp("#e9d3a0")[1], 14, 50, 8, 3); a("#e05a4a", 10, 55, 16, 1); }
+  }
   // a wooden planter by the pool: flowers, or a clipped ball, by tile
   function planter(a, x, y) {
     const w = ramp("#8a5a35");
@@ -2018,6 +2043,7 @@ function demoState(n, ts) {
       case "A": return arcade(a);
       case "b": return beanbag(a, y);
       case "j": return lounger(a, y);
+      case "u": return beachTowel(a, x, y);
       case "@": return umbrella(a);
       case "&": return tree(a, h);
       case "%": return bush(a, h);
@@ -2568,13 +2594,13 @@ function demoState(n, ts) {
   });
   canvas.addEventListener("mouseleave", () => { tip.hidden = true; if (hoverId) { hoverId = ""; draw(); } });
 
-  // ---- idea filter: which ideas show in the rooms; the choice is kept in this origin's localStorage ----
-  const STORE = "imp-rooms-ideas", boxes = new Map();
-  let choice = {all: true, on: new Set(), unlinked: true}, chooserKey = "", allBox = null, unlinkedBox = null;
+  // ---- idea chooser: which ideas are in the building besides the live ones; the choice is kept in this origin's localStorage ----
+  const boxes = new Map();
+  let choice = {all: false, on: new Set()}, chooserKey = "", allBox = null;
   // every storage touch can throw (blocked site data, quota): then the choice lives only in this page
   try { choice = parsePick(localStorage.getItem(STORE)) || choice; } catch (e) { /* in memory */ }
   function savePick() {
-    try { localStorage.setItem(STORE, JSON.stringify({all: choice.all, on: [...choice.on], unlinked: choice.unlinked})); } catch (e) { /* in memory */ }
+    try { localStorage.setItem(STORE, JSON.stringify({all: choice.all, on: [...choice.on]})); } catch (e) { /* in memory */ }
   }
   function ideaKeys(chars) { return [...new Set(chars.map(c => ideaKey(c.id)).filter(k => k.includes("/")))].sort(); }
   function changed(edit) {
@@ -2601,12 +2627,9 @@ function demoState(n, ts) {
     const body = $("ideas-body");
     body.replaceChildren();
     boxes.clear();
-    const [allLabel, a] = box("All ideas, including new ones");
+    const [allLabel, a] = box("All ideas in the building", "Unticked ideas lounge at the pool unless a session is live");
     allBox = a;
-    a.addEventListener("change", () => changed(seen => {
-      choice.all = a.checked;
-      if (!a.checked) { choice.on = new Set(seen); choice.unlinked = true; }  // unticking keeps what is shown; later ideas come in unticked
-    }));
+    a.addEventListener("change", () => changed(() => { choice.all = a.checked; }));  // unticking goes back to the ticks below
     body.appendChild(allLabel);
     const byProject = new Map();
     for (const k of keys) {
@@ -2626,20 +2649,14 @@ function demoState(n, ts) {
       }
       body.appendChild(set);
     }
-    const [unLabel, u] = box("Unlinked sessions");
-    unlinkedBox = u;
-    u.addEventListener("change", () => changed(() => { choice.unlinked = u.checked; }));
-    body.appendChild(unLabel);
     const note = document.createElement("div");
     note.className = "empty";
-    note.textContent = "Saved in this browser for this address only: 127.0.0.1 and localhost keep separate choices.";
+    note.textContent = "A live idea is in the building, ticked or not. Saved in this browser for this address only: 127.0.0.1 and localhost keep separate choices.";
     body.appendChild(note);
   }
   // boxes show the choice; with All ticked they are ticked and locked
   function syncChooser(total) {
     allBox.checked = choice.all;
-    unlinkedBox.checked = choice.all || choice.unlinked;
-    unlinkedBox.disabled = choice.all;
     let on = 0;
     for (const [k, input] of boxes) {
       input.checked = choice.all || choice.on.has(k);
@@ -2652,11 +2669,10 @@ function demoState(n, ts) {
     if (!last) return;
     buildChooser(last.characters);
     syncChooser(boxes.size);
-    const kept = keep(last.characters, choice), shownSet = new Set(kept), hid = last.characters.filter(c => !shownSet.has(c));
-    const waiting = hid.filter(c => c.activity === "wait").length;
-    // a wait hidden by the filter is still counted, so it never vanishes silently
-    $("roster-title").textContent = "Who is where" + (hid.length ? " (" + hid.length + " hidden by the filter, " + waiting + " waiting on you)" : "");
-    $("nobody").textContent = hid.length && !kept.length ? "Everyone is hidden by the filter." : "Nobody is in yet.";
+    const kept = keep(last.characters, choice), pool = kept.filter(c => c.room === "pool");
+    const waiting = pool.filter(c => c.activity === "wait").length;
+    // a wait at the pool is counted too, so it is never missed
+    $("roster-title").textContent = "Who is where" + (pool.length ? " (" + pool.length + " at the pool, " + waiting + " waiting on you)" : "");
     apply({ts: last.ts, characters: kept});
   }
 

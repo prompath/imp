@@ -218,7 +218,7 @@ class TestDashboard(unittest.TestCase):
         self.assertNotIn("Access-Control-Allow-Origin", headers)
         data = json.loads(body)
         self.assertEqual(set(data), {"ts", "characters"})
-        keys = {"id", "kind", "role", "room", "activity", "project", "idea", "title", "note"}
+        keys = {"id", "kind", "role", "room", "activity", "project", "idea", "title", "note", "live"}
         self.assertEqual([(c["id"], c["room"], c["activity"], c["role"]) for c in data["characters"]],
                          [("proj/evil", "office", "work", "chief"), ("proj/evil#" + h8("a"), "office", "work", "builder")])
         self.assertTrue(all(set(c) == keys for c in data["characters"]))
@@ -263,10 +263,18 @@ class TestRooms(unittest.TestCase):
         rows = [row({"id": "d"}, w, stage="done"), row({"id": "s"}, w, stage="shelved"), row({"id": "n"}, stage="done")]
         self.assertEqual(rooms(rows, [w]), {})  # linked sessions of hidden ideas don't turn up as unlinked
 
-    def test_2_backlog_sunbathes_live_or_not(self):
-        live = sess("waiting_reply")
-        rows = [row({"id": "a"}, stage="backlog"), row({"id": "b"}, live, stage="backlog", gate="G1", waiting_on="user")]
-        self.assertEqual(rooms(rows), {"p/a": ("pool", "idle", ""), "p/b": ("pool", "idle", "")})
+    def test_2_backlog_follows_the_other_rows(self):  # r3: the server sends nobody to the pool; the page does, by ticks
+        rows = [row({"id": "a"}, stage="backlog"), row({"id": "b"}, sess("needs_permission"), stage="backlog"),
+                row({"id": "c"}, sess("working"), stage="backlog")]
+        self.assertEqual(rooms(rows), {"p/a": ("lounge", "idle", ""), "p/b": ("lounge", "wait", "permission"),
+                                       "p/c": ("office", "work", "")})
+
+    def test_live_flag(self):
+        lone = dict(sess("waiting_reply"), cwd="/x/y")
+        rows = [row({"id": "on"}, sess("working", a="imp:builder")), row({"id": "gate"}, gate="G1"),
+                row({"id": "old"}, sess("working", age=601))]
+        got = {c["id"]: c["live"] for c in impctl.rooms_state(rows, [lone], NOW)["characters"]}
+        self.assertEqual(got, {"p/on": True, f"p/on#{h8('a')}": True, "p/gate": False, "p/old": False, "s0": True})
 
     def test_3_permission_and_gates_go_to_the_kitchen(self):
         rows = [row({"id": "perm"}, sess("needs_permission")),
@@ -321,7 +329,7 @@ class TestRooms(unittest.TestCase):
         got = {c["id"]: (c["kind"], c["role"], c["room"]) for c in impctl.rooms_state(rows, [], NOW)["characters"]}
         self.assertEqual(got, {
             "p/x": ("lead", "chief", "lounge"), f"p/x#{h8('a1')}": ("agent", "builder", "lab"),
-            f"p/x#{h8('a2')}": ("agent", "general-purpose", "lab"), "p/bk": ("lead", "chief", "pool"),
+            f"p/x#{h8('a2')}": ("agent", "general-purpose", "lab"), "p/bk": ("lead", "chief", "office"),
             f"p/bk#{h8('z')}": ("agent", "reviewer", "office"), "p/dead": ("lead", "chief", "lounge")})
 
 
@@ -375,36 +383,62 @@ class TestRoomsPage(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         return json.loads(r.stdout)
 
-    def test_keep_filters_by_idea_key(self):
+    def test_keep_sends_unticked_not_live_leads_to_the_pool(self):
         got = self.pure("""
-        const c = (id, activity) => ({id, activity: activity || "work"});
-        const chars = [c("p/a"), c("p/a#0123abcd"), c("p/b"), c("q#1/x"), c("q#1/x#deadbeef"), c("p/ideas/old.md"),
-          c("p/ideas/old.md#00000001"), c("s1a2b3c4d"), c("s1a2b3c4d#00000001")];
-        const ids = (on, unlinked, all) => keep(chars, {all: !!all, on: new Set(on), unlinked}).map(x => x.id);
-        return {all: ids([], false, true).length, none: ids([], false), a: ids(["p/a"], false), un: ids([], true),
-          hash: ids(["q#1/x"], false), path: ids(["p/ideas/old.md"], false), same: keep(chars, {all: true}) === chars,
+        const c = (id, live, activity, note, kind) => ({id, kind: kind || (id.includes("#") && /#[0-9a-f]{8}$/.test(id) ? "agent" : "lead"),
+          live: !!live, room: "lab", activity: activity || (live ? "work" : "idle"), note: note || ""});
+        const chars = [c("p/a"), c("p/live", true), c("p/live#0123abcd", true), c("p/gate", false, "wait", "G1 Plan"),
+          c("q#1/x"), c("p/ideas/old.md"), c("s1a2b3c4d", true), c("s1a2b3c4d#00000001", true)];
+        const run = (on, all) => keep(chars, {all: !!all, on: new Set(on)});
+        const where = list => list.map(x => x.id + ":" + x.room + ":" + x.activity + ":" + x.note);
+        const saved = parsePick(null) || {all: false, on: new Set()};
+        return {none: where(run([])), tick: where(run(["p/a", "q#1/x", "p/ideas/old.md", "p/live"])), all: run([], true) === chars,
+          saved: where(keep(chars, saved)), untouched: chars.every(x => x.room === "lab"), store: STORE,
+          norm: normalize({characters: [{id: "a", live: true}, {id: "b", live: "yes"}, {id: "c"}]}).characters.map(x => x.live),
           keys: ["p/a#0123abcd", "q#1/x#deadbeef", "s1a2b3c4d#00000001", "p/a#xyz"].map(ideaKey)};
         """)
-        self.assertEqual(got["all"], 9)
-        self.assertEqual(got["none"], [])
-        self.assertEqual(got["a"], ["p/a", "p/a#0123abcd"])
-        self.assertEqual(got["un"], ["s1a2b3c4d", "s1a2b3c4d#00000001"])
-        self.assertEqual(got["hash"], ["q#1/x", "q#1/x#deadbeef"])  # a # in the project name is not an agent suffix
-        self.assertEqual(got["path"], ["p/ideas/old.md", "p/ideas/old.md#00000001"])  # an idea with no id is keyed by its path
-        self.assertTrue(got["same"])
+        self.assertEqual(got["none"], [  # the default: only live ideas and sessions are in; a gate keeps its wait at the pool
+            "p/a:pool:idle:", "p/live:lab:work:", "p/live#0123abcd:lab:work:", "p/gate:pool:wait:G1 Plan", "q#1/x:pool:idle:",
+            "p/ideas/old.md:pool:idle:", "s1a2b3c4d:lab:work:", "s1a2b3c4d#00000001:lab:work:"])
+        self.assertEqual(got["tick"], [  # a tick brings an idea in; a # in the project or a path id is still one idea
+            "p/a:lab:idle:", "p/live:lab:work:", "p/live#0123abcd:lab:work:", "p/gate:pool:wait:G1 Plan", "q#1/x:lab:idle:",
+            "p/ideas/old.md:lab:idle:", "s1a2b3c4d:lab:work:", "s1a2b3c4d#00000001:lab:work:"])
+        self.assertTrue(got["all"])  # All brings everyone in, as sent
+        self.assertEqual(got["saved"], got["none"])  # nothing saved: nothing ticked
+        self.assertTrue(got["untouched"])  # keep copies, it never edits the poll
+        self.assertEqual(got["norm"], [True, False, False])  # only a real true is live
+        self.assertEqual(got["store"], "imp-rooms-ideas-v2")  # the r2 key, where "all" was the default, is never read
         self.assertEqual(got["keys"], ["p/a", "q#1/x", "s1a2b3c4d", "p/a#xyz"])
 
     def test_saved_choice_is_validated(self):
         got = self.pure("""
-        const ok = parsePick('{"all":false,"on":["p/a"],"unlinked":true}');
-        const bad = [null, "", "{", "[]", "null", '{"all":1,"on":[],"unlinked":true}', '{"all":true,"on":{"p/a":1},"unlinked":true}',
-          '{"all":true,"on":[1],"unlinked":true}', JSON.stringify({all: false, on: ["x".repeat(201)], unlinked: true}),
-          JSON.stringify({all: false, on: Array.from({length: 501}, (_, i) => "k/" + i), unlinked: true}),
-          '{"all":true,"on":["constructor"],"unlinked":"yes"}'].map(s => parsePick(s));
-        return {ok: [ok.all, [...ok.on], ok.unlinked], bad};
+        const ok = parsePick('{"all":false,"on":["p/a"]}'), r2 = parsePick('{"all":true,"on":[],"unlinked":true}');
+        const bad = [null, "", "{", "[]", "null", '{"all":1,"on":[]}', '{"all":true,"on":{"p/a":1}}',
+          '{"all":true,"on":[1]}', JSON.stringify({all: false, on: ["x".repeat(201)]}),
+          JSON.stringify({all: false, on: Array.from({length: 501}, (_, i) => "k/" + i)}),
+          '{"all":"yes","on":["constructor"]}'].map(s => parsePick(s));
+        return {ok: [ok.all, [...ok.on], Object.keys(ok)], r2: [r2.all, Object.keys(r2)], bad};
         """)
-        self.assertEqual(got["ok"], [False, ["p/a"], True])
+        self.assertEqual(got["ok"], [False, ["p/a"], ["all", "on"]])
+        self.assertEqual(got["r2"], [True, ["all", "on"]])  # an extra field is dropped; the v2 key keeps r2 saves out anyway
         self.assertEqual(got["bad"], [None] * 11)
+
+    def test_pool_and_lawn_hold_twenty(self):
+        got = self.pure("""
+        const pool = SPOTS.filter(s => spotGroup(s) === "pool:l");
+        const wait = {id: "p/w", kind: "lead", room: "pool", activity: "wait", note: "G1 Plan"};
+        const idle = Array.from({length: pool.length}, (_, i) => ({id: "p/i" + i, kind: "lead", room: "pool", activity: "idle", note: ""}));
+        const want = c => ({id: c.id, group: charGroup(c), pri: priority(c)});
+        const first = assignSpots(idle.map(want), new Map()), after = assignSpots(idle.concat([wait]).map(want), first);
+        return {n: pool.length, towels: pool.filter(s => s.kind === "t").length,
+          lost: pool.filter(s => !bfs(CAMPUS_DOOR.x, CAMPUS_DOOR.y, s.x, s.y)).length, wait: after.get("p/w") >= 0,
+          heads: pool.filter(s => s.kind === "t").every(s => tileAt(s.x - 1, s.y) === "u")};
+        """)
+        self.assertGreaterEqual(got["n"], 20)
+        self.assertGreaterEqual(got["towels"], 12)
+        self.assertEqual(got["lost"], 0)  # every lounger and towel is reachable from the campus door
+        self.assertTrue(got["heads"])
+        self.assertTrue(got["wait"])  # a full pool still finds a waiting idea a spot: its ! never goes to the overflow
 
     def test_kitchen_gives_spots_by_priority(self):
         got = self.pure("""
@@ -505,9 +539,10 @@ class TestRoomsPage(unittest.TestCase):
     def test_wait_text_does_not_double(self):
         got = self.pure("""
         const w = note => stateText({activity: "wait", note, room: "lounge"});
-        return [w("G1 Plan"), w(""), w("permission")];
+        return [w("G1 Plan"), w(""), w("permission"), stateText({activity: "idle", room: "pool"}), roomText({room: "pool"})];
         """)
-        self.assertEqual(got, ["waiting on you: G1 Plan", "waiting on you", "waiting on you: permission"])
+        self.assertEqual(got, ["waiting on you: G1 Plan", "waiting on you", "waiting on you: permission", "not in the building",
+                               "Pool (not ticked)"])
 
     def test_s2_helpers_stay_dom_free(self):  # the empty context above throws on any DOM or window use at load
         got = self.pure("""
