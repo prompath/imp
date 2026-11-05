@@ -25,7 +25,7 @@ The arguments start with the command name.
 | `idea <description>` | Route it (`references/routing.md`), choose a short kebab-case `id`, create the idea from `templates/STATUS.md` where the `Ideas layout` slot says, set `group` (`references/state.md`), then recon → G1 |
 | `continue [id]` | Resolve the idea (section 5), read its STATUS and latest plan, say where it stands, and do the next step. Never skip a gate that hasn't been passed. |
 | `notes [id] <notes>` | Follow `references/state.md` → *Filing notes* |
-| `ideas [--all] [--scan DIR]` | Run `impctl.py ideas` with the same flags and show the output as-is |
+| `ideas [flags]` | Run `impctl.py ideas` with the same flags and show the output as-is |
 | `investigate <case>` | Follow `references/investigate.md` |
 | free text | Route it (`references/routing.md`) |
 

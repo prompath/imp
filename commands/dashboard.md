@@ -16,4 +16,4 @@ else
 fi
 ```
 
-If `${CLAUDE_PLUGIN_ROOT}` is empty, the plugin folder is the one above this command's `commands/` folder. Show the URL and nothing else. It lists ideas from every registered project (`/ideas --all --scan DIR` registers them).
+If `${CLAUDE_PLUGIN_ROOT}` is empty, the plugin folder is the one above this command's `commands/` folder. Show the URL and nothing else. It lists ideas from every registered project (`/ideas --projects --scan DIR` registers them).

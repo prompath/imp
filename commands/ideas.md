@@ -1,6 +1,6 @@
 ---
-description: List imp ideas in this project, or all projects with --all
-argument-hint: "[--all] [--scan DIR]"
+description: List open imp ideas in this project (--all adds done and shelved, --projects lists every project)
+argument-hint: "[--all] [--backlog|--pitch|--experiment|--ship|--document|--done|--shelved] [--stage S] [--waiting W] [--group G] [--projects] [--scan DIR]"
 disable-model-invocation: true
 ---
 

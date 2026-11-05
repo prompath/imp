@@ -159,7 +159,7 @@ class TestRegistryAndCli(unittest.TestCase):
         write(p / "ideas" / "x" / "STATUS.md", status("x-idea"))
         self.reg.parent.mkdir(parents=True)
         self.reg.write_text(f"{p.resolve()}\n/nonexistent/x\n")
-        r = self.cli("ideas", "--all")
+        r = self.cli("ideas", "--projects")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("alive (company)", r.stdout)
         self.assertIn("x-idea", r.stdout)
@@ -168,10 +168,29 @@ class TestRegistryAndCli(unittest.TestCase):
     def test_cli_scan_registers(self):
         make_project(self.base / "projects", "one")
         make_project(self.base / "projects", "two")
-        r = self.cli("ideas", "--all", "--scan", str(self.base / "projects"))
+        r = self.cli("ideas", "--projects", "--scan", str(self.base / "projects"))
         self.assertEqual(r.returncode, 0, r.stderr)
         names = sorted(p.name for p in impctl.load_registry())
         self.assertEqual(names, ["one", "two"])
+
+    def test_cli_hides_done_and_filters(self):
+        p = make_project(self.base, "proj")
+        write(p / "ideas" / "a" / "STATUS.md", status("live-one", stage="pitch", group="Pricing / Vouchers"))
+        write(p / "ideas" / "b" / "STATUS.md", status("old-one", "agents", stage="done"))
+        write(p / "ideas" / "c" / "STATUS.md", status("parked", "agents", stage="shelved"))
+
+        def ids(*flags):
+            out = self.cli("ideas", *flags, cwd=p).stdout
+            return sorted(i for i in ("live-one", "old-one", "parked") if i in out)
+
+        self.assertEqual(ids(), ["live-one"])
+        self.assertEqual(ids("--all"), ["live-one", "old-one", "parked"])
+        self.assertEqual(ids("--done"), ["old-one"])
+        self.assertEqual(ids("--done", "--shelved"), ["old-one", "parked"])
+        self.assertEqual(ids("--stage", "pitch"), ["live-one"])
+        self.assertEqual(ids("--all", "--waiting", "agents"), ["old-one", "parked"])
+        self.assertEqual(ids("--group", "pricing"), ["live-one"])
+        self.assertNotEqual(self.cli("ideas", "--stage", "nope", cwd=p).returncode, 0)
 
     def test_cli_works_without_project_file(self):
         p = self.base / "plain"

@@ -148,6 +148,22 @@ def format_rows(ideas: list) -> str:
     return "\n".join(out)
 
 
+STAGES = ["backlog", "pitch", "experiment", "ship", "document", "done", "shelved"]
+HIDDEN = {"done", "shelved"}  # left out of /ideas unless --all or a stage filter asks for them
+
+
+def filter_ideas(ideas: list, stages=None, show_all=False, waiting=None, group=None) -> list:
+    if stages:
+        ideas = [i for i in ideas if i.get("stage") in stages]
+    elif not show_all:
+        ideas = [i for i in ideas if i.get("stage") not in HIDDEN]
+    if waiting:
+        ideas = [i for i in ideas if i.get("waiting_on") == waiting]
+    if group:
+        ideas = [i for i in ideas if (i.get("group") or "").lower().startswith(group.lower())]
+    return ideas
+
+
 def resolve(ideas: list, query: str) -> dict:
     for i in ideas:
         if i.get("id") == query:
@@ -789,7 +805,13 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="imp")
     sub = ap.add_subparsers(dest="cmd", required=True)
     p_ideas = sub.add_parser("ideas")
-    p_ideas.add_argument("--all", action="store_true")
+    p_ideas.add_argument("--all", action="store_true", help="every stage, done and shelved included")
+    p_ideas.add_argument("--stage", action="append", choices=STAGES)
+    for st in STAGES:
+        p_ideas.add_argument(f"--{st}", dest="stage", action="append_const", const=st)
+    p_ideas.add_argument("--waiting", choices=["user", "marketing", "agents"])
+    p_ideas.add_argument("--group")
+    p_ideas.add_argument("--projects", action="store_true", help="every registered project")
     p_ideas.add_argument("--scan")
     p_ideas.add_argument("--project")
     p_res = sub.add_parser("resolve")
@@ -823,16 +845,18 @@ def main(argv=None) -> int:
 
     if args.scan:
         _scan(Path(args.scan).expanduser())
-    if not args.all:
-        root = _project_arg(args.project)
-        print(format_rows(find_ideas(root)))
+    def listing(root):
+        return format_rows(filter_ideas(find_ideas(root), args.stage, args.all, args.waiting, args.group))
+
+    if not args.projects:
+        print(listing(_project_arg(args.project)))
         return 0
     for root in load_registry():
         if not (root / PROJECT_FILE).is_file():
             print(f"{root} (not found on this machine)\n")
             continue
         cfg = project_config(root)
-        print(f"{cfg['name']} ({cfg['kind']})\n{format_rows(find_ideas(root))}\n")
+        print(f"{cfg['name']} ({cfg['kind']})\n{listing(root)}\n")
     return 0
 
 

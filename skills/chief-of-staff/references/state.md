@@ -55,4 +55,4 @@ Goes in `<idea folder>/local/`, or `<stage dir>/local/<id>/` for a flat-file ide
 
 ## Listing (`/ideas`)
 
-`impctl.py ideas [--all] [--scan DIR]`. Show the output as-is, then at most one line pointing at the ideas waiting on the user.
+`impctl.py ideas` with the user's flags. By default it hides `done` and `shelved` ideas. `--all` shows every stage; `--<stage>` (`--pitch`, `--done`, ...) or `--stage S` shows only those stages and can repeat; `--waiting W` and `--group G` (a prefix of `group`) narrow further; `--projects` lists every registered project; `--scan DIR` registers projects under DIR first. Show the output as-is, then at most one line pointing at the ideas waiting on the user.

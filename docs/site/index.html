@@ -125,7 +125,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 0.86rem; border-top: 
 <pre><code>/imp-init</code></pre>
 <p>It reads the project's <code>CLAUDE.md</code> and <code>README.md</code>, drafts <code>.imp/project.md</code>, and shows you the draft. Slots it couldn't find are marked <code># default</code>. Nothing is written until you approve. Commit the file with the project so your other machines get it.</p>
 <h3>On a new machine</h3>
-<pre><code>/ideas --all --scan ~/Projects</code></pre>
+<pre><code>/ideas --projects --scan ~/Projects</code></pre>
 <p>This finds every connected project and adds it to this machine's list (<code>~/.config/imp/projects.txt</code>). Idea state travels with each project's git repo.</p>
 <h3>Updating imp</h3>
 <p>Run <code>claude plugin marketplace update imp</code>, then <code>claude plugin update imp@imp</code>, and restart Claude Code. Maintainers raise <code>version</code> in <code>.claude-plugin/plugin.json</code> for each release.</p>
@@ -137,7 +137,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 0.86rem; border-top: 
 <tr><td><code>/idea &lt;description&gt;</code></td><td>Starts an idea. The chief-of-staff picks a workflow and says why, creates the idea's STATUS, looks around (read-only), then shows the G1 plan and waits.</td></tr>
 <tr><td><code>/continue [id]</code></td><td>Resumes an idea at its current step. It never skips a gate.</td></tr>
 <tr><td><code>/notes [id] &lt;notes&gt;</code></td><td>Files your meeting notes into the feedback log, updates decisions and assumptions, and proposes the next plan.</td></tr>
-<tr><td><code>/ideas [--all] [--scan DIR]</code></td><td>Lists ideas in this project, or in every project with <code>--all</code>.</td></tr>
+<tr><td><code>/ideas [--all] [--&lt;stage&gt;] [--waiting W] [--group G] [--projects] [--scan DIR]</code></td><td>Lists open ideas in this project, or in every project with <code>--projects</code>. Done and shelved ideas are hidden unless you pass <code>--all</code> or a stage flag such as <code>--done</code> or <code>--pitch</code>. <code>--waiting user</code> and <code>--group Pricing</code> narrow the list.</td></tr>
 <tr><td><code>/investigate &lt;case&gt;</code></td><td>Checks whether a result is a misunderstanding, a code bug or a rulebook gap.</td></tr>
 <tr><td><code>/imp:push [note]</code></td><td>Commits the repo's changes, summarizes everything unpushed, and pushes once you say yes. Under <code>push_forbidden</code> it commits and hands you the push command.</td></tr>
 <tr><td><code>/imp-init</code></td><td>Connects the current project.</td></tr>
@@ -264,7 +264,7 @@ G1 → builder: notebook + a webpage to pick a user and compare CF vs GNN side b
 Document: README (what, why, how, results)</pre>
 
 <h3>Listing everything</h3>
-<pre class="term"><span class="you">you › /ideas --all</span>
+<pre class="term"><span class="you">you › /ideas --projects</span>
 acme-analytics (company)
 cart-reminder     pitch          waiting: marketing  2026-10-21
 lapsing-voucher   experiment r1  waiting: agents     2026-10-30

@@ -19,7 +19,7 @@ Restart Claude Code. imp needs `python3` on your `PATH`.
 
 Run `/imp-init` inside the project. It drafts `.imp/project.md` from the project's `CLAUDE.md`/`README.md`, shows it to you, and writes it only after you approve. Commit the file with the project.
 
-On a new machine, `/ideas --all --scan ~/Projects` finds every connected project.
+On a new machine, `/ideas --projects --scan ~/Projects` finds every connected project.
 
 ## Update
 
@@ -39,7 +39,7 @@ Maintainers: raise `version` in `.claude-plugin/plugin.json` for each release.
 | `/idea <description>` | Start an idea: pick a workflow, look around, show the plan, wait for go-ahead |
 | `/continue [id]` | Resume an idea where it stopped |
 | `/notes [id] <notes>` | File your meeting notes and propose the next round |
-| `/ideas [--all] [--scan DIR]` | List ideas in this project, or every project, nested by domain and use-case if the project sets `Idea groups` |
+| `/ideas [--all] [--<stage>] [--waiting W] [--group G] [--projects] [--scan DIR]` | List open ideas in this project, or every project with `--projects`. Done and shelved ideas are hidden unless you pass `--all` or a stage flag (`--done`, `--pitch`, ...). Output is nested by domain and use-case if the project sets `Idea groups` |
 | `/investigate <case>` | Check whether a result is a misunderstanding, a code bug or a rulebook gap |
 | `/imp:push [note]` | Commit the repo's changes, summarize everything unpushed, and push once you say yes |
 | `/imp-init` | Connect the current project |
