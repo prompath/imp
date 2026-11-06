@@ -8,7 +8,7 @@ imp mirrors its ideas to Notion, one way: imp to Notion. imp is the source of tr
 - Every Notion write follows `references/gates.md` (outward writes): show the list, wait for a yes, then write. A yes covers that list only.
 - Never delete anything in Notion.
 - IDs live in `~/.config/imp/notion.json`: `{"parent_page_id", "projects_ds", "tasks_ds"}` (data source ids). IDs only, never a token.
-- The export is `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/impctl.py" ideas --json`: `{"projects", "tasks", "warnings"}` for every registered project with `notion: on`. It reads only STATUS files and each round's plan Hypothesis line. Show its `warnings`. If it exits non-zero (two projects with one name), show the message and stop.
+- The export is `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/impctl.py" ideas --json`: `{"projects", "tasks", "warnings"}` for every registered project with `notion: on`. It reads only each idea's own file (STATUS.md or flat note) and each round's plan Hypothesis line. Show its `warnings`. If it exits non-zero (two projects with one name), show the message and stop.
 
 ## setup
 

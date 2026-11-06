@@ -402,7 +402,7 @@ VERDICTS = ["worked", "worse", "no effect", "inconclusive", "broken"]
 
 
 def notion_export(now: float) -> dict:
-    """Projects and tasks of the repos with `notion: on`. Reads only STATUS.md and each round's plan.md Hypothesis line."""
+    """Projects and tasks of the repos with `notion: on`. Reads only each idea's own file (STATUS.md or flat note) and each round's plan.md Hypothesis line."""
     roots = [r for r in load_registry() if (r / PROJECT_FILE).is_file()]
     names = [project_config(r)["name"] for r in roots]
     on = {project_config(r)["name"]: r for r in roots if project_config(r).get("notion") == "on"}
@@ -416,7 +416,7 @@ def notion_export(now: float) -> dict:
         if repo not in on:
             continue
         parts = Path(idea["_path"]).parts
-        if parts[-1] != "STATUS.md" or {"db", "local"} & set(parts):  # notes, db/ and local/ dumps: never read, never listed
+        if {"db", "local"} & set(parts):  # db/ and local/ dumps: never read, never listed
             continue
         if not idea.get("id"):
             warnings.append(f"{repo}: {idea['_path']} skipped (no id)")

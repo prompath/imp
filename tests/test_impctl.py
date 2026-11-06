@@ -331,6 +331,16 @@ class TestNotionExport(unittest.TestCase):
         (pr,) = self.export()["projects"]
         self.assertEqual((pr["start"], pr["end"]), ("2026-09-03", "2026-12-01"))
 
+    def test_flat_note_exported_db_local_and_non_ideas_skipped(self):
+        fm = lambda i: f"---\nid: {i}\nwaiting_on: user\n---\n"
+        write(self.p / "ideas" / "research" / "x.md", fm("x") + "## Open questions\n\n- Q1 why\n")
+        write(self.p / "ideas" / "research" / "plain.md", "# no frontmatter\n\n## Open questions\n\n- Q9 no\n")
+        write(self.p / "ideas" / "y" / "db" / "STATUS.md", fm("dbx") + "## Open questions\n\n- Q2 no\n")
+        write(self.p / "ideas" / "y" / "local" / "z.md", fm("z"))
+        e = self.export()
+        self.assertEqual([p["imp_id"] for p in e["projects"]], ["agents/x"])
+        self.assertEqual(sorted(self.tasks()), ["agents/x/q/Q1"])
+
     def test_round_tasks(self):
         d = self.idea(round="3", stage="experiment", body=(
             "## Rounds\n\n| Round | Hypothesis | Branch @ sha | Verdict | Learned | Result |\n|---|---|---|---|---|---|\n"
