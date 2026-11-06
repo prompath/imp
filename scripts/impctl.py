@@ -398,6 +398,9 @@ def _hypothesis(plan: Path) -> str:
     return ""
 
 
+VERDICTS = ["worked", "worse", "no effect", "inconclusive", "broken"]
+
+
 def notion_export(now: float) -> dict:
     """Projects and tasks of the repos with `notion: on`. Reads only STATUS.md and each round's plan.md Hypothesis line."""
     roots = [r for r in load_registry() if (r / PROJECT_FILE).is_file()]
@@ -412,7 +415,8 @@ def notion_export(now: float) -> dict:
         repo = idea["project"]
         if repo not in on:
             continue
-        if Path(idea["_path"]).name != "STATUS.md":  # notes, db/ dumps: never read, never listed
+        parts = Path(idea["_path"]).parts
+        if parts[-1] != "STATUS.md" or {"db", "local"} & set(parts):  # notes, db/ and local/ dumps: never read, never listed
             continue
         if not idea.get("id"):
             warnings.append(f"{repo}: {idea['_path']} skipped (no id)")
@@ -444,14 +448,22 @@ def notion_export(now: float) -> dict:
         for n in range(1, last + 1):
             c = rows.get(n) or [""] * 6
             hyp = c[1] or _hypothesis((root / idea["_path"]).parent / "rounds" / f"r{n}" / "plan.md")
+            words = c[3].lower().split()
+            verdict = " ".join(words[:2]) if words[:2] == ["no", "effect"] else (words[0] if words else "")
+            if verdict not in VERDICTS:
+                if c[3]:
+                    warnings.append(f"{key}/r{n}: verdict '{c[3]}' is not one of {', '.join(VERDICTS)}; left blank")
+                verdict = ""
             tasks.append({"task_id": f"{key}/r{n}", "project": key, "name": f"R{n}: {hyp}" if hyp else f"R{n}",
                           "type": "round", "status": "Done" if c[3] or n < last or past else "Open",
-                          "verdict": c[3], "branch_sha": c[2], "result": c[5]})
+                          "verdict": verdict, "branch_sha": c[2], "result": c[5]})
         texts = []
         for line in _section(body, "Open questions"):
-            q = " ".join(line.split()[1:]) if re.match(r"\s*[-*](\s|$)", line) else ""
-            if q and not re.fullmatch(r"<.*>", q):
-                texts.append(q)
+            if re.match(r"[-*](\s|$)", line):
+                texts.append(" ".join(line.split()[1:]))
+            elif texts and line[:1] in (" ", "\t") and line.strip():  # sub-bullet or wrapped line: part of the bullet
+                texts[-1] = f"{texts[-1]} {line.strip()}".strip()
+        texts = [q for q in texts if q and not re.fullmatch(r"<.*>", q)]
         labels = [m.group(1) if (m := re.match(r"([A-Z]{1,2}\d+)\b", q)) else "" for q in texts]
         seen = set()
         for q, label in zip(texts, labels):

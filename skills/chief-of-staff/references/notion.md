@@ -42,7 +42,7 @@ imp mirrors its ideas to Notion, one way: imp to Notion. imp is the source of tr
 
 1. Read `notion.json`; if it's missing, say `/imp:notion setup` comes first.
 2. Run the export. With an `id`, keep only the project whose `imp_id` ends in `/<id>` and its tasks.
-3. Look up what exists by key, one query per key, with `notion-query-data-sources` in **rows mode** and a text filter: `imp_id string_is "<repo>/<id>"` on Projects, `task_id string_is "<task_id>"` on Tasks. Never use SQL mode (workspace quota on lower plans). Keep each match's page id and properties. Also list every existing row for the repos in scope, to find the missing ones (step 4).
+3. Load what exists, with `notion-query-data-sources` in **rows mode** and a text filter. Never use SQL mode (workspace quota on lower plans). Projects: `imp_id string_starts_with "<repo>/"`. Tasks: `task_id string_starts_with "<repo>/"`. Run it once per repo in scope, with `limit: 100`, and page on until no rows are left. If rows mode has no cursor, split by idea instead (`<repo>/<id>/`) so no query returns more than 100 rows. Keep each row's page id and properties. Then match the export keys against these rows in memory; no per-key lookups. `string_starts_with` is *Assumed*: the probe verified only `string_is`. Check it live in step 8 (the first live sync).
 4. Build the list, one line per row:
    - **create**: no page for the key.
    - **update**: a page exists and a property differs (name the property and both values).

@@ -358,6 +358,23 @@ class TestNotionExport(unittest.TestCase):
             f"agents/a/q/{h('A1: dup')}", f"agents/a/q/{h('A1: dup again')}"]))
         self.assertEqual(t["agents/a/q/D1"]["name"], "D1: label one")
 
+    def test_question_continuation_lines_join_the_bullet(self):
+        self.idea(body="## Open questions\n\n- D1: long\n  wrapped\n  - sub\n- D2: next\n")
+        t = self.tasks()
+        self.assertEqual(sorted(t), ["agents/a/q/D1", "agents/a/q/D2"])
+        self.assertEqual(t["agents/a/q/D1"]["name"], "D1: long wrapped - sub")
+
+    def test_verdict_normalised_or_blank_with_warning(self):
+        self.idea(round="4", stage="experiment", body=(
+            "## Rounds\n\n| Round | Hypothesis | Branch @ sha | Verdict | Learned | Result |\n|---|---|---|---|---|---|\n"
+            "| 1 | h | b | Worked, mostly | x | r |\n| 2 | h | b | No effect (flat) | x | r |\n"
+            "| 3 | h | b | great | x | r |\n"))
+        t = self.tasks()
+        self.assertEqual([t[f"agents/a/r{n}"]["verdict"] for n in (1, 2, 3, 4)], ["", "no effect", "", ""])
+        w = self.export()["warnings"]
+        self.assertEqual(len(w), 2)  # r1 ("worked," keeps its comma) and r3
+        self.assertIn("agents/a/r3", w[1])
+
     def test_opt_in_and_idless(self):
         other = make_project(self.base, "personal")  # no notion key
         impctl.register(other)
@@ -380,8 +397,9 @@ class TestNotionExport(unittest.TestCase):
         write(d / "db" / "schema.md", "---\nwaiting_on: user\nid: SECRET-DB\n---\nSECRET-DB\n")
         write(d / "local" / "rows.md", "---\nwaiting_on: user\nid: SECRET-LOCAL\n---\nSECRET-LOCAL\n")
         write(d / "notes.md", "SECRET-NOTES\n")
+        write(d / "db" / "STATUS.md", "---\nid: SECRET-DBSTATUS\nwaiting_on: user\n---\nSECRET-DBSTATUS\n")
         out = json.dumps(self.export())
-        for s in ["SECRET-DB", "SECRET-LOCAL", "SECRET-NOTES", "schema.md", "rows.md"]:
+        for s in ["SECRET-DB", "SECRET-LOCAL", "SECRET-NOTES", "SECRET-DBSTATUS", "schema.md", "rows.md"]:
             self.assertNotIn(s, out)
 
     def test_cli_json(self):
