@@ -1,6 +1,6 @@
 ---
-description: Mirror imp ideas to Notion (one-way): create the Projects and Tasks databases, or sync them
-argument-hint: "setup | sync [id]"
+description: Sync imp ideas one way into an existing Notion tracker (Areas, User Requests, Tasks)
+argument-hint: "setup <page> | sync [id] | cleanup"
 disable-model-invocation: true
 ---
 

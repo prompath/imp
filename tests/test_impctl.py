@@ -321,8 +321,8 @@ class TestNotionExport(unittest.TestCase):
         self.idea(title="T", group="Pricing / offers", stage="experiment", round="2", gate="G2",
                   blocked_by="b", last_update="2026-11-05", started="2026-10-01")
         (pr,) = self.export()["projects"]
-        self.assertEqual((pr["imp_id"], pr["repo"], pr["name"], pr["domain"], pr["use_case"], pr["blocked_by"]),
-                         ("agents/a", "agents", "T", "Pricing", "offers", "agents/b"))
+        self.assertEqual((pr["imp_id"], pr["repo"], pr["name"], pr["group"], pr["domain"], pr["use_case"], pr["blocked_by"]),
+                         ("agents/a", "agents", "T", "Pricing / offers", "Pricing", "offers", "agents/b"))
         self.assertEqual((pr["start"], pr["end"], pr["path"]), ("2026-10-01", "2026-11-05", "ideas/a/STATUS.md"))
 
     def test_start_falls_back_to_first_decision_and_end_to_monitor_until(self):

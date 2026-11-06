@@ -7,7 +7,7 @@ push_forbidden:            # comma-separated globs relative to the project root,
 meeting: self              # who reviews between stages
 deck: html-slides
 agent_overrides:           # role=agent, role=agent  e.g. presenter=acme-deck-builder
-notion:                    # on = /imp:notion mirrors this project's ideas to Notion; blank = never
+notion:                    # on = /imp:notion syncs this project's ideas into an existing Notion tracker; blank = never
 ---
 
 # Project settings (imp defaults)
@@ -49,7 +49,7 @@ HTML slides: use the frontend-slides plugin if it's installed; otherwise one sel
 
 ## Notion
 
-Off. Set `notion: on` in the frontmatter to let `/imp:notion` mirror this project's ideas to Notion (one-way, imp to Notion). Only STATUS files are exported, never `local/` or data files. Name the Notion workspace or teamspace here if the project has one.
+Off. Set `notion: on` in the frontmatter to let `/imp:notion` sync this project's ideas into an existing Notion tracker with Areas, User Requests and Tasks databases (one-way, imp to Notion; it never creates the databases). Only each idea's own file is exported, never `local/` or data files. Name the workspace, teamspace and tracker page here if the project has one; the database ids and the group-to-Area map live in `~/.config/imp/notion.json`.
 
 ## Reviewer extra checks
 

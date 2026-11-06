@@ -430,7 +430,8 @@ def notion_export(now: float) -> dict:
         domain, _, use_case = (idea.get("group") or "").partition("/")
         projects.append({
             "imp_id": key, "name": idea.get("title") or idea["id"], "repo": repo,
-            "kind": idea.get("kind") or project_config(root)["kind"], "domain": domain.strip(),
+            "kind": idea.get("kind") or project_config(root)["kind"], "group": (idea.get("group") or "").strip(),
+            "domain": domain.strip(),
             "use_case": use_case.strip(), "stage": idea.get("stage") or "", "gate": idea.get("gate") or "",
             "waiting_on": idea.get("waiting_on") or "", "round": idea.get("round") or "",
             "next_step": idea.get("next_step") or "", "branch": idea.get("branch") or "",
