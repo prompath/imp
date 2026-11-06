@@ -325,6 +325,13 @@ class TestNotionExport(unittest.TestCase):
                          ("agents/a", "agents", "T", "Pricing / offers", "Pricing", "offers", "agents/b"))
         self.assertEqual((pr["start"], pr["end"], pr["path"]), ("2026-10-01", "2026-11-05", "ideas/a/STATUS.md"))
 
+    def test_ur_id_and_source(self):
+        self.idea("a", ur=" UR-123 ")
+        self.idea("b")
+        p = {x["imp_id"]: x for x in self.export()["projects"]}
+        self.assertEqual((p["agents/a"]["ur_id"], p["agents/a"]["source"]), ("UR-123", "MKT request"))
+        self.assertEqual((p["agents/b"]["ur_id"], p["agents/b"]["source"]), ("", "Internal"))
+
     def test_start_falls_back_to_first_decision_and_end_to_monitor_until(self):
         self.idea(body="## Decisions\n\n- 2026-09-03: go (user)\n- 2026-09-09: more\n",
                   last_update="2026-11-05", monitor_until="2026-12-01")

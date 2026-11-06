@@ -8,9 +8,9 @@ Calls marked *Assumed (live check)* were not covered by the probe (`ideas/notion
 
 - Find the Notion tools by name suffix (`notion-fetch`, `notion-search`, `notion-update-data-source`, `notion-create-pages`, `notion-update-page`, `notion-create-view`, `notion-query-data-sources`, `notion-delete-pages`), never by a fixed prefix. If the connector isn't connected, say so and stop.
 - Every Notion write follows `references/gates.md` (outward writes): show the list, wait for a yes, then write. A yes covers that list only.
-- Schema changes are additive only: add properties, options and rows. Never rename or drop a property or an option.
+- Schema changes are additive only: add properties, options and rows. Never rename or drop a property or an option. The one user-approved exception: setup renames the User Requests database title to "Work" (title only; property names stay).
 - **Ownership rule.** Write only to rows that have an `imp_id` (URs) or a `task_id` (Tasks), and only these properties:
-  - URs: `Request` (title), `Area`, `Project type`, `Status`, `Stage`, `Gate`, `Waiting on`, `Next step`, `Branch`, `Round`, `Timeline`, `Blocked by`, plus `imp_id` on create.
+  - URs: `Request` (title), `Area`, `Project type`, `Status`, `Stage`, `Gate`, `Waiting on`, `Next step`, `Branch`, `Round`, `Timeline`, `Blocked by`, `Source`, `UR id`, plus `imp_id` on create.
   - Tasks: `Name`, `Status`, `Kind`, `User Request`, `task_id`.
   - Never write `Priority`, `Owner`, `Mandays`, `Requested by`, `Type`, `Assigned` or `Due`. Never touch a row without an `imp_id`/`task_id`, and never touch an Areas row except to create one in setup.
 - Never delete, except in `cleanup`, and there only the exact pages the user confirms.
@@ -23,6 +23,8 @@ Calls marked *Assumed (live check)* were not covered by the probe (`ideas/notion
 - The export is `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/impctl.py" ideas --json`: `{"projects", "tasks", "warnings"}` for every registered project with `notion: on`. It reads only each idea's own file (STATUS.md or flat note) and each round's plan Hypothesis line. Show its `warnings`. If it exits non-zero (two projects with one name), show the message and stop. "project" in the export is an imp idea, a UR in Notion.
 
 ## Maps
+
+**Source / UR id:** export `source` (`MKT request` or `Internal`, from the STATUS `ur:` key) and `ur_id`. "UR" in this doc means a row of the requests database (now titled Work).
 
 **UR Status** (first match wins):
 
@@ -42,7 +44,7 @@ Calls marked *Assumed (live check)* were not covered by the probe (`ideas/notion
 ## setup <page>
 
 1. The user names the Team Tracker page. Find it with `notion-search` if it's a name, confirm it, then `notion-fetch` it. If `notion.json` exists, show it and ask before changing anything.
-2. Locate the three data sources on the page by title: **Areas**, **User Requests**, **Tasks**. `notion-fetch` each `collection://` url and read its schema. Stop and say which is missing if one isn't found, or if a required property is absent: Areas `Area` (title); URs `Request` (title), `Area` relation, `Status` status, `Timeline` date, `Blocked by` relation, `Project type` select; Tasks `Name` (title), `Status` status, `User Request` relation. Note every existing option of `Project type`, with its color.
+2. Locate the three data sources on the page by title: **Areas**, **User Requests** (or **Work**, if already renamed; with `notion.json`, use the stored `requests_ds`), **Tasks**. `notion-fetch` each `collection://` url and read its schema. Stop and say which is missing if one isn't found, or if a required property is absent: Areas `Area` (title); URs `Request` (title), `Area` relation, `Status` status, `Timeline` date, `Blocked by` relation, `Project type` select; Tasks `Name` (title), `Status` status, `User Request` relation. Note every existing option of `Project type`, with its color.
 3. Run the export and list its distinct `group` values. Propose an Area for each: an existing Area whose name matches it, else a **new Area** named after it. Already-mapped groups in `notion.json` keep their Area. The user corrects the map.
 4. Show the plan and wait for a yes. It lists:
    - New UR properties, skipping any that already exist (`notion-update-data-source` on User Requests; `ADD COLUMN` is probe-verified):
@@ -53,12 +55,16 @@ Calls marked *Assumed (live check)* were not covered by the probe (`ideas/notion
      ADD COLUMN "Waiting on" SELECT('user':red, 'marketing':yellow, 'agents':gray),
      ADD COLUMN "Next step" RICH_TEXT, ADD COLUMN "Branch" RICH_TEXT, ADD COLUMN "Round" NUMBER
      ```
+     Also `ADD COLUMN "Source" SELECT('MKT request':blue, 'Internal':gray), ADD COLUMN "UR id" RICH_TEXT`.
      Several `ADD COLUMN` clauses in one statement are *Assumed (live check)*; else send one call per column.
+   - Rename the database title to **Work**: `notion-update-data-source` with `title` (*Assumed (live check)*). This is the one user-approved exception to "never rename". It changes the title only; properties keep their names (the Tasks relation stays `User Request`). Skip it if the title is already Work.
    - New Tasks properties: `ADD COLUMN "task_id" RICH_TEXT, ADD COLUMN "Kind" SELECT('round':blue, 'question':yellow, 'manual':gray)`.
-   - Two new views on User Requests (`notion-create-view`):
-     - **Timeline**: `TIMELINE BY "Timeline"`, grouped by `Area`. The probe verified `TIMELINE BY "Start" TO "End"` only: one date-range property and grouping a timeline are *Assumed (live check)*.
+   - Four new views on the requests database (`notion-create-view`):
+     - **Timeline**: `TIMELINE BY "Timeline"`, grouped by `Area`, and also grouped or coloured by `Source` if the DSL allows it; otherwise keep the Area grouping and tell the user. The probe verified `TIMELINE BY "Start" TO "End"` only: one date-range property, grouping a timeline and colouring by Source are *Assumed (live check)*.
      - **imp pipeline**: board `GROUP BY "Stage"`, filtered to `"imp_id" IS NOT EMPTY`. The filter is *Assumed (live check)*: if the call rejects it, create the board unfiltered and tell the user that the Stage-blank column holds the hand-made URs.
-   - One line added to the page's callout, with `notion-update-page` on the page (*Assumed (live check)*: editing inside a callout): "Rows with an imp_id are synced from imp (everything-ais); edit them in imp, except Priority/Owner/Mandays/Requested by/Type."
+     - **MKT requests**: `FILTER "Source" = "MKT request"; SORT BY "UR id" ASC`.
+     - **Internal work**: `FILTER "Source" = "Internal"`. Both filters are *Assumed (live check)*.
+   - One line added to the page's callout, with `notion-update-page` on the page (*Assumed (live check)*: editing inside a callout): "Rows with an imp_id are synced from imp (everything-ais); edit them in imp, except Priority/Owner/Mandays/Requested by/Type. Source tells MKT requests (with a UR id) from internal work."
    Existing views, rows and properties are not changed.
 5. On a yes, run the steps in that order: properties, views, callout.
 6. Then ask a **separate yes** for the Area rows and the `Project type` options, shown with the snapshot below. The ALTER can blank values on the live select, so it comes last and is guarded:
@@ -74,7 +80,7 @@ Calls marked *Assumed (live check)* were not covered by the probe (`ideas/notion
 2. Run the export. With an `id`, keep only the project whose `imp_id` ends in `/<id>` and its tasks. If any project's `group` is not in `areas`, stop (see Maps).
 3. Load what exists, with `notion-query-data-sources` in **rows mode** and a text filter. Never use SQL mode (workspace quota on lower plans). URs: `imp_id string_starts_with "<repo>/"`. Tasks: `task_id string_starts_with "<repo>/"`. Run it once per repo in scope, with `limit: 100`, and page on until no rows are left. If rows mode has no cursor, split by idea instead (`<repo>/<id>/`) so no query returns more than 100 rows. Keep each row's page id and owned properties. Then match the export keys against these rows in memory; no per-key lookups. `string_starts_with` is *Assumed (live check)*: the probe verified only `string_is`. Rows without an `imp_id`/`task_id` never come back from these queries, so they are never compared or written.
 4. Build the target values from the export and the Maps:
-   - UR: `Request` = name; `Area` = `[areas[group]]`; `Project type` = `area_names[group]`; `Status` and `Stage` from the UR Status map; `Gate`, `Waiting on`, `Next step`, `Branch`, `Round`; `Timeline` = start → end; `Blocked by` = the UR whose `imp_id` is `blocked_by`.
+   - UR: `Request` = name; `Area` = `[areas[group]]`; `Project type` = `area_names[group]`; `Status` and `Stage` from the UR Status map; `Source` = export `source`; `UR id` = export `ur_id` (blank left out); `Gate`, `Waiting on`, `Next step`, `Branch`, `Round`; `Timeline` = start → end; `Blocked by` = the UR whose `imp_id` is `blocked_by`.
    - Task: `Name`; `Status` and `Kind` from the Task Status map; `User Request` = `[<UR page id of its project>]`; `task_id`.
    - A `Gate` or `Waiting on` value that isn't a setup option is left blank and listed under the counts.
 5. Build the list, one line per row, comparing owned properties only:

@@ -428,8 +428,9 @@ def notion_export(now: float) -> dict:
         decided = re.search(r"^- (\d{4}-\d{2}-\d{2})", "\n".join(_section(body, "Decisions")), re.M)
         blocked = idea.get("blocked_by") or ""
         domain, _, use_case = (idea.get("group") or "").partition("/")
+        ur = (idea.get("ur") or "").strip()
         projects.append({
-            "imp_id": key, "name": idea.get("title") or idea["id"], "repo": repo,
+            "imp_id": key, "ur_id": ur, "source": "MKT request" if ur else "Internal", "name": idea.get("title") or idea["id"], "repo": repo,
             "kind": idea.get("kind") or project_config(root)["kind"], "group": (idea.get("group") or "").strip(),
             "domain": domain.strip(),
             "use_case": use_case.strip(), "stage": idea.get("stage") or "", "gate": idea.get("gate") or "",
