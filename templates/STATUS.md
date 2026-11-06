@@ -13,6 +13,7 @@ branch:
 blocked_by:                # id of an idea that has to finish first
 monitor_until:             # monitor stage: earliest date it can be called done
 next_check:                # monitor stage: date the next check is due
+started:                   # YYYY-MM-DD the idea began; set on /idea
 last_update: YYYY-MM-DD
 ---
 

@@ -376,6 +376,93 @@ def dashboard_rows(now: float, sessions=None) -> list:
     return rows
 
 
+def _section(body: str, title: str) -> list:
+    """Lines under `## <title>` up to the next `## `."""
+    out, on = [], False
+    for line in body.splitlines():
+        if line.startswith("## "):
+            on = line[3:].strip().lower() == title.lower()
+        elif on:
+            out.append(line)
+    return out
+
+
+def _hypothesis(plan: Path) -> str:
+    try:
+        for line in plan.read_text(encoding="utf-8", errors="replace").splitlines():
+            m = re.match(r"\*\*Hypothesis[^*]*\*\*:?\s*(.*)", line)
+            if m:
+                return m.group(1).strip()
+    except OSError:
+        pass
+    return ""
+
+
+def notion_export(now: float) -> dict:
+    """Projects and tasks of the repos with `notion: on`. Reads only STATUS.md and each round's plan.md Hypothesis line."""
+    roots = [r for r in load_registry() if (r / PROJECT_FILE).is_file()]
+    names = [project_config(r)["name"] for r in roots]
+    on = {project_config(r)["name"]: r for r in roots if project_config(r).get("notion") == "on"}
+    for name in on:
+        if names.count(name) > 1:
+            paths = ", ".join(str(r) for r in roots if project_config(r)["name"] == name)
+            raise ValueError(f"two registered projects are named '{name}' ({paths}); rename one in .imp/project.md")
+    projects, tasks, warnings = [], [], []
+    for _, _, idea, _ in dashboard_rows(now, sessions=[]):  # [] so the activity files are not cleaned up
+        repo = idea["project"]
+        if repo not in on:
+            continue
+        if Path(idea["_path"]).name != "STATUS.md":  # notes, db/ dumps: never read, never listed
+            continue
+        if not idea.get("id"):
+            warnings.append(f"{repo}: {idea['_path']} skipped (no id)")
+            continue
+        root = on[repo]
+        text = (root / idea["_path"]).read_text(encoding="utf-8", errors="replace")
+        body = text.split("\n---", 1)[1] if text.startswith("---") and "\n---" in text else text
+        key = f"{repo}/{idea['id']}"
+        decided = re.search(r"^- (\d{4}-\d{2}-\d{2})", "\n".join(_section(body, "Decisions")), re.M)
+        blocked = idea.get("blocked_by") or ""
+        domain, _, use_case = (idea.get("group") or "").partition("/")
+        projects.append({
+            "imp_id": key, "name": idea.get("title") or idea["id"], "repo": repo,
+            "kind": idea.get("kind") or project_config(root)["kind"], "domain": domain.strip(),
+            "use_case": use_case.strip(), "stage": idea.get("stage") or "", "gate": idea.get("gate") or "",
+            "waiting_on": idea.get("waiting_on") or "", "round": idea.get("round") or "",
+            "next_step": idea.get("next_step") or "", "branch": idea.get("branch") or "",
+            "blocked_by": (blocked if "/" in blocked else f"{repo}/{blocked}") if blocked else "",
+            "start": idea.get("started") or (decided.group(1) if decided else ""),
+            "end": idea.get("monitor_until") or idea.get("last_update") or "", "path": idea["_path"]})
+        rows = {}
+        for line in _section(body, "Rounds"):
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            num = cells[0].lstrip("rR")
+            if line.lstrip().startswith("|") and len(cells) >= 6 and num.isdigit() and not any("<" in c for c in cells):
+                rows[int(num)] = cells
+        last = int(idea["round"]) if (idea.get("round") or "").isdigit() else 0
+        past = idea.get("stage") in ("ship", "monitor", "document", "done")
+        for n in range(1, last + 1):
+            c = rows.get(n) or [""] * 6
+            hyp = c[1] or _hypothesis((root / idea["_path"]).parent / "rounds" / f"r{n}" / "plan.md")
+            tasks.append({"task_id": f"{key}/r{n}", "project": key, "name": f"R{n}: {hyp}" if hyp else f"R{n}",
+                          "type": "round", "status": "Done" if c[3] or n < last or past else "Open",
+                          "verdict": c[3], "branch_sha": c[2], "result": c[5]})
+        texts = []
+        for line in _section(body, "Open questions"):
+            q = " ".join(line.split()[1:]) if re.match(r"\s*[-*](\s|$)", line) else ""
+            if q and not re.fullmatch(r"<.*>", q):
+                texts.append(q)
+        labels = [m.group(1) if (m := re.match(r"([A-Z]{1,2}\d+)\b", q)) else "" for q in texts]
+        seen = set()
+        for q, label in zip(texts, labels):
+            k = label if label and labels.count(label) == 1 else hashlib.sha1(q.encode()).hexdigest()[:8]
+            if k not in seen:  # an identical bullet twice is one task
+                seen.add(k)
+                tasks.append({"task_id": f"{key}/q/{k}", "project": key, "name": q, "type": "question",
+                              "status": "Open", "verdict": "", "branch_sha": "", "result": ""})
+    return {"projects": projects, "tasks": tasks, "warnings": warnings}
+
+
 TRACK = ["G1", "G-data", "G2", "G3"]
 NEXT_GATE = {"pitch": "G1", "experiment": "G2", "ship": "G3", "monitor": "G-data", "document": "G3"}
 SPAN = 3600  # timeline window, seconds
@@ -1027,6 +1114,7 @@ def main(argv=None) -> int:
     p_ideas.add_argument("--group")
     p_ideas.add_argument("--projects", action="store_true", help="every registered project")
     p_ideas.add_argument("--scan")
+    p_ideas.add_argument("--json", action="store_true", help="export for /imp:notion: projects, tasks, warnings")
     p_ideas.add_argument("--project")
     p_res = sub.add_parser("resolve")
     p_res.add_argument("query")
@@ -1077,6 +1165,14 @@ def main(argv=None) -> int:
         except AmbiguousIdea as e:
             print(f"imp: {e}", file=sys.stderr)
             return 2
+
+    if args.json:
+        try:
+            print(json.dumps(notion_export(time.time()), indent=2))
+        except ValueError as e:
+            print(f"imp: {e}", file=sys.stderr)
+            return 1
+        return 0
 
     if args.scan:
         _scan(Path(args.scan).expanduser())

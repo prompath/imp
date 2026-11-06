@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import subprocess
@@ -288,6 +289,107 @@ class TestBlockedBy(unittest.TestCase):
         out = impctl.format_rows([{"id": "a", "waiting_on": "user", "blocked_by": "bill-fix"}])
         self.assertIn("blocked by: bill-fix", out)
         self.assertNotIn("waiting: user", out)
+
+
+class TestNotionExport(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.base = Path(self.tmp.name)
+        self._old = os.environ.get("IMP_REGISTRY")
+        os.environ["IMP_REGISTRY"] = str(self.base / "projects.txt")
+        self.p = make_project(self.base, "agents", "notion: on\n")
+        impctl.register(self.p)
+
+    def tearDown(self):
+        if self._old is None:
+            os.environ.pop("IMP_REGISTRY", None)
+        else:
+            os.environ["IMP_REGISTRY"] = self._old
+        self.tmp.cleanup()
+
+    def idea(self, id_="a", body="", **kw):
+        write(self.p / "ideas" / id_ / "STATUS.md", status(id_, **kw).replace("body\n", body))
+        return self.p / "ideas" / id_
+
+    def export(self):
+        return impctl.notion_export(0)
+
+    def tasks(self):
+        return {t["task_id"]: t for t in self.export()["tasks"]}
+
+    def test_project_fields(self):
+        self.idea(title="T", group="Pricing / offers", stage="experiment", round="2", gate="G2",
+                  blocked_by="b", last_update="2026-11-05", started="2026-10-01")
+        (pr,) = self.export()["projects"]
+        self.assertEqual((pr["imp_id"], pr["repo"], pr["name"], pr["domain"], pr["use_case"], pr["blocked_by"]),
+                         ("agents/a", "agents", "T", "Pricing", "offers", "agents/b"))
+        self.assertEqual((pr["start"], pr["end"], pr["path"]), ("2026-10-01", "2026-11-05", "ideas/a/STATUS.md"))
+
+    def test_start_falls_back_to_first_decision_and_end_to_monitor_until(self):
+        self.idea(body="## Decisions\n\n- 2026-09-03: go (user)\n- 2026-09-09: more\n",
+                  last_update="2026-11-05", monitor_until="2026-12-01")
+        (pr,) = self.export()["projects"]
+        self.assertEqual((pr["start"], pr["end"]), ("2026-09-03", "2026-12-01"))
+
+    def test_round_tasks(self):
+        d = self.idea(round="3", stage="experiment", body=(
+            "## Rounds\n\n| Round | Hypothesis | Branch @ sha | Verdict | Learned | Result |\n|---|---|---|---|---|---|\n"
+            "| 1 | from row | exp/a-r1 @ abc | worked | x | rounds/r1/result.md |\n"
+            "| <n> | <h> | | | | |\n"))
+        write(d / "rounds" / "r2" / "plan.md", "# P\n\n**Hypothesis (round 2):** from plan\n")
+        t = self.tasks()
+        self.assertEqual(sorted(t), ["agents/a/r1", "agents/a/r2", "agents/a/r3"])
+        self.assertEqual((t["agents/a/r1"]["name"], t["agents/a/r1"]["status"], t["agents/a/r1"]["verdict"]),
+                         ("R1: from row", "Done", "worked"))
+        self.assertEqual((t["agents/a/r2"]["name"], t["agents/a/r2"]["status"]), ("R2: from plan", "Done"))
+        self.assertEqual((t["agents/a/r3"]["name"], t["agents/a/r3"]["status"]), ("R3", "Open"))
+
+    def test_round_done_when_stage_past_experiment(self):
+        self.idea(round="1", stage="monitor")
+        self.assertEqual(self.tasks()["agents/a/r1"]["status"], "Done")
+
+    def test_question_keys(self):
+        self.idea(body="## Open questions\n\n- D1: label  one\n-   r2: not a   label\n-\n- <question>\n"
+                       "- A1: dup\n- A1: dup again\n\n## Artifacts\n\n- x\n")
+        t = self.tasks()
+        h = lambda s: hashlib.sha1(s.encode()).hexdigest()[:8]
+        self.assertEqual(sorted(t), sorted([
+            "agents/a/q/D1", f"agents/a/q/{h('r2: not a label')}",
+            f"agents/a/q/{h('A1: dup')}", f"agents/a/q/{h('A1: dup again')}"]))
+        self.assertEqual(t["agents/a/q/D1"]["name"], "D1: label one")
+
+    def test_opt_in_and_idless(self):
+        other = make_project(self.base, "personal")  # no notion key
+        impctl.register(other)
+        write(other / "ideas" / "x" / "STATUS.md", status("x"))
+        write(self.p / "ideas" / "n" / "STATUS.md", "---\nwaiting_on: user\n---\n")
+        out = self.export()
+        self.assertEqual(out["projects"], [])
+        self.assertEqual(len(out["warnings"]), 1)
+
+    def test_name_clash_stops(self):
+        twin = make_project(self.base / "sub", "agents")
+        impctl.register(twin)
+        with self.assertRaises(ValueError) as cm:
+            self.export()
+        self.assertIn(str(twin), str(cm.exception))
+        self.assertIn(str(self.p), str(cm.exception))
+
+    def test_reads_only_status_and_plan(self):
+        d = self.idea(round="1", body="## Open questions\n\n- D1: q\n")
+        write(d / "db" / "schema.md", "---\nwaiting_on: user\nid: SECRET-DB\n---\nSECRET-DB\n")
+        write(d / "local" / "rows.md", "---\nwaiting_on: user\nid: SECRET-LOCAL\n---\nSECRET-LOCAL\n")
+        write(d / "notes.md", "SECRET-NOTES\n")
+        out = json.dumps(self.export())
+        for s in ["SECRET-DB", "SECRET-LOCAL", "SECRET-NOTES", "schema.md", "rows.md"]:
+            self.assertNotIn(s, out)
+
+    def test_cli_json(self):
+        self.idea()
+        r = subprocess.run([sys.executable, "-I", str(SCRIPT), "ideas", "--json"], capture_output=True, text=True,
+                           env=dict(os.environ, IMP_REGISTRY=str(self.base / "projects.txt")), cwd=self.base)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout)["projects"][0]["imp_id"], "agents/a")
 
 
 if __name__ == "__main__":

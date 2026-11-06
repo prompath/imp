@@ -141,6 +141,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 0.86rem; border-top: 
 <tr><td><code>/investigate &lt;case&gt;</code></td><td>Checks whether a result is a misunderstanding, a code bug or a rulebook gap. A plain question about the data goes to the analysis workflow instead.</td></tr>
 <tr><td><code>/save [id]</code></td><td>Saves progress on the idea this session is working on: updates STATUS with the open decisions, commits only that idea's files, and prints the <code>/imp:continue &lt;id&gt;</code> line. With no id, it works out the idea from this session's activity, or from idea files with uncommitted changes.</td></tr>
 <tr><td><code>/imp:push [note]</code></td><td>Commits the repo's changes, summarizes everything unpushed, and pushes once you say yes. Under <code>push_forbidden</code> it commits and hands you the push command.</td></tr>
+<tr><td><code>/imp:notion setup | sync [id]</code></td><td>Mirrors imp ideas to Notion, one way (imp to Notion). <code>setup</code> creates a Projects database (one row per idea) and a Tasks database (round tasks and open questions) under a page you name. <code>sync</code> shows a create/update/unchanged/closed list and writes only after your yes; it never deletes. Only projects with <code>notion: on</code> are exported, and only their STATUS files.</td></tr>
 <tr><td><code>/imp-init</code></td><td>Connects the current project.</td></tr>
 <tr><td><code>/imp:retro [session]</code></td><td>Runs a retrospective on a coding session (this one by default) and suggests changes to the agent's environment, most severe first: navigation, automated checks, coding standards, steering files, tool economy and information access. Adapted from <a href="https://github.com/mattpocock/skills">mattpocock/skills</a>.</td></tr>
 <tr><td><code>/imp:dashboard [--port N]</code></td><td>Starts a local page at <code>http://127.0.0.1:8765/</code> (if it isn't already running) that lists every registered project's ideas in four groups: <em>Waiting on you</em> (a permission prompt, a session waiting for your reply, or <code>waiting_on: user</code>, with the gate), <em>In progress</em> (a live session, with its running agents), <em>Idle</em> (nothing live, backlog/shelved, or 7+ days without an update) and <em>Done</em> (behind a "show finished" box), plus stat tiles, a gate track, a sequence diagram per idea and a 60-minute state timeline, under an animated banner. It refreshes every 5 seconds without reloading the page. The same server also serves <code>/rooms</code>, a pixel campus of who works where, with a Zoom button and an Ideas chooser (see below).</td></tr>
@@ -351,6 +352,7 @@ waiting_on: user      # user | marketing | agents
 gate:                 # G1 | G-data | G2 | G3 | meeting while stopped at it
 next_step: Run branch exp/cart-reminder-r2 and share results
 branch: exp/cart-reminder-r2
+started: 2026-10-01   # the Notion timeline starts here
 last_update: 2026-10-21
 ---
 ## Decisions · ## Feedback log · ## Assumptions · ## Open questions · ## Artifacts</code></pre>
@@ -376,7 +378,7 @@ last_update: 2026-10-21
 
 <!-- 8 -->
 <h2 id="extend">Project settings: <code>.imp/project.md</code></h2>
-<p>Frontmatter keys are read by the scripts. The prose sections underneath (Ideas layout, Knowledge, Code, Data execution, Deck, Meeting, Reviewer extra checks) are read by the chief-of-staff and passed to agents in their briefs.</p>
+<p>Frontmatter keys are read by the scripts. The prose sections underneath (Ideas layout, Knowledge, Code, Data execution, Deck, Meeting, Notion, Reviewer extra checks) are read by the chief-of-staff and passed to agents in their briefs.</p>
 <div class="table"><table>
 <tr><th>Slot</th><th>Default (personal)</th><th>acme-analytics</th></tr>
 <tr><td><code>kind</code></td><td>personal</td><td>company</td></tr>
@@ -386,6 +388,7 @@ last_update: 2026-10-21
 <tr><td><code>meeting</code></td><td>self</td><td>weekly review meeting</td></tr>
 <tr><td><code>deck</code></td><td>html-slides</td><td>pdf-slides (Acme brand theme)</td></tr>
 <tr><td><code>agent_overrides</code></td><td>(none)</td><td>e.g. <code>presenter=acme-deck-builder</code></td></tr>
+<tr><td><code>notion</code></td><td>blank (off)</td><td><code>on</code>: <code>/imp:notion</code> mirrors this project's ideas to Notion</td></tr>
 </table></div>
 <h3>Replacing a whole agent for one project</h3>
 <pre><code># acme-analytics/.claude/agents/acme-deck-builder.md   ← your agent

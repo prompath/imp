@@ -10,5 +10,7 @@ Fixed in the base. A project's slots can add checks but can never remove a gate.
 | **G3 Tested** | Before docs and the deployed slide of a ship | Nothing new | The user says it tested fine |
 | **Meeting** | Between lifecycle stages, per the `meeting` slot | The deck to present | The user returns with `/notes` |
 
+**Outward writes:** G-data extends to any write to an external workspace (Notion and the like). Show what will be created, updated or closed and wait for a yes before every write. Never delete there. A yes covers that list only.
+
 A go-ahead covers only the plan that was shown. A changed plan is a new G1.
 Read-only recon (reading code, notes and the web) is allowed before G1.

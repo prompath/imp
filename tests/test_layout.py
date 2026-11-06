@@ -33,10 +33,10 @@ class TestTemplates(unittest.TestCase):
                   "templates/brief.md", "templates/deck-outlines.md", "templates/result.md"]:
             self.assertTrue((ROOT / f).is_file(), f)
         proj = parse_frontmatter(read("defaults/project.md"))
-        for k in ["kind", "ideas_root", "integration_branch", "push_forbidden", "meeting", "deck", "agent_overrides"]:
+        for k in ["kind", "ideas_root", "integration_branch", "push_forbidden", "meeting", "deck", "agent_overrides", "notion"]:
             self.assertIn(k, proj)
         st = parse_frontmatter(read("templates/STATUS.md"))
-        for k in ["id", "group", "stage", "round", "waiting_on", "gate", "last_update"]:
+        for k in ["id", "group", "stage", "round", "waiting_on", "gate", "started", "last_update"]:
             self.assertIn(k, st)
         self.assertEqual(read("templates/deck-outlines.md").count("Assumptions to confirm"), 2)
 
@@ -76,8 +76,8 @@ class TestAgents(unittest.TestCase):
         self.assertNotIn("WebSearch", tools_of(parse_frontmatter(read("agents/claim-checker.md"))))
 
 
-COMMANDS = ["idea", "continue", "notes", "ideas", "investigate", "save"]
-REFS = ["routing", "gates", "evidence", "lifecycle", "segment-treatment", "investigate", "analysis", "explore", "state"]
+COMMANDS = ["idea", "continue", "notes", "ideas", "investigate", "save", "notion"]
+REFS = ["routing", "gates", "evidence", "lifecycle", "segment-treatment", "investigate", "analysis", "explore", "state", "notion"]
 WORKFLOWS = ["lifecycle", "segment-treatment", "investigate", "analysis", "explore"]
 
 
@@ -138,7 +138,7 @@ class TestDocsSite(unittest.TestCase):
     def test_site(self):
         import re
         html = read("docs/site/index.html")
-        for s in ["/idea", "/continue", "/notes", "/ideas", "/investigate", "/imp-init", "/imp:dashboard",
+        for s in ["/idea", "/continue", "/notes", "/ideas", "/investigate", "/imp:notion", "/imp-init", "/imp:dashboard",
                   "G1", "G2", "Verified", "push_forbidden", "agent_overrides", ".imp/workflows"]:
             self.assertIn(s, html, s)
         for src in re.findall(r'<script[^>]*src="([^"]+)"', html):
