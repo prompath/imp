@@ -44,7 +44,7 @@ Calls marked *Assumed (live check)* were not covered by the probe (`ideas/notion
 1. The user names the Team Tracker page. Find it with `notion-search` if it's a name, confirm it, then `notion-fetch` it. If `notion.json` exists, show it and ask before changing anything.
 2. Locate the three data sources on the page by title: **Areas**, **User Requests**, **Tasks**. `notion-fetch` each `collection://` url and read its schema. Stop and say which is missing if one isn't found, or if a required property is absent: Areas `Area` (title); URs `Request` (title), `Area` relation, `Status` status, `Timeline` date, `Blocked by` relation, `Project type` select; Tasks `Name` (title), `Status` status, `User Request` relation. Note every existing option of `Project type`, with its color.
 3. Run the export and list its distinct `group` values. Propose an Area for each: an existing Area whose name matches it, else a **new Area** named after it. Already-mapped groups in `notion.json` keep their Area. The user corrects the map.
-4. Show the whole plan and wait for a yes. It lists:
+4. Show the plan and wait for a yes. It lists:
    - New UR properties, skipping any that already exist (`notion-update-data-source` on User Requests; `ADD COLUMN` is probe-verified):
      ```
      ADD COLUMN "imp_id" RICH_TEXT,
@@ -55,15 +55,18 @@ Calls marked *Assumed (live check)* were not covered by the probe (`ideas/notion
      ```
      Several `ADD COLUMN` clauses in one statement are *Assumed (live check)*; else send one call per column.
    - New Tasks properties: `ADD COLUMN "task_id" RICH_TEXT, ADD COLUMN "Kind" SELECT('round':blue, 'question':yellow, 'manual':gray)`.
-   - New Area rows, one per unmapped group: `notion-create-pages` with `parent: {"data_source_id": "<areas ds>"}`, `allow_async: false`, properties `{"Area": "<name>"}`.
-   - The matching `Project type` options: `ALTER COLUMN "Project type" SET SELECT('<every existing option>':<its color>, …, '<new Area>':<color>)`. List **every** existing option: options left out are removed. *Assumed (live check)*: the ALTER syntax; fetch the schema afterwards and check no option was lost.
    - Two new views on User Requests (`notion-create-view`):
      - **Timeline**: `TIMELINE BY "Timeline"`, grouped by `Area`. The probe verified `TIMELINE BY "Start" TO "End"` only: one date-range property and grouping a timeline are *Assumed (live check)*.
      - **imp pipeline**: board `GROUP BY "Stage"`, filtered to `"imp_id" IS NOT EMPTY`. The filter is *Assumed (live check)*: if the call rejects it, create the board unfiltered and tell the user that the Stage-blank column holds the hand-made URs.
    - One line added to the page's callout, with `notion-update-page` on the page (*Assumed (live check)*: editing inside a callout): "Rows with an imp_id are synced from imp (everything-ais); edit them in imp, except Priority/Owner/Mandays/Requested by/Type."
    Existing views, rows and properties are not changed.
-5. On a yes, run the steps in that order: properties, Area rows (keep the returned page ids), Project type options, views, callout.
-6. Write `notion.json`: page id, the three data source urls, `areas` (group → Area page id, existing and new) and `area_names` (group → Area name). Say what was added, with links.
+5. On a yes, run the steps in that order: properties, views, callout.
+6. Then ask a **separate yes** for the Area rows and the `Project type` options, shown with the snapshot below. The ALTER can blank values on the live select, so it comes last and is guarded:
+   - New Area rows, one per unmapped group: `notion-create-pages` with `parent: {"data_source_id": "<areas ds>"}`, `allow_async: false`, properties `{"Area": "<name>"}`. Keep the returned page ids.
+   - `ALTER COLUMN "Project type" SET SELECT('<every existing option>':<its color>, …, '<new Area>':<color>)`. List **every** existing option: options left out are removed. *Assumed (live check)*: the ALTER syntax.
+   - Before the ALTER, snapshot every User Request's `Project type` (rows mode, url → value) and show it. After the ALTER, re-read the values and compare, and fetch the schema to check no option was lost. If any value or option changed, stop, report the rows to the user and continue nothing.
+   - Skip this step if no group needs a new Area.
+7. Write `notion.json`: page id, the three data source urls, `areas` (group → Area page id, existing and new) and `area_names` (group → Area name). Say what was added, with links.
 
 ## sync [id]
 
@@ -82,9 +85,11 @@ Calls marked *Assumed (live check)* were not covered by the probe (`ideas/notion
    Show counts first, then the list.
 6. Wait for a yes. No yes, no write.
 7. On a yes, write **URs first, then Tasks**:
-   - Create: `notion-create-pages` with `parent: {"data_source_id": "<ds>"}` and `allow_async: false`, so the page ids come back at once. Update: `notion-update-page` with the changed owned properties only.
+   - Create: `notion-create-pages` with `parent: {"data_source_id": "<ds>"}` and `allow_async: false`, so the page ids come back at once. Update: `notion-update-page` with the changed owned properties only. *Assumed (live check)*: the probe never updated properties. Run the first update on one row, fetch it back and check it, then do the rest.
+   - Batch creates: at most 50 pages per `notion-create-pages` call (the hard limit is 100), or one call per idea.
+   - Tasks of new URs use the page ids returned by the UR create call.
    - Status (a **status** property) by option name, e.g. `"Status": "In progress"`. *Assumed (live check)*: the probe wrote selects only.
-   - Timeline: `"date:Timeline:start": "2026-11-01"`, `"date:Timeline:end": "2026-11-20"`, `"date:Timeline:is_datetime": 0`. `start` and `is_datetime` are probe-verified; `end` on a range is *Assumed (live check)*. Leave the end out if the export `end` is blank, and the whole Timeline if `start` is blank.
+   - Timeline: `"date:Timeline:start": "2026-11-01"`, `"date:Timeline:end": "2026-11-20"`, `"date:Timeline:is_datetime": 0`. `start` and `is_datetime` are probe-verified; `end` on a range is *Assumed (live check)*. Leave the end out if the export `end` is blank, and the whole Timeline if `start` is blank. A blank export end therefore leaves the old Timeline end in Notion.
    - Relations are arrays of page ids: `Area`, the Task `User Request`, and `Blocked by` (set it in a second pass, after all URs exist; skip it if that UR isn't in Notion).
    - Round (number) is a number; blank values are left out.
 8. Report counts of created, updated, unchanged and closed, and one link to the User Requests database. A second sync with no STATUS change must show zero creates. The hand-made rows must be untouched: count the URs and Tasks without an `imp_id`/`task_id` before and after the first live sync.
@@ -95,7 +100,7 @@ Optional, list-only helper for an untidy tracker. It changes nothing by itself.
 
 1. Read `notion.json`. Query Tasks (rows mode) and list two groups: Tasks with no `User Request`, and Tasks with an empty `Name`. Show each row's page id, name, Status and Assigned. Rows with a `task_id` are not listed (a sync will fix them).
 2. The user picks rows, one by one or by listed id, and says what to do with each: trash, or leave. Attaching a Task to a UR is the user's edit in Notion; imp doesn't do it.
-3. Repeat the exact ids back and wait for a yes. Then `notion-delete-pages` on those ids only, with `user_confirmed` set only after that yes. It moves them to Trash, which the user can restore.
+3. Repeat the exact ids back and wait for a yes. Then `notion-delete-pages` on those ids only, with `user_confirmed` set only after that yes (*Assumed (live check)*: the probe never deleted). It moves them to Trash, which the user can restore.
 
 ## Offers
 
