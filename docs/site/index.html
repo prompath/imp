@@ -151,12 +151,12 @@ footer { margin-top: 56px; color: var(--muted); font-size: 0.86rem; border-top: 
 
 <h3>With or without Notion</h3>
 <figure>
-<svg viewBox="0 0 760 240" role="img" aria-labelledby="f4t">
+<svg viewBox="0 0 760 260" role="img" aria-labelledby="f4t">
   <title id="f4t">After the STATUS update, a project with Notion on gets an offer to sync; without Notion the flow ends there</title>
   <text class="tg" x="226" y="22" text-anchor="middle">only if notion: on and notion.json exists</text>
   <rect class="box-accent" x="10" y="40" width="124" height="70" rx="10"/>
   <text class="t" x="72" y="68" text-anchor="middle">STATUS update</text>
-  <text class="ts" x="72" y="88" text-anchor="middle">step 7</text>
+  <text class="ts" x="72" y="88" text-anchor="middle">or rename, merge, shelve</text>
   <rect class="box-accent" x="164" y="40" width="124" height="70" rx="10"/>
   <text class="t" x="226" y="68" text-anchor="middle">Offers sync</text>
   <text class="ts" x="226" y="88" text-anchor="middle">/imp:notion</text>
@@ -180,11 +180,14 @@ footer { margin-top: 56px; color: var(--muted); font-size: 0.86rem; border-top: 
   <text class="ts" x="72" y="189" text-anchor="middle">flow ends here</text>
   <path class="arrow" d="M72,112 L72,148"/>
   <text class="t" x="688" y="140" text-anchor="middle">Work item fields</text>
-  <text class="ts" x="688" y="158" text-anchor="middle">Key, Area, Source,</text>
-  <text class="ts" x="688" y="173" text-anchor="middle">UR id, Status, Timeline</text>
-  <text class="ts" x="688" y="188" text-anchor="middle">started: → due:</text>
+  <text class="ts" x="688" y="158" text-anchor="middle">Request, Area,</text>
+  <text class="ts" x="688" y="173" text-anchor="middle">Source, UR id,</text>
+  <text class="ts" x="688" y="188" text-anchor="middle">Status, Next step,</text>
+  <text class="ts" x="688" y="203" text-anchor="middle">Blocked by, Key,</text>
+  <text class="ts" x="688" y="218" text-anchor="middle">Timeline</text>
+  <text class="ts" x="688" y="233" text-anchor="middle">started: → due:</text>
 </svg>
-<figcaption>One way only: imp writes to Notion and never reads back. Only Work items are written; Tasks are hand-made. Nothing it writes mentions imp. Items On hold in Notion are left alone.</figcaption>
+<figcaption>One way only: imp writes to Notion and never copies changes from Notion back into imp. Only Work items are written; Tasks are hand-made. Nothing it writes mentions imp. Items On hold in Notion are left alone.</figcaption>
 </figure>
 
 <!-- 4 -->
@@ -467,7 +470,7 @@ command: postmortem      # optional
 <p>Every workflow runs through the chief-of-staff, so a new one gets the gates, the evidence rules and the no-push hook automatically. If a project workflow turns out to be useful everywhere, move its file into imp's <code>references/</code>; it's the same format.</p>
 
 <footer>
-  imp 1.6.0 · Source: <a href="https://github.com/prompath/imp">prompath/imp</a>
+  imp 1.7.1 · Source: <a href="https://github.com/prompath/imp">prompath/imp</a>
 </footer>
 </div>
 <script>
