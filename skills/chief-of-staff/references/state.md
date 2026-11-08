@@ -11,7 +11,8 @@ From `templates/STATUS.md`:
 - `branch`
 - `blocked_by`: the id of an idea that has to finish first, or blank. `impctl.py ideas` shows it in place of `waiting_on`. Clear it when that idea reaches `done`, and say so.
 - `ur`: the UR id from the internal PM tool, for an MKT request. Blank means internal work (ad-hoc, no UR id). The Notion export sets `Source` and `UR id` from it.
-- `started`: the date the idea began, `YYYY-MM-DD`. Set it when you create the idea. The Notion timeline runs from it to `monitor_until`, else `last_update`; if blank, the export uses the first date under `## Decisions`.
+- `started`: the date the idea began, `YYYY-MM-DD`. Set it when you create the idea. If blank, the export uses the first date under `## Decisions`.
+- `due`: the planned (or actual) end date, `YYYY-MM-DD`. It is the Notion Timeline end. If blank, the end is `monitor_until`, else `last_update`.
 - `last_update`: today's date, `YYYY-MM-DD`
 - `monitor_until`, `next_check`: dates for the `monitor` stage (`references/lifecycle.md`). The dashboard shows a monitored idea as waiting on you once `next_check` is today or earlier, and never marks it stale.
 - `next_step`: one line

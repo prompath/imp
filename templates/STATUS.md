@@ -15,6 +15,7 @@ monitor_until:             # monitor stage: earliest date it can be called done
 next_check:                # monitor stage: date the next check is due
 ur:                        # UR id from the internal PM tool for an MKT request; blank = internal work
 started:                   # YYYY-MM-DD the idea began; set on /idea
+due:                       # YYYY-MM-DD planned end date; the Notion Timeline end
 last_update: YYYY-MM-DD
 ---
 

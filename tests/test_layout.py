@@ -36,7 +36,7 @@ class TestTemplates(unittest.TestCase):
         for k in ["kind", "ideas_root", "integration_branch", "push_forbidden", "meeting", "deck", "agent_overrides", "notion"]:
             self.assertIn(k, proj)
         st = parse_frontmatter(read("templates/STATUS.md"))
-        for k in ["id", "group", "stage", "round", "waiting_on", "gate", "started", "last_update"]:
+        for k in ["id", "group", "stage", "round", "waiting_on", "gate", "started", "due", "last_update"]:
             self.assertIn(k, st)
         self.assertEqual(read("templates/deck-outlines.md").count("Assumptions to confirm"), 2)
 

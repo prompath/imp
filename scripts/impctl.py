@@ -438,7 +438,7 @@ def notion_export(now: float) -> dict:
             "next_step": idea.get("next_step") or "", "branch": idea.get("branch") or "",
             "blocked_by": (blocked if "/" in blocked else f"{repo}/{blocked}") if blocked else "",
             "start": idea.get("started") or (decided.group(1) if decided else ""),
-            "end": idea.get("monitor_until") or idea.get("last_update") or "", "path": idea["_path"]})
+            "end": idea.get("due") or idea.get("monitor_until") or idea.get("last_update") or "", "path": idea["_path"]})
         rows = {}
         for line in _section(body, "Rounds"):
             cells = [c.strip() for c in line.strip().strip("|").split("|")]

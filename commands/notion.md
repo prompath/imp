@@ -1,5 +1,5 @@
 ---
-description: Sync imp ideas one way into an existing Notion tracker (Areas, User Requests, Tasks)
+description: Sync ideas one way into the Team Tracker Work and Tasks databases in Notion
 argument-hint: "setup <page> | sync [id] | cleanup"
 disable-model-invocation: true
 ---

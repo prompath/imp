@@ -338,6 +338,11 @@ class TestNotionExport(unittest.TestCase):
         (pr,) = self.export()["projects"]
         self.assertEqual((pr["start"], pr["end"]), ("2026-09-03", "2026-12-01"))
 
+    def test_due_is_end_when_set(self):
+        self.idea(last_update="2026-11-05", monitor_until="2026-12-01", due="2026-11-20")
+        (pr,) = self.export()["projects"]
+        self.assertEqual(pr["end"], "2026-11-20")
+
     def test_flat_note_exported_db_local_and_non_ideas_skipped(self):
         fm = lambda i: f"---\nid: {i}\nwaiting_on: user\n---\n"
         write(self.p / "ideas" / "research" / "x.md", fm("x") + "## Open questions\n\n- Q1 why\n")
