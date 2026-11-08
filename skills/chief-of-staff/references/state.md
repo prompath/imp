@@ -10,6 +10,9 @@ From `templates/STATUS.md`:
 - `round`: the experiment round
 - `branch`
 - `blocked_by`: the id of an idea that has to finish first, or blank. `impctl.py ideas` shows it in place of `waiting_on`. Clear it when that idea reaches `done`, and say so.
+- `ur`: the UR id from the internal PM tool, for an MKT request. Blank means internal work (ad-hoc, no UR id). The Notion export sets `Source` and `UR id` from it.
+- `started`: the date the idea began, `YYYY-MM-DD`. Set it when you create the idea. If blank, the export uses the first date under `## Decisions`.
+- `due`: the planned (or actual) end date, `YYYY-MM-DD`. It is the Notion Timeline end. If blank, the end is `monitor_until`, else `last_update`.
 - `last_update`: today's date, `YYYY-MM-DD`
 - `monitor_until`, `next_check`: dates for the `monitor` stage (`references/lifecycle.md`). The dashboard shows a monitored idea as waiting on you once `next_check` is today or earlier, and never marks it stale.
 - `next_step`: one line
@@ -70,6 +73,8 @@ Ask before each change, then keep the tracker and every link in step:
 - **Merge** A into B: copy A's decisions, open questions, assumptions and artifact links into B's STATUS under a dated note, set A `stage: shelved` with `next_step: merged into <B>`.
 - **Shelve**: `stage: shelved` and a one-line reason in `## Decisions`.
 - **Block**: set `blocked_by` (above).
+
+After a rename, merge or shelve, if `~/.config/imp/notion.json` exists and the project has `notion: on`, offer `/imp:notion sync <id>` for each idea touched (`references/notion.md`).
 
 ## Listing (`/ideas`)
 
