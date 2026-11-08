@@ -49,7 +49,7 @@ HTML slides: use the frontend-slides plugin if it's installed; otherwise one sel
 
 ## Notion
 
-Off. Set `notion: on` in the frontmatter to let `/imp:notion` sync this project's ideas into an existing Notion tracker with Areas, User Requests and Tasks databases (one-way, imp to Notion; it never creates the databases). Only each idea's own file is exported, never `local/` or data files. Name the workspace, teamspace and tracker page here if the project has one; the database ids and the group-to-Area map live in `~/.config/imp/notion.json`.
+Off. Set `notion: on` in the frontmatter to let `/imp:notion` sync this project's ideas into the Team Tracker Work database in Notion (one-way, imp to Notion; it never creates databases). Only each idea's own file is exported, never `local/` or data files. Name the workspace, teamspace and tracker page here if the project has one; the database ids and the group-to-Area option map (`area_names`) live in `~/.config/imp/notion.json`.
 
 ## Reviewer extra checks
 

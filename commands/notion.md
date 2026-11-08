@@ -1,5 +1,5 @@
 ---
-description: Sync ideas one way into the Team Tracker Work and Tasks databases in Notion
+description: Sync ideas one way into the Team Tracker Work database in Notion
 argument-hint: "setup <page> | sync [id] | cleanup"
 disable-model-invocation: true
 ---
