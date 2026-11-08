@@ -149,42 +149,86 @@ footer { margin-top: 56px; color: var(--muted); font-size: 0.86rem; border-top: 
 <div class="note"><strong>Why <code>/ideas</code> and <code>/notes</code>?</strong> Claude Code already has built-in <code>/status</code> and <code>/feedback</code> commands. You can also just describe what you want in plain words; the chief-of-staff routes it and says which workflow it picked.</div>
 <p><strong>IDs:</strong> <code>/ideas</code> prints each idea's id. Every command accepts part of one (<code>lapsing</code> → <code>lapsing-voucher</code>). If two ideas match, it asks. Without an id, <code>/notes</code> goes to the idea waiting on a meeting.</p>
 
+<h3>With or without Notion</h3>
+<figure>
+<svg viewBox="0 0 760 240" role="img" aria-labelledby="f3t">
+  <title id="f3t">After the STATUS update, a project with Notion on gets an offer to sync; without Notion the flow ends there</title>
+  <text class="tg" x="226" y="22" text-anchor="middle">only if notion: on and notion.json exists</text>
+  <rect class="box-accent" x="10" y="40" width="124" height="70" rx="10"/>
+  <text class="t" x="72" y="68" text-anchor="middle">STATUS update</text>
+  <text class="ts" x="72" y="88" text-anchor="middle">step 7</text>
+  <rect class="box-accent" x="164" y="40" width="124" height="70" rx="10"/>
+  <text class="t" x="226" y="68" text-anchor="middle">Offers sync</text>
+  <text class="ts" x="226" y="88" text-anchor="middle">/imp:notion</text>
+  <text class="ts" x="226" y="103" text-anchor="middle">sync &lt;id&gt;</text>
+  <rect class="box-accent" x="318" y="40" width="124" height="70" rx="10"/>
+  <text class="t" x="380" y="68" text-anchor="middle">List shown</text>
+  <text class="ts" x="380" y="88" text-anchor="middle">create, update,</text>
+  <text class="ts" x="380" y="103" text-anchor="middle">unchanged, closed</text>
+  <rect class="box-gate" x="472" y="40" width="124" height="70" rx="10"/>
+  <text class="t" x="534" y="68" text-anchor="middle">Your yes</text>
+  <text class="ts" x="534" y="88" text-anchor="middle">G-data</text>
+  <rect class="box-accent" x="626" y="40" width="124" height="70" rx="10"/>
+  <text class="t" x="688" y="68" text-anchor="middle">Work item</text>
+  <text class="ts" x="688" y="88" text-anchor="middle">written in Notion</text>
+  <path class="arrow" d="M134,75 L162,75"/>
+  <path class="arrow" d="M288,75 L316,75"/>
+  <path class="arrow" d="M442,75 L470,75"/>
+  <path class="arrow" d="M596,75 L624,75"/>
+  <rect class="box" x="10" y="150" width="124" height="50" rx="10"/>
+  <text class="t" x="72" y="171" text-anchor="middle">No Notion</text>
+  <text class="ts" x="72" y="189" text-anchor="middle">flow ends here</text>
+  <path class="arrow" d="M72,112 L72,148"/>
+  <text class="t" x="688" y="140" text-anchor="middle">Work item fields</text>
+  <text class="ts" x="688" y="158" text-anchor="middle">Key, Area, Source,</text>
+  <text class="ts" x="688" y="173" text-anchor="middle">UR id, Status, Timeline</text>
+  <text class="ts" x="688" y="188" text-anchor="middle">started: → due:</text>
+</svg>
+<figcaption>One way only: imp writes to Notion and never reads back. Only Work items are written; Tasks are hand-made. Nothing it writes mentions imp. Items On hold in Notion are left alone.</figcaption>
+</figure>
+
 <!-- 4 -->
 <h2 id="lifecycle">The idea lifecycle</h2>
 <p>This is how work moves with the business team: pitch at the weekly meeting, experiment in rounds, ship, monitor it in production when something needs watching (checks on set dates until a <code>monitor_until</code> date), document. A personal idea follows the same stages, with you as the meeting.</p>
 <figure>
 <svg viewBox="0 0 760 300" role="img" aria-labelledby="f2t">
-  <title id="f2t">Lifecycle stages with gates and the meeting loop</title>
-  <rect class="box-accent" x="10" y="40" width="150" height="70" rx="10"/>
-  <text class="t" x="85" y="68" text-anchor="middle">1 · Pitch</text>
-  <text class="ts" x="85" y="88" text-anchor="middle">research, sizing, deck</text>
-  <rect class="box-accent" x="210" y="40" width="160" height="70" rx="10"/>
-  <text class="t" x="290" y="68" text-anchor="middle">2 · Experiment rN</text>
-  <text class="ts" x="290" y="88" text-anchor="middle">exp/&lt;id&gt;-rN, result per round</text>
-  <rect class="box-accent" x="420" y="40" width="150" height="70" rx="10"/>
-  <text class="t" x="495" y="68" text-anchor="middle">3 · Ship</text>
-  <text class="ts" x="495" y="88" text-anchor="middle">feat/&lt;id&gt; branch</text>
-  <rect class="box-accent" x="620" y="40" width="130" height="70" rx="10"/>
-  <text class="t" x="685" y="68" text-anchor="middle">4 · Document</text>
-  <text class="ts" x="685" y="88" text-anchor="middle">notes, deployed slide</text>
-  <path class="arrow" d="M160,75 L208,75"/>
-  <path class="arrow" d="M370,75 L418,75"/>
-  <path class="arrow" d="M570,75 L618,75"/>
-  <text class="tg" x="85" y="30" text-anchor="middle">G1</text>
-  <text class="tg" x="290" y="30" text-anchor="middle">G1 · G2</text>
-  <text class="tg" x="495" y="30" text-anchor="middle">G1 · G2 · G3</text>
-  <text class="tg" x="685" y="30" text-anchor="middle">G1</text>
+  <title id="f2t">Lifecycle stages (pitch, experiment, ship, optional monitor, document) with gates and the meeting loop</title>
+  <rect class="box-accent" x="10" y="40" width="124" height="70" rx="10"/>
+  <text class="t" x="72" y="68" text-anchor="middle">1 · Pitch</text>
+  <text class="ts" x="72" y="88" text-anchor="middle">research, deck</text>
+  <rect class="box-accent" x="164" y="40" width="124" height="70" rx="10"/>
+  <text class="t" x="226" y="68" text-anchor="middle">2 · Experiment</text>
+  <text class="ts" x="226" y="88" text-anchor="middle">exp/&lt;id&gt;-rN</text>
+  <rect class="box-accent" x="318" y="40" width="124" height="70" rx="10"/>
+  <text class="t" x="380" y="68" text-anchor="middle">3 · Ship</text>
+  <text class="ts" x="380" y="88" text-anchor="middle">feat/&lt;id&gt; branch</text>
+  <rect class="box-accent" x="472" y="40" width="124" height="70" rx="10" stroke-dasharray="5 3"/>
+  <text class="t" x="534" y="68" text-anchor="middle">4 · Monitor</text>
+  <text class="ts" x="534" y="88" text-anchor="middle">dated checks</text>
+  <text class="ts" x="534" y="103" text-anchor="middle">(optional)</text>
+  <rect class="box-accent" x="626" y="40" width="124" height="70" rx="10"/>
+  <text class="t" x="688" y="68" text-anchor="middle">5 · Document</text>
+  <text class="ts" x="688" y="88" text-anchor="middle">notes, slide</text>
+  <path class="arrow" d="M134,75 L162,75"/>
+  <path class="arrow" d="M288,75 L316,75"/>
+  <path class="arrow" d="M442,75 L470,75"/>
+  <path class="arrow" d="M596,75 L624,75"/>
+  <text class="tg" x="72" y="30" text-anchor="middle">G1</text>
+  <text class="tg" x="226" y="30" text-anchor="middle">G1 · G2</text>
+  <text class="tg" x="380" y="30" text-anchor="middle">G1 · G2 · G3</text>
+  <text class="tg" x="534" y="30" text-anchor="middle">G1 · G-data</text>
+  <text class="tg" x="688" y="30" text-anchor="middle">G1</text>
   <rect class="box-gate" x="130" y="190" width="260" height="56" rx="10"/>
   <text class="t" x="260" y="214" text-anchor="middle">Meeting (you present the deck)</text>
   <text class="ts" x="260" y="233" text-anchor="middle">come back with /notes</text>
-  <path class="arrow-gate" d="M85,112 L85,218 L128,218"/>
-  <path class="arrow-gate" d="M290,112 L290,188"/>
-  <path class="arrow-gate" d="M392,218 C440,218 440,150 335,114"/>
+  <path class="arrow-gate" d="M72,112 L72,218 L128,218"/>
+  <path class="arrow-gate" d="M226,112 L226,188"/>
+  <path class="arrow-gate" d="M392,218 C440,218 400,150 275,114"/>
   <text class="ts" x="445" y="170">adjust → round N+1</text>
   <text class="ts" x="445" y="186">or "it's right" → ship</text>
-  <text class="ts" x="10" y="282">Dashed = waits for you or the business team. G-data applies whenever a query has to run.</text>
+  <text class="ts" x="10" y="282">Dashed = waits for you or the business team, or optional. G-data applies whenever a query has to run.</text>
 </svg>
-<figcaption>Every round gets its own folder and a <code>result.md</code> with a verdict, even when it didn't work. After each round you choose another round, the meeting or ship; the results deck covers every round since the last meeting.</figcaption>
+<figcaption>After G3 you are asked whether to monitor: checks run on set dates until <code>monitor_until</code>, or you go straight to Document. Every round gets its own folder and a <code>result.md</code> with a verdict, even when it didn't work. After each round you choose another round, the meeting or ship; the results deck covers every round since the last meeting.</figcaption>
 </figure>
 <div class="table"><table>
 <tr><th>Point</th><th>STATUS shows</th></tr>
@@ -199,7 +243,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 0.86rem; border-top: 
 <div class="table"><table>
 <tr><th>Gate</th><th>When</th><th>You see</th><th>It waits for</th></tr>
 <tr><td><span class="pill">G1 Plan</span></td><td>Before any work beyond read-only looking around</td><td>Plan, business-execution assumptions (their own section), other assumptions, risks, alternatives, data runs needed, outputs</td><td>Your go-ahead or edits</td></tr>
-<tr><td><span class="pill">G-data</span></td><td>Before every data or cluster run</td><td>The full script and the exact command</td><td>Approval of that exact version</td></tr>
+<tr><td><span class="pill">G-data</span></td><td>Before every data or cluster run, and before any write to an external workspace such as Notion</td><td>The full script and the exact command; for a workspace, the list of what will be created, updated or closed</td><td>Approval of that exact version, or a yes to that list. Nothing is deleted there except pages you confirm one by one</td></tr>
 <tr><td><span class="pill">G2 Ready to push</span></td><td>Code committed locally, reviewer passed</td><td>Change summary, diff, results, branch</td><td>You push (or say yes to <code>/imp:push</code>) and test; agents never push on their own</td></tr>
 <tr><td><span class="pill">G3 Tested</span></td><td>Before docs and the deployed slide of a ship</td><td>-</td><td>You say it tested fine</td></tr>
 <tr><td><span class="pill">Meeting</span></td><td>Between stages</td><td>The deck</td><td>Your <code>/notes</code></td></tr>
