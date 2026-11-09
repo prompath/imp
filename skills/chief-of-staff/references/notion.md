@@ -85,6 +85,7 @@ Never write On hold; people set it. A synced row whose Notion Status is On hold 
 - `page_layout` changes and property changes need separate calls.
 - A Timeline range end works on create.
 - An emoji `icon` in `notion-create-pages` works, including 🕵️ (variation selector); it comes back as `{"type": "emoji"}` (verified 2026-11-09 on a private page, not yet on a Work row).
+- A Tasks `Due` range works on create (`date:Due:start`, `date:Due:end`, `date:Due:is_datetime` 0), and `"date:Due:end": null` in `notion-update-page` turns it back into a single date. The create-call icon also works on a Tasks row and survives a property update (verified 2026-11-09).
 - Rows mode `string_starts_with` works; multi-clause `ADD COLUMN` and a database title change work.
 
 ## cleanup
