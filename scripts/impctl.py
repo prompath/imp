@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """imp helpers: frontmatter, project registry, idea listing and ID matching.
 
-Stdlib only. Used by the chief-of-staff skill through the CLI, by hooks/no_push.py and
+Stdlib only. Used by the chief-of-staff and secretary skills through the CLI, by hooks/no_push.py and
 hooks/activity.py, and by `impctl.py dashboard` (a local server on 127.0.0.1 only: a page of every idea,
 live, and /rooms, a pixel campus of who works where).
 """
@@ -329,6 +329,14 @@ def _agents(sessions: list) -> str:
     return ", ".join(sorted(names))
 
 
+def _day(value: str):
+    """The date of a `YYYY-MM-DD` string, else None."""
+    try:
+        return date.fromisoformat(value) if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value or "") else None
+    except ValueError:
+        return None
+
+
 def classify(idea: dict, sessions: list, now: float) -> tuple:
     """(group, note) for one idea; `sessions` are the ones linked to it."""
     live = [s for s in sessions if _live(s, now)]
@@ -351,6 +359,9 @@ def classify(idea: dict, sessions: list, now: float) -> tuple:
         if (idea.get("next_check") or "9999") <= date.fromtimestamp(now).isoformat():
             return "waiting", "monitoring check due"
         return "idle", f"monitoring until {idea.get('monitor_until') or '?'}"
+    due = _day(idea.get("due") or "")  # a malformed date is never compared; `agenda` reports it
+    if due and due < date.fromtimestamp(now) and stage not in ("backlog", "shelved"):
+        return "waiting", f"due {due.isoformat()}"
     if stage in ("backlog", "shelved") or days >= STALE_DAYS:
         return "idle", stage if stage in ("backlog", "shelved") else f"{days}d without update"
     if idea.get("waiting_on") == "user":
@@ -398,6 +409,43 @@ def _hypothesis(plan: Path) -> str:
     return ""
 
 
+def _body(path: Path) -> str:
+    """The file's text after its frontmatter."""
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return text.split("\n---", 1)[1] if text.startswith("---") and "\n---" in text else text
+
+
+def _open_questions(body: str) -> list:
+    """Bullet texts under `## Open questions`; a wrapped line or sub-bullet joins its bullet."""
+    texts = []
+    for line in _section(body, "Open questions"):
+        if re.match(r"[-*](\s|$)", line):
+            texts.append(" ".join(line.split()[1:]))
+        elif texts and line[:1] in (" ", "\t") and line.strip():  # sub-bullet or wrapped line: part of the bullet
+            texts[-1] = f"{texts[-1]} {line.strip()}".strip()
+    return [q for q in texts if q and not re.fullmatch(r"<.*>", q)]
+
+
+TASK = re.compile(r"\s*[-*] \[([ xX])\] T(\d+):\s*(.*)")
+TAG = re.compile(r"\s*\((due|remind|done) ([^()]*)\)\s*$")
+
+
+def _tasks(text: str) -> list:
+    """Task lines `- [ ] T1: text (due YYYY-MM-DD) (remind YYYY-MM-DD HH:MM)`, done `- [x] T1: text (done YYYY-MM-DD)`."""
+    out = []
+    for line in text.splitlines():
+        m = TASK.fullmatch(line.rstrip())
+        if not m:
+            continue
+        rest, tags = m.group(3), {}
+        while t := TAG.search(rest):  # tags trail the text, in any order
+            tags[t.group(1)] = t.group(2).strip()
+            rest = rest[:t.start()]
+        out.append({"n": int(m.group(2)), "done": m.group(1) != " ", "text": rest.strip(),
+                    "due": tags.get("due", ""), "remind": tags.get("remind", ""), "done_on": tags.get("done", "")})
+    return out
+
+
 VERDICTS = ["worked", "worse", "no effect", "inconclusive", "broken"]
 
 
@@ -422,8 +470,7 @@ def notion_export(now: float) -> dict:
             warnings.append(f"{repo}: {idea['_path']} skipped (no id)")
             continue
         root = on[repo]
-        text = (root / idea["_path"]).read_text(encoding="utf-8", errors="replace")
-        body = text.split("\n---", 1)[1] if text.startswith("---") and "\n---" in text else text
+        body = _body(root / idea["_path"])
         key = f"{repo}/{idea['id']}"
         decided = re.search(r"^- (\d{4}-\d{2}-\d{2})", "\n".join(_section(body, "Decisions")), re.M)
         blocked = idea.get("blocked_by") or ""
@@ -459,13 +506,7 @@ def notion_export(now: float) -> dict:
             tasks.append({"task_id": f"{key}/r{n}", "project": key, "name": f"R{n}: {hyp}" if hyp else f"R{n}",
                           "type": "round", "status": "Done" if c[3] or n < last or past else "Open",
                           "verdict": verdict, "branch_sha": c[2], "result": c[5]})
-        texts = []
-        for line in _section(body, "Open questions"):
-            if re.match(r"[-*](\s|$)", line):
-                texts.append(" ".join(line.split()[1:]))
-            elif texts and line[:1] in (" ", "\t") and line.strip():  # sub-bullet or wrapped line: part of the bullet
-                texts[-1] = f"{texts[-1]} {line.strip()}".strip()
-        texts = [q for q in texts if q and not re.fullmatch(r"<.*>", q)]
+        texts = _open_questions(body)
         labels = [m.group(1) if (m := re.match(r"([A-Z]{1,2}\d+)\b", q)) else "" for q in texts]
         seen = set()
         for q, label in zip(texts, labels):
@@ -475,6 +516,133 @@ def notion_export(now: float) -> dict:
                 tasks.append({"task_id": f"{key}/q/{k}", "project": key, "name": q, "type": "question",
                               "status": "Open", "verdict": "", "branch_sha": "", "result": ""})
     return {"projects": projects, "tasks": tasks, "warnings": warnings}
+
+
+# --- secretary ---------------------------------------------------------------
+
+AGENDA = [("overdue", "Overdue"), ("due", "Due soon"), ("checks", "Monitor checks"),
+          ("gates", "Waiting on you at a gate"), ("tasks", "Open tasks")]
+
+
+def secretary_path() -> Path:
+    env = os.environ.get("IMP_SECRETARY")
+    return Path(env) if env else Path.home() / ".config" / "imp" / "secretary"
+
+
+def agenda(now: float, days: int = 7, new: bool = False) -> dict:
+    """{"today", "sections": {name: [item]}, "problems"} from every registered idea and the secretary's tasks.md.
+
+    Every run records what it reported in a per-day seen-file; `new` keeps only items not reported before today."""
+    today = date.fromtimestamp(now)
+    sections = {k: [] for k, _ in AGENDA}
+    problems = []
+    roots = [r for r in load_registry() if (r / PROJECT_FILE).is_file()]
+    notion = {project_config(r)["name"] for r in roots if project_config(r).get("notion") == "on"}
+
+    def day(value, ref, field, fmt="YYYY-MM-DD"):  # malformed: reported, never compared
+        d = _day(value)
+        if value and not d:
+            problems.append(f"{ref}: {field} '{value}' is not {fmt}")
+        return d
+
+    def due_section(value, ref):
+        d = day(value, ref, "due")
+        return None if not d else "overdue" if d < today else "due" if (d - today).days <= days else None
+
+    def add_tasks(tasks, prefix, keyed, path):
+        for t in tasks:
+            ref = f"{prefix}/T{t['n']}"
+            stamp = t["remind"]
+            if stamp and not (re.fullmatch(r"(\S+) \d{2}:\d{2}", stamp) and _day(stamp.split()[0])):
+                problems.append(f"{ref}: remind '{stamp}' is not YYYY-MM-DD HH:MM")
+            if t["done"]:
+                continue
+            sections[due_section(t["due"], ref) or "tasks"].append(
+                {"kind": "task", "ref": ref, "key": ref if keyed else "", "text": t["text"], "note": "",
+                 "due": t["due"], "remind": stamp, "path": str(path)})
+
+    for _, _, idea, _ in dashboard_rows(now, sessions=[]):  # [] so the activity files are not cleaned up
+        stage = idea.get("stage") or ""
+        if stage in HIDDEN:
+            continue
+        path = Path(idea["_folder"]) / Path(idea["_path"]).name
+        ref = f"{idea['project']}/{idea.get('id') or idea['_path']}"
+        item = {"kind": "idea", "ref": ref, "key": "", "text": idea.get("title") or "", "note": stage,
+                "due": idea.get("due") or "", "remind": "", "path": str(path)}
+        sec = due_section(idea.get("due") or "", ref)
+        if sec and stage not in ("backlog", "monitor"):  # a monitored idea is listed by its checks instead
+            sections[sec].append(item)
+        if stage == "monitor":
+            check = day(idea.get("next_check") or "", ref, "next_check")
+            until = day(idea.get("monitor_until") or "", ref, "monitor_until")
+            if check and check <= today:
+                sections["checks"].append(dict(item, note=f"check due {check.isoformat()}"))
+            if until and until <= today:
+                sections["checks"].append(dict(item, note=f"monitor_until {until.isoformat()} reached"))
+        try:
+            body = _body(path)
+        except OSError:
+            continue
+        if idea.get("waiting_on") == "user" and idea.get("gate"):
+            sections["gates"].append(dict(item, note=GATES.get(idea["gate"], idea["gate"]),
+                                          questions=_open_questions(body)))
+        keyed = idea["project"] in notion and idea.get("id") and not {"db", "local"} & set(Path(idea["_path"]).parts)
+        add_tasks(_tasks("\n".join(_section(body, "Tasks"))), ref, keyed, path)
+
+    loose = secretary_path() / "tasks.md"
+    if loose.is_file():
+        add_tasks(_tasks(loose.read_text(encoding="utf-8", errors="replace")), "secretary", True, loose)
+
+    seen_file = secretary_path() / f"seen-{today.isoformat()}.txt"
+    seen = set(seen_file.read_text().splitlines()) if seen_file.is_file() else set()
+    ids = {f"{s}|{i['ref']}|{i['note']}" for s, items in sections.items() for i in items} | {f"problem|{p}" for p in problems}
+    if new:
+        sections = {s: [i for i in items if f"{s}|{i['ref']}|{i['note']}" not in seen] for s, items in sections.items()}
+        problems = [p for p in problems if f"problem|{p}" not in seen]
+    if ids - seen:
+        seen_file.parent.mkdir(parents=True, exist_ok=True)
+        for old in seen_file.parent.glob("seen-*.txt"):
+            if old != seen_file:
+                old.unlink(missing_ok=True)
+        with seen_file.open("a") as f:
+            f.write("".join(f"{i}\n" for i in sorted(ids - seen)))
+    return {"today": today.isoformat(), "sections": sections, "problems": problems}
+
+
+def format_agenda(a: dict, new: bool = False) -> str:
+    lines = []
+    for key, title in AGENDA:
+        if a["sections"][key]:
+            lines.append(title)
+        for i in a["sections"][key]:
+            bits = [i["ref"], i["text"], i["note"], i["due"] and f"due {i['due']}", i["remind"] and f"remind {i['remind']}"]
+            lines.append("  " + "  ".join(b for b in bits if b))
+            lines += [f"    ? {q}" for q in i.get("questions") or []]
+    if a["problems"]:
+        lines += ["Problems"] + [f"  {p}" for p in a["problems"]]
+    return "\n".join(lines) or ("nothing new" if new else "nothing due")
+
+
+def journal(now: float, today_only: bool = False) -> list:
+    """(HH:MM, project/id) for ideas the sessions of the last day touched, latest first; reads the activity
+    files without `load_sessions`, which deletes old ones. A file keeps only each session's latest idea."""
+    found = [(r, project_config(r)["name"], find_ideas(r)) for r in load_registry() if (r / PROJECT_FILE).is_file()]
+    last = {}
+    for f in activity_path().glob("*.json"):
+        try:
+            s = json.loads(f.read_text())
+        except (OSError, ValueError):
+            continue
+        seen = s.get("last_seen") or 0
+        if not s.get("idea") or now - seen > 86400 or (today_only and date.fromtimestamp(seen) != date.fromtimestamp(now)):
+            continue
+        for root, name, ideas in found:
+            hit = owner(root, ideas, s["idea"])
+            if hit:
+                ref = f"{name}/{hit.get('id') or hit['_path']}"
+                last[ref] = max(last.get(ref, 0), seen)
+                break
+    return [(time.strftime("%H:%M", time.localtime(t)), ref) for ref, t in sorted(last.items(), key=lambda x: -x[1])]
 
 
 TRACK = ["G1", "G-data", "G2", "G3"]
@@ -1143,7 +1311,23 @@ def main(argv=None) -> int:
     p_reg.add_argument("dir", nargs="?")
     p_dash = sub.add_parser("dashboard")
     p_dash.add_argument("--port", type=int, default=8765)
+    p_ag = sub.add_parser("agenda", help="what is due, waiting and open, for the secretary")
+    p_ag.add_argument("--days", type=int, default=7, help="due-soon window in days")
+    p_ag.add_argument("--new", action="store_true", help="only items not reported before today")
+    p_ag.add_argument("--json", action="store_true", help="items with each task's Notion Key")
+    p_jr = sub.add_parser("journal", help="ideas your sessions touched in the last day")
+    p_jr.add_argument("--today", action="store_true", help="only today")
     args = ap.parse_args(argv)
+
+    if args.cmd == "agenda":
+        a = agenda(time.time(), args.days, args.new)
+        print(json.dumps(a, indent=2) if args.json else format_agenda(a, args.new))
+        return 0
+
+    if args.cmd == "journal":
+        for hhmm, ref in journal(time.time(), args.today):
+            print(f"{hhmm}  {ref}")
+        return 0
 
     if args.cmd == "register":
         root = _project_arg(args.dir, require=True)
