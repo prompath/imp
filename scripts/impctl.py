@@ -427,11 +427,11 @@ def _open_questions(body: str) -> list:
 
 
 TASK = re.compile(r"\s*[-*] \[([ xX])\] T(\d+):\s*(.*)")
-TAG = re.compile(r"\s*\((due|remind|done) ([^()]*)\)\s*$")
+TAG = re.compile(r"\s*\((due|remind|done|start) ([^()]*)\)\s*$")
 
 
 def _tasks(text: str) -> list:
-    """Task lines `- [ ] T1: text (due YYYY-MM-DD) (remind YYYY-MM-DD HH:MM)`, done `- [x] T1: text (done YYYY-MM-DD)`."""
+    """Task lines `- [ ] T1: text (start YYYY-MM-DD) (due YYYY-MM-DD) (remind YYYY-MM-DD HH:MM)`, done `- [x] T1: text (done YYYY-MM-DD)`."""
     out = []
     for line in text.splitlines():
         m = TASK.fullmatch(line.rstrip())
@@ -442,7 +442,7 @@ def _tasks(text: str) -> list:
             tags[t.group(1)] = t.group(2).strip()
             rest = rest[:t.start()]
         out.append({"n": int(m.group(2)), "done": m.group(1) != " ", "text": rest.strip(),
-                    "due": tags.get("due", ""), "remind": tags.get("remind", ""), "done_on": tags.get("done", "")})
+                    "start": tags.get("start", ""), "due": tags.get("due", ""), "remind": tags.get("remind", ""), "done_on": tags.get("done", "")})
     return out
 
 
@@ -558,11 +558,14 @@ def agenda(now: float, days: int = 7, new: bool = False) -> dict:
             stamp = t["remind"]
             if stamp and not (re.fullmatch(r"(\S+) \d{2}:\d{2}", stamp) and _day(stamp.split()[0])):
                 problems.append(f"{ref}: remind '{stamp}' is not YYYY-MM-DD HH:MM")
+            day(t["start"], ref, "start")
+            if _day(t["start"]) and _day(t["due"]) and _day(t["start"]) > _day(t["due"]):
+                problems.append(f"{ref}: start {t['start']} is after due {t['due']}")
             if t["done"]:
                 continue
             sections[due_section(t["due"], ref) or "tasks"].append(
                 {"kind": "task", "ref": ref, "key": ref if keyed else "", "text": t["text"], "note": today_note(t["due"], ""),
-                 "due": t["due"], "remind": stamp, "path": str(path)})
+                 "start": t["start"], "due": t["due"], "remind": stamp, "path": str(path)})
 
     for _, _, idea, _ in dashboard_rows(now, sessions=[]):  # [] so the activity files are not cleaned up
         stage = idea.get("stage") or ""
@@ -571,7 +574,7 @@ def agenda(now: float, days: int = 7, new: bool = False) -> dict:
         path = Path(idea["_folder"]) / Path(idea["_path"]).name
         ref = f"{idea['project']}/{idea.get('id') or idea['_path']}"
         item = {"kind": "idea", "ref": ref, "key": "", "text": idea.get("title") or "", "note": stage,
-                "due": idea.get("due") or "", "remind": "", "path": str(path)}
+                "start": "", "due": idea.get("due") or "", "remind": "", "path": str(path)}
         sec = due_section(idea.get("due") or "", ref)
         if sec and stage not in ("backlog", "monitor"):  # a monitored idea is listed by its checks instead
             sections[sec].append(dict(item, note=today_note(item["due"], stage)))
@@ -618,7 +621,7 @@ def format_agenda(a: dict, new: bool = False) -> str:
         if a["sections"][key]:
             lines.append(title)
         for i in a["sections"][key]:
-            bits = [i["ref"], i["text"], i["note"], i["due"] and f"due {i['due']}", i["remind"] and f"remind {i['remind']}"]
+            bits = [i["ref"], i["text"], i["note"], i.get("start") and f"start {i['start']}", i["due"] and f"due {i['due']}", i["remind"] and f"remind {i['remind']}"]
             lines.append("  " + "  ".join(b for b in bits if b))
             lines += [f"    ? {q}" for q in i.get("questions") or []]
     if a["problems"]:

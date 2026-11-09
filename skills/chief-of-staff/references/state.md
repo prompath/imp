@@ -21,7 +21,7 @@ From `templates/STATUS.md`:
 
 ## Tasks
 
-`## Tasks` in STATUS holds the idea's dated to-dos, written by the `/imp:secretary` session: `- [ ] T1: <text> (due YYYY-MM-DD) (remind YYYY-MM-DD HH:MM)`, done `- [x] T1: <text> (done YYYY-MM-DD)`. `T<n>` labels go up per file and are never reused; `due` and `remind` are optional. The secretary also writes `due`, `next_check` and `## Open questions`, and nothing else in STATUS; re-read the file before editing it in a work session too. Its own files are in `~/.config/imp/secretary/` (`IMP_SECRETARY` overrides): `journal/YYYY-MM-DD.md`, loose tasks in `tasks.md` (same line format), and a per-day seen-file for `impctl.py agenda --new`. `impctl.py agenda [--days N] [--new] [--json]` lists overdue and due-soon ideas and tasks, monitor checks, gates waiting on you and open tasks, and reports malformed dates.
+`## Tasks` in STATUS holds the idea's dated to-dos, written by the `/imp:secretary` session: `- [ ] T1: <text> (start YYYY-MM-DD) (due YYYY-MM-DD) (remind YYYY-MM-DD HH:MM)`, done `- [x] T1: <text> (done YYYY-MM-DD)`. `T<n>` labels go up per file and are never reused; `start`, `due` and `remind` are optional. The secretary also writes `due`, `next_check` and `## Open questions`, and nothing else in STATUS; re-read the file before editing it in a work session too. Its own files are in `~/.config/imp/secretary/` (`IMP_SECRETARY` overrides): `journal/YYYY-MM-DD.md`, loose tasks in `tasks.md` (same line format), and a per-day seen-file for `impctl.py agenda --new`. `impctl.py agenda [--days N] [--new] [--json]` lists overdue and due-soon ideas and tasks, monitor checks, gates waiting on you and open tasks, and reports malformed dates.
 
 ## Where state lives
 

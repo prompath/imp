@@ -40,6 +40,10 @@ class TestTasks(unittest.TestCase):
             (3, False, "plain (see notes) here", "", "", ""),
             (10, True, "indented", "x", "2027-01-15 15:00", "")])
 
+    def test_parse_start(self):
+        t = impctl._tasks("- [ ] T1: Send deck (start 2027-01-18) (due 2027-01-20)\n- [ ] T2: none\n")
+        self.assertEqual([x["start"] for x in t], ["2027-01-18", ""])
+
     def test_open_questions_helper(self):
         self.assertEqual(impctl._open_questions("## Open questions\n\n- D1: a\n  b\n- <q>\n-\n## Next\n- no\n"), ["D1: a b"])
 
@@ -175,6 +179,17 @@ class TestAgenda(SecretaryCase):
         self.assertIn("  solo/mine/T1  local only  due today  due 2027-01-15", text)
         self.assertTrue(text.endswith("Problems\n  team/bad: due 'next week' is not YYYY-MM-DD\n"
                                       "  team/bad/T1: remind 'tomorrow' is not YYYY-MM-DD HH:MM"))
+
+    def test_start(self):
+        write(self.base / "sec" / "tasks.md", "- [ ] T1: ok (start 2027-01-15) (due 2027-01-20)\n"
+                                              "- [ ] T2: back (start 2027-01-22) (due 2027-01-20)\n"
+                                              "- [x] T3: done back (start 2027-01-22) (due 2027-01-20)\n"
+                                              "- [ ] T4: bad (start soon) (due 2027-01-20)\n")
+        a = impctl.agenda(NOW)
+        self.assertEqual(sorted(a["problems"]), ["secretary/T2: start 2027-01-22 is after due 2027-01-20",
+                                                 "secretary/T3: start 2027-01-22 is after due 2027-01-20",
+                                                 "secretary/T4: start 'soon' is not YYYY-MM-DD"])
+        self.assertIn("  secretary/T1  ok  start 2027-01-15  due 2027-01-20", impctl.format_agenda(a))
 
     def test_never_loads_sessions(self):
         old = self.act / "old.json"

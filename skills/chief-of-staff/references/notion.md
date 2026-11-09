@@ -24,7 +24,7 @@ Layout verified 2026-11-08. Calls marked *Assumed (live check)* were not tried l
 
 **Work** (title `Request`): `Area` select, `Source` select (MKT request, Internal), `UR id` text, `Status` status (Not started, On hold, In progress, Blocked, Monitoring, Done), `Next step` text, `Timeline` date range, `Blocked by` self-relation (back-relation `Blocking`), `Tasks` relation, `Key` text (hidden). Owned by people: Owner, Priority, Mandays, Requested by, Type. Views: Board, Timeline, MKT, All requests.
 
-**Tasks** (title `Name`): `Status`, `User Request` relation to Work, `Key`, Assigned, Due. The sync does not touch it; the secretary writes only Tasks with a `Key`.
+**Tasks** (title `Name`): `Status`, `User Request` relation to Work, `Key`, Assigned, Due (a date range written by the secretary, start to due). The sync does not touch it; the secretary writes only Tasks with a `Key`.
 
 ## Maps
 

@@ -47,7 +47,7 @@ last_update: YYYY-MM-DD
 
 ## Tasks
 
-<!-- - [ ] T1: <task> (due YYYY-MM-DD) (remind YYYY-MM-DD HH:MM), done: - [x] T1: <task> (done YYYY-MM-DD) -->
+<!-- - [ ] T1: <task> (start YYYY-MM-DD) (due YYYY-MM-DD) (remind YYYY-MM-DD HH:MM), done: - [x] T1: <task> (done YYYY-MM-DD) -->
 
 ## Open questions
 
