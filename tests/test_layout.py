@@ -154,7 +154,7 @@ class TestDocsSite(unittest.TestCase):
     def test_site(self):
         import re
         html = read("docs/site/index.html")
-        for s in ["/idea", "/continue", "/notes", "/ideas", "/investigate", "/imp:notion", "/imp-init", "/imp:dashboard",
+        for s in ["/idea", "/continue", "/notes", "/ideas", "/investigate", "/imp:notion", "/imp-init", "/imp:dashboard", "/imp:secretary",
                   "G1", "G2", "Verified", "push_forbidden", "agent_overrides", ".imp/workflows"]:
             self.assertIn(s, html, s)
         for src in re.findall(r'<script[^>]*src="([^"]+)"', html):
