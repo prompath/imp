@@ -49,7 +49,7 @@ For work that has to run in production for a while before it can be called done:
 
 - Update the project's notes (rulebook, change log, model/pipeline notes) per the `Knowledge` slot, including a short *what we tried* from the `## Rounds` table, dead ends too.
 - presenter builds the **deployed slide** (`templates/deck-outlines.md` → Deployed): one slide telling the business team it's done and live from the deploy date. reviewer checks it, including the project's extra checks. Show it.
-- Move the idea folder to its final place per the `Ideas layout` slot, update the tracker, and set `stage: done`.
+- Set `stage: done` and move the idea folder to its final place with `impctl.py stage <id> done` (dry run, the user's yes, `--apply`; `references/state.md` → *Stage changes*), then update the tracker.
 
 ## Transitions
 
@@ -71,3 +71,6 @@ For work that has to run in production for a while before it can be called done:
 | monitor | `monitor_until` passed, checks held, user confirms | document | agents |
 | document | done | done | - |
 | any | user parks it | shelved | - |
+| any | user puts it on hold | on-hold | - |
+| any | user parks it back to backlog | backlog | - |
+| on-hold, backlog | user resumes it (`impctl.py stage <id> resume`) | the stage it left | - |

@@ -133,7 +133,22 @@ class TestSkillsAndCommands(unittest.TestCase):
         self.assertIn("icon", notion)
         self.assertIn("📄", notion)
         self.assertIn("Secretary exception", read("skills/chief-of-staff/references/gates.md"))
+        self.assertIn("| stage `on-hold` | On hold |", notion)
+        self.assertNotIn("Never write On hold", notion)
+        self.assertIn("except a Status change away from On hold", notion)
+        self.assertIn("except a Work Status change away from On hold, which waits for a yes",
+                      read("skills/chief-of-staff/references/gates.md"))
         self.assertIn("## Tasks", read("templates/STATUS.md"))
+
+    def test_stage_changes(self):
+        state = read("skills/chief-of-staff/references/state.md")
+        for s in ["impctl.py\" stage", "stage_folders", "link_check", "on-hold", "resume"]:
+            self.assertIn(s, state, s)
+        defaults = read("defaults/project.md")
+        self.assertIn("stage_folders:", defaults)
+        self.assertIn("link_check:", defaults)
+        self.assertIn("--on-hold", read("commands/ideas.md"))
+        self.assertIn("impctl.py stage <id> resume", read("skills/chief-of-staff/references/lifecycle.md"))
 
     def test_workflow_files_have_frontmatter(self):
         from impctl import parse_frontmatter
@@ -160,7 +175,8 @@ class TestDocsSite(unittest.TestCase):
         import re
         html = read("docs/site/index.html")
         for s in ["/idea", "/continue", "/notes", "/ideas", "/investigate", "/imp:notion", "/imp-init", "/imp:dashboard", "/imp:secretary",
-                  "G1", "G2", "Verified", "push_forbidden", "agent_overrides", ".imp/workflows"]:
+                  "G1", "G2", "Verified", "push_forbidden", "agent_overrides", ".imp/workflows",
+                  "stage_folders", "link_check", "impctl.py stage", "an item set On hold by hand in Notion is listed as an update"]:
             self.assertIn(s, html, s)
         for src in re.findall(r'<script[^>]*src="([^"]+)"', html):
             self.assertTrue(src.startswith("https://cdn.jsdelivr.net/"), src)

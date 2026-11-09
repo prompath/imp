@@ -4,7 +4,7 @@
 
 From `templates/STATUS.md`:
 - `group`: `<Domain> / <use-case>`, exactly one, from the `Idea groups` slot. An idea that spans domains goes under its cross-domain domain. If nothing fits, ask the user before adding to the slot. Blank if the slot lists none.
-- `stage`: `backlog | pitch | experiment | ship | monitor | document | done | shelved`
+- `stage`: `backlog | pitch | experiment | ship | monitor | document | on-hold | done | shelved`. `on-hold` is parked by the user: listed by `/ideas`, idle on the dashboard, never due, and On hold in Notion. Change `backlog`, `done`, `shelved` and `on-hold` with `impctl.py stage` (*Stage changes*).
 - `waiting_on`: `user | marketing | agents`. `marketing` means whoever the `meeting` slot names; with `meeting: self` it's `user`.
 - `gate`: `G1 | G-data | G2 | G3 | meeting`. Set it when you stop at a gate; clear it (blank) once the user passes it. The dashboard shows it.
 - `round`: the experiment round
@@ -12,7 +12,7 @@ From `templates/STATUS.md`:
 - `blocked_by`: the id of an idea that has to finish first, or blank. `impctl.py ideas` shows it in place of `waiting_on`. Clear it when that idea reaches `done`, and say so.
 - `ur`: the UR id from the internal PM tool, for an MKT request. Blank means internal work (ad-hoc, no UR id). The Notion export sets `Source` and `UR id` from it.
 - `started`: the date the idea began, `YYYY-MM-DD`. Set it when you create the idea. If blank, the export uses the first date under `## Decisions`. The secretary may move it on request.
-- `due`: the planned (or actual) end date, `YYYY-MM-DD`. It is the Notion Timeline end. If blank, the end is `monitor_until`, else `last_update`. Once it has passed, the dashboard shows the idea as waiting on you ("due <date>"), unless it is backlog, shelved, done or monitored.
+- `due`: the planned (or actual) end date, `YYYY-MM-DD`. It is the Notion Timeline end. If blank, the end is `monitor_until`, else `last_update`. Once it has passed, the dashboard shows the idea as waiting on you ("due <date>"), unless it is backlog, on hold, shelved, done or monitored.
 - `last_update`: today's date, `YYYY-MM-DD`
 - `monitor_until`, `next_check`: dates for the `monitor` stage (`references/lifecycle.md`). The dashboard shows a monitored idea as waiting on you once `next_check` is today or earlier, and never marks it stale. Waiting on you means: a permission prompt, a session waiting for your reply, `waiting_on: user` (with the gate), a monitor check due, or a passed `due`.
 - `next_step`: one line
@@ -75,11 +75,21 @@ Goes in `<idea folder>/local/`, or `<stage dir>/local/<id>/` for a flat-file ide
 Ask before each change, then keep the tracker and every link in step:
 - **Rename**: new `id`, `title` and folder name (per the `Ideas layout` slot), the branch if it carries the id, and every mention in STATUS, plans and the tracker.
 - **Merge** A into B: copy A's decisions, open questions, assumptions and artifact links into B's STATUS under a dated note, set A `stage: shelved` with `next_step: merged into <B>`.
-- **Shelve**: `stage: shelved` and a one-line reason in `## Decisions`.
+- **Shelve**: `impctl.py stage <id> shelved --reason "<one line>"` (*Stage changes*): show the dry run, wait for the user's yes, then run it again with `--apply`.
 - **Block**: set `blocked_by` (above).
 
-After a rename, merge or shelve, if `~/.config/imp/notion.json` exists and the project has `notion: on`, offer `/imp:notion sync <id>` for each idea touched (`references/notion.md`).
+After a rename, merge, shelve or other stage change, if `~/.config/imp/notion.json` exists and the project has `notion: on`, offer `/imp:notion sync <id>` for each idea touched (`references/notion.md`).
+
+## Stage changes
+
+`python3 "${CLAUDE_PLUGIN_ROOT}/scripts/impctl.py" stage <id> <backlog|done|shelved|on-hold|resume> [--reason TEXT] [--apply]` changes an idea's stage the same way every time. Without `--apply` it only prints the changes, one per line, and writes nothing. Show that, wait for the user's yes, then run it with `--apply`.
+
+- Frontmatter: `stage`, `last_update`, `gate` cleared; for `done` and `shelved` also `waiting_on` cleared and `next_step` set (`done`, or `shelved: <reason>`). `shelved` needs `--reason`. Every other byte of the file is kept.
+- `## Decisions` gets `- YYYY-MM-DD: <stage> (from <old stage>[; moved from <old folder>])[: <reason>] (user)`. `resume` reads the latest such line, sets that old stage back and, if the folder moved, moves it back.
+- Folder: moved only if `.imp/project.md` has `stage_folders` naming the stage (e.g. `stage_folders: done=implemented`, a comma list of `stage=folder` under the ideas root) and the idea is a folder with `STATUS.md`. Flat notes never move. Tracked files move with `git mv`. If the target exists, nothing is done.
+- Links: after a move, root-absolute links to the old folder (`](/ideas/…/A B/…)`, `](</…>)`, `%20`) in the project's tracked `.md` files are rewritten. Then the `link_check` command from `.imp/project.md` runs at the project root, if set, and its output and exit code are shown. A failure is reported, not rolled back.
+- By hand afterwards: the tracker the `Ideas layout` slot names, then offer `/imp:notion sync <id>` (below).
 
 ## Listing (`/ideas`)
 
-`impctl.py ideas` with the user's flags. By default it hides `done` and `shelved` ideas. `--all` shows every stage; `--<stage>` (`--pitch`, `--done`, ...) or `--stage S` shows only those stages and can repeat; `--waiting W` and `--group G` (a prefix of `group`) narrow further; `--projects` lists every registered project; `--scan DIR` registers projects under DIR first. Show the output as-is, then at most one line pointing at the ideas waiting on the user.
+`impctl.py ideas` with the user's flags. By default it hides `done` and `shelved` ideas. `--all` shows every stage; `--<stage>` (`--pitch`, `--on-hold`, `--done`, ...) or `--stage S` shows only those stages and can repeat; `--waiting W` and `--group G` (a prefix of `group`) narrow further; `--projects` lists every registered project; `--scan DIR` registers projects under DIR first. Show the output as-is, then at most one line pointing at the ideas waiting on the user.

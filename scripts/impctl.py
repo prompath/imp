@@ -154,8 +154,9 @@ def format_rows(ideas: list) -> str:
     return "\n".join(out)
 
 
-STAGES = ["backlog", "pitch", "experiment", "ship", "monitor", "document", "done", "shelved"]
+STAGES = ["backlog", "pitch", "experiment", "ship", "monitor", "document", "on-hold", "done", "shelved"]
 HIDDEN = {"done", "shelved"}  # left out of /ideas unless --all or a stage filter asks for them
+PARKED = ("backlog", "on-hold", "shelved")  # idle on the dashboard and never due, whatever `due` says
 
 
 def filter_ideas(ideas: list, stages=None, show_all=False, waiting=None, group=None) -> list:
@@ -291,6 +292,141 @@ def _project_arg(value, require=False):
         root = next((d for d in [start, *start.parents] if (d / ".git").exists()), start)
     return root
 
+# --- stage changes -----------------------------------------------------------
+
+# a Decisions line written by `stage`: `- YYYY-MM-DD: done (from pitch; moved from ideas/pitch/A B): reason (user)`
+CHANGED = re.compile(r"^- \d{4}-\d{2}-\d{2}: ([\w-]+) \(from ([\w-]+)(?:; moved from (.+?))?\)(?::| \(user\))", re.M)
+
+
+def _set_frontmatter(text: str, values: dict) -> str:
+    """`text` with each `key: value` set in its leading --- block, a trailing `# comment` kept in its column.
+    A missing key with a value goes in before the closing ---. Every other byte is kept."""
+    lines, todo = text.splitlines(keepends=True), dict(values)
+    for n, line in enumerate(lines[1:], 1):
+        body = line.rstrip("\r\n")
+        eol = line[len(body):] or "\n"
+        if body.strip() == "---":
+            lines[n:n] = [f"{k}: {v}{eol}" for k, v in todo.items() if v]
+            break
+        key, _, rest = body.partition(":")
+        if key in todo and body[:1] not in " \t-#":
+            head = f"{key}: {todo.pop(key)}"
+            m = re.search(r"(^|\s)#.*", rest)  # same comment rule as _clean
+            comment = m.group().lstrip() if m else ""
+            col = len(body) - len(comment)
+            lines[n] = (head + " " * max(1, col - len(head)) + comment if comment else head.rstrip()) + line[len(body):]
+    return "".join(lines)
+
+
+def _add_decision(text: str, entry: str) -> str:
+    """`text` with `entry` as the last line of `## Decisions`; a new section at the end if there is none."""
+    eol = "\r\n" if "\r\n" in text else "\n"
+    lines = text.splitlines(keepends=True)
+    start = next((n for n, l in enumerate(lines) if l.rstrip() == "## Decisions"), None)
+    if start is None:
+        return text + ("" if text.endswith("\n") else eol) + f"{eol}## Decisions{eol}{eol}{entry}{eol}"
+    end = next((n for n in range(start + 1, len(lines)) if lines[n].startswith("## ")), len(lines))
+    while end > start + 1 and not lines[end - 1].strip():
+        end -= 1
+    if not lines[end - 1].endswith("\n"):
+        lines[end - 1] += eol
+    lines.insert(end, (eol if end == start + 1 else "") + entry + eol)
+    return "".join(lines)
+
+
+def _link_edits(root: Path, old: str, new: str) -> list:
+    """(path, text, count) for tracked .md files with root-absolute links into folder `old`, rewritten to `new`.
+
+    Forms: `](/old/…)`, `](</old/…>)`, `](/old%20name/…)`, and the folder itself with no trailing slash."""
+    # shortcut: relative `../` links from outside the folder are not rewritten (none in any project yet); the link check reports them
+    out = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--", "*.md"], capture_output=True, text=True).stdout
+    forms = {(old, new), (old.replace(" ", "%20"), new.replace(" ", "%20"))}
+    edits = []
+    for f in filter(None, out.split("\0")):
+        try:
+            text = (root / f).read_bytes().decode("utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        count = 0
+        for o, n in forms:
+            text, k = re.subn(rf"(\]\(<?)/{re.escape(o)}(?=[/)>])", lambda m: f"{m.group(1)}/{n}", text)
+            count += k
+        if count:
+            edits.append((root / f, text, count))
+    return edits
+
+
+def stage_change(root: Path, idea: dict, target: str, reason: str = "", apply: bool = False) -> list:
+    """Output lines of `impctl.py stage`: the planned changes, and with `apply` their result.
+
+    Raises ValueError before any write when the change can't be made."""
+    rel = lambda p: p.relative_to(root).as_posix()
+    cfg, path = project_config(root), root / idea["_path"]
+    text, name = path.read_bytes().decode("utf-8"), idea.get("id") or idea["_path"]
+    old, today = idea.get("stage") or "", date.today().isoformat()
+    folder = path.parent if path.name == "STATUS.md" else None  # a flat note never moves
+    out, dest, extra = [], None, {}
+    if target == "resume":
+        hits = list(CHANGED.finditer("\n".join(_section(text, "Decisions"))))
+        if not hits:
+            raise ValueError(f"{name}: no '(from <stage>)' line under ## Decisions to resume from")
+        to, back, moved = hits[-1].groups()
+        if to != (old or "-"):
+            raise ValueError(f"{name}: stage is '{old}', not '{to}' as its last stage change left it; nothing to resume")
+        new = "" if back == "-" else back
+        if moved and folder and rel(folder) != moved:
+            dest = root / moved
+        entry = f"resumed {back} (from {old or '-'})"
+    else:
+        if target == old:
+            raise ValueError(f"{name} is already {target}")
+        if target == "shelved" and not reason:
+            raise ValueError("shelved needs --reason")
+        new = target
+        if new in ("done", "shelved"):  # waiting_on stays as a key: the idea must still list
+            extra = dict(waiting_on="", next_step="done" if new == "done" else f"shelved: {reason}")
+        sub = dict(p.strip().split("=", 1) for p in (cfg.get("stage_folders") or "").split(",") if "=" in p).get(new)
+        if sub and not folder:
+            out.append(f"no move: {rel(path)} is a flat note")
+        elif sub and folder.parent != root / cfg["ideas_root"] / sub:
+            dest = root / cfg["ideas_root"] / sub / folder.name
+        entry = f"{new} (from {old or '-'}" + (f"; moved from {rel(folder)}" if dest else "") + ")"
+    if dest and dest.exists():
+        raise ValueError(f"{rel(dest)} already exists; nothing done")
+    values = dict(stage=new, gate="", **extra, last_update=today)
+    fm = parse_frontmatter(text)
+    changed = {k: v for k, v in values.items() if (fm.get(k) or "") != v}
+    entry = f"- {today}: {entry}" + (f": {reason}" if reason else "") + " (user)"
+    out.append(f"frontmatter {rel(path)}: " + ", ".join(f"{k} {fm.get(k) or repr('')} -> {v or repr('')}" for k, v in changed.items()))
+    out.append(f"decision {rel(path)}: {entry}")
+    if apply:
+        path.write_bytes(_add_decision(_set_frontmatter(text, changed), entry).encode("utf-8"))
+    if dest:
+        out.append(f"move {rel(folder)} -> {rel(dest)}")
+        for f, new_text, count in _link_edits(root, rel(folder), rel(dest)):  # before the move: same result, old paths
+            out.append(f"link {rel(f)}: {count}")
+            if apply:
+                f.write_bytes(new_text.encode("utf-8"))
+        if apply:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            tracked = subprocess.run(["git", "-C", str(root), "ls-files", "--", rel(folder)], capture_output=True, text=True).stdout
+            if tracked:
+                subprocess.run(["git", "-C", str(root), "mv", "--", rel(folder), rel(dest)], check=True, capture_output=True, text=True)
+            else:
+                os.rename(folder, dest)
+    check = cfg.get("link_check")
+    if check:
+        out.append(f"run {check}")
+        if apply:
+            r = subprocess.run(check, shell=True, cwd=root, capture_output=True, text=True)  # the project's own command, from .imp/project.md
+            out += (r.stdout + r.stderr).splitlines() + [f"link_check exit {r.returncode}"]
+    if not apply:
+        out.append("dry run: nothing written; run again with --apply")
+    out.append(f"next (by hand): update the tracker the Ideas layout slot names, then /imp:notion sync {name}"
+               + ("; live sessions keep the old path until they touch the idea again" if dest else ""))
+    return out
+
+
 # --- dashboard ---------------------------------------------------------------
 
 LIVE_SECS = 600  # a session silent this long without SessionEnd counts as ended (crash)
@@ -360,10 +496,10 @@ def classify(idea: dict, sessions: list, now: float) -> tuple:
             return "waiting", "monitoring check due"
         return "idle", f"monitoring until {idea.get('monitor_until') or '?'}"
     due = _day(idea.get("due") or "")  # a malformed date is never compared; `agenda` reports it
-    if due and due < date.fromtimestamp(now) and stage not in ("backlog", "shelved"):
+    if due and due < date.fromtimestamp(now) and stage not in PARKED:
         return "waiting", f"due {due.isoformat()}"
-    if stage in ("backlog", "shelved") or days >= STALE_DAYS:
-        return "idle", stage if stage in ("backlog", "shelved") else f"{days}d without update"
+    if stage in PARKED or days >= STALE_DAYS:
+        return "idle", stage if stage in PARKED else f"{days}d without update"
     if idea.get("waiting_on") == "user":
         return "waiting", gate or "waiting on you"
     return "idle", ""
@@ -576,7 +712,7 @@ def agenda(now: float, days: int = 7, new: bool = False) -> dict:
         item = {"kind": "idea", "ref": ref, "key": "", "text": idea.get("title") or "", "note": stage,
                 "start": "", "due": idea.get("due") or "", "remind": "", "path": str(path)}
         sec = due_section(idea.get("due") or "", ref)
-        if sec and stage not in ("backlog", "monitor"):  # a monitored idea is listed by its checks instead
+        if sec and stage not in ("backlog", "on-hold", "monitor"):  # a monitored idea is listed by its checks instead
             sections[sec].append(dict(item, note=today_note(item["due"], stage)))
         if stage == "monitor":
             check = day(idea.get("next_check") or "", ref, "next_check")
@@ -1307,6 +1443,12 @@ def main(argv=None) -> int:
     p_res = sub.add_parser("resolve")
     p_res.add_argument("query")
     p_res.add_argument("--project")
+    p_st = sub.add_parser("stage", help="change an idea's stage, folder and links; a dry run unless --apply")
+    p_st.add_argument("query")
+    p_st.add_argument("stage", choices=["backlog", "done", "shelved", "on-hold", "resume"])
+    p_st.add_argument("--reason", default="", help="one line for ## Decisions; required for shelved")
+    p_st.add_argument("--apply", action="store_true", help="make the changes (default: only print them)")
+    p_st.add_argument("--project")
     p_cur = sub.add_parser("current")
     p_cur.add_argument("--session", default="")
     p_cur.add_argument("--project")
@@ -1359,16 +1501,21 @@ def main(argv=None) -> int:
             print("no undefined codes")
         return 1 if found else 0
 
-    if args.cmd == "resolve":
+    if args.cmd in ("resolve", "stage"):
+        root = _project_arg(args.project)
         try:
-            print(resolve(find_ideas(_project_arg(args.project)), args.query)["_path"])
+            idea = resolve(find_ideas(root), args.query)
+            print(idea["_path"] if args.cmd == "resolve" else "\n".join(stage_change(root, idea, args.stage, args.reason, args.apply)))
             return 0
-        except UnknownIdea as e:
+        except (UnknownIdea, ValueError) as e:
             print(f"imp: {e}", file=sys.stderr)
             return 1
         except AmbiguousIdea as e:
             print(f"imp: {e}", file=sys.stderr)
             return 2
+        except subprocess.CalledProcessError as e:
+            print(f"imp: {' '.join(e.cmd)}: {e.stderr.strip()}", file=sys.stderr)
+            return 1
 
     if args.json:
         try:

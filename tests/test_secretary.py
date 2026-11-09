@@ -170,6 +170,12 @@ class TestAgenda(SecretaryCase):
                          [("secretary/T1", "due today"), ("team/today", "due today")])
         self.assertEqual(impctl.agenda(morning + 3600, new=True)["sections"]["due"], [])  # the morning run marked it seen
 
+    def test_on_hold_is_never_due(self):
+        self.idea(self.on, "held", stage="on-hold", due=D(-2), body="## Tasks\n\n- [ ] T1: still listed (due 2027-01-10)\n")
+        r = self.refs(impctl.agenda(NOW))
+        self.assertEqual(r["overdue"], [("team/held/T1", "")])  # its tasks still count, the idea itself does not
+        self.assertEqual(r["due"], [])
+
     def test_text_output(self):
         self.fixtures()
         text = impctl.format_agenda(impctl.agenda(NOW))

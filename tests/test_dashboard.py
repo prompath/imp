@@ -191,6 +191,11 @@ class TestClassify(unittest.TestCase):
         self.assertEqual(c(idea(waiting_on="user", last_update="2027-01-09"), [], NOW)[0], "waiting")
         self.assertEqual(c(idea(stage="shelved"), [sess("working")], NOW)[0], "progress")
 
+    def test_on_hold_is_idle_never_overdue(self):
+        c = impctl.classify
+        self.assertEqual(c(idea(stage="on-hold", waiting_on="user", due="2027-01-01", last_update="2026-01-01"), [], NOW),
+                         ("idle", "on-hold"))
+
     def test_monitor(self):
         c = impctl.classify
         old = "2026-12-01"  # long before TODAY: a monitored idea is never stale

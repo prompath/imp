@@ -219,6 +219,150 @@ class TestRegistryAndCli(unittest.TestCase):
         self.assertEqual(self.cli("resolve", "zzz", cwd=p).returncode, 1)
 
 
+
+def git(p: Path, *args):
+    return subprocess.run(["git", "-C", str(p), "-c", "user.name=t", "-c", "user.email=t@t", *args],
+                          capture_output=True, text=True, check=True).stdout
+
+
+IDEA = ("---\nid: offer-timing\ntitle: Offer timing\nstage: pitch               # backlog | pitch\nwaiting_on: user\n"
+        "gate: G1                   # G1 | G2\nnext_step: present the deck\nlast_update: 2026-01-01\n---\n\n"
+        "# Offer timing\n\n## Decisions\n\n- 2026-01-01: start (user)\n\n## Feedback log\n\nSee [plan](rounds/r1/plan.md).\n")
+
+
+class TestStage(unittest.TestCase):
+    setUp, tearDown, cli = TestRegistryAndCli.setUp, TestRegistryAndCli.tearDown, TestRegistryAndCli.cli
+
+    def snapshot(self, p: Path) -> dict:
+        return {f: f.read_bytes() for f in p.rglob("*") if f.is_file() and ".git" not in f.parts}
+
+    def mapped(self) -> Path:
+        """A git project with `stage_folders: done=implemented`, an idea in ideas/pitch/Offer Timing and links to it."""
+        p = make_project(self.base, "proj", "stage_folders: done=implemented\nlink_check: echo checked; exit 3\n")
+        idea = p / "ideas" / "pitch" / "Offer Timing"
+        write(idea / "STATUS.md", IDEA.replace("See [plan]", "[me](</ideas/pitch/Offer Timing/STATUS.md>) [plan]"))
+        write(idea / "rounds" / "r1" / "plan.md", "plan")
+        write(p / "INDEX.md", "- [a](/ideas/pitch/Offer%20Timing/STATUS.md)\n- [b](</ideas/pitch/Offer Timing/STATUS.md>)\n"
+                              "- [c](/ideas/pitch/Offer Timing/)\n- [d](/ideas/pitch/Offer Timing)\n"
+                              "- [e](/ideas/pitch/Offer Timing Two/x.md)\n- [f](ideas/pitch/Offer Timing/STATUS.md)\n")
+        write(p / "ideas" / "pitch" / "flat-note.md", status("flat-note", stage="pitch"))
+        git(p, "init", "-q")
+        git(p, "add", "-A")
+        git(p, "commit", "-qm", "init")
+        write(idea / "local" / "rows.csv", "untracked")
+        return p
+
+    def test_dry_run_writes_nothing_and_apply_edits_only_frontmatter(self):
+        p = make_project(self.base, "proj")
+        write(p / "ideas" / "offer-timing" / "STATUS.md", IDEA)
+        before = self.snapshot(p)
+        r = self.cli("stage", "offer", "done", cwd=p)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("stage pitch -> done, gate G1 -> '', waiting_on user -> '', next_step present the deck -> done", r.stdout)
+        self.assertIn("dry run", r.stdout)
+        self.assertNotIn("move ", r.stdout)  # no stage_folders: imp's own layout never moves
+        self.assertEqual(self.snapshot(p), before)
+        r = self.cli("stage", "offer", "done", "--apply", cwd=p)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertNotIn("dry run", r.stdout)
+        self.assertTrue(r.stdout.strip().splitlines()[-1].startswith("next (by hand): update the tracker"))
+        today = impctl.date.today().isoformat()
+        want = (IDEA.replace("stage: pitch      ", "stage: done       ").replace("waiting_on: user", "waiting_on:")
+                .replace("gate: G1  ", "gate:     ").replace("next_step: present the deck", "next_step: done")
+                .replace("last_update: 2026-01-01", f"last_update: {today}")
+                .replace("start (user)\n", f"start (user)\n- {today}: done (from pitch) (user)\n"))
+        self.assertEqual((p / "ideas" / "offer-timing" / "STATUS.md").read_text(), want)
+        self.assertEqual(self.cli("stage", "offer", "done", cwd=p).returncode, 1)  # already done
+
+    def test_shelved_needs_reason(self):
+        p = make_project(self.base, "proj")
+        write(p / "ideas" / "x" / "STATUS.md", status("x-idea", stage="pitch") + "\n## Decisions\n\n## Rounds\n")
+        r = self.cli("stage", "x-idea", "shelved", "--apply", cwd=p)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("--reason", r.stderr)
+        r = self.cli("stage", "x-idea", "shelved", "--reason", "no budget", "--apply", cwd=p)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        text = (p / "ideas" / "x" / "STATUS.md").read_text()
+        today = impctl.date.today().isoformat()
+        self.assertIn(f"## Decisions\n\n- {today}: shelved (from pitch): no budget (user)\n\n## Rounds", text)
+        fm = impctl.parse_frontmatter(text)
+        self.assertEqual((fm["stage"], fm["next_step"], fm["waiting_on"]), ("shelved", "shelved: no budget", ""))
+        self.assertIn("x-idea", self.cli("ideas", "--shelved", cwd=p).stdout)  # waiting_on kept as a key: still listed
+
+    def test_on_hold_and_resume_without_move(self):
+        p = make_project(self.base, "proj")
+        write(p / "ideas" / "x" / "STATUS.md", status("x-idea", stage="experiment", round=2) + "\n## Decisions\n")
+        write(p / "ideas" / "y" / "STATUS.md", status("y-idea", stage="pitch"))
+        r = self.cli("stage", "x-idea", "resume", cwd=p)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("to resume from", r.stderr)  # no `(from …)` line
+        self.assertEqual(self.cli("stage", "x-idea", "on-hold", "--apply", cwd=p).returncode, 0)
+        self.assertEqual(self.cli("ideas", "--on-hold", cwd=p).stdout.count("\n"), 1)
+        self.assertIn("x-idea", self.cli("ideas", "--on-hold", cwd=p).stdout)
+        self.assertIn("x-idea", self.cli("ideas", cwd=p).stdout)  # not hidden
+        r = self.cli("stage", "x-idea", "resume", "--apply", cwd=p)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        text = (p / "ideas" / "x" / "STATUS.md").read_text()
+        self.assertEqual(impctl.parse_frontmatter(text)["stage"], "experiment")
+        self.assertIn("resumed experiment (from on-hold) (user)", text)
+        self.assertIn("nothing to resume", self.cli("stage", "x-idea", "resume", cwd=p).stderr)
+
+    def test_unknown_and_ambiguous(self):
+        p = make_project(self.base, "proj")
+        write(p / "ideas" / "a" / "STATUS.md", status("offer-timing"))
+        write(p / "ideas" / "b" / "STATUS.md", status("offer-mix"))
+        self.assertEqual(self.cli("stage", "offer", "done", cwd=p).returncode, 2)
+        self.assertEqual(self.cli("stage", "zzz", "done", cwd=p).returncode, 1)
+        self.assertNotEqual(self.cli("stage", "offer-mix", "pitch", cwd=p).returncode, 0)  # not a stage target
+
+    def test_move_rewrites_links_and_runs_check(self):
+        p = self.mapped()
+        before = self.snapshot(p)
+        r = self.cli("stage", "offer", "done", cwd=p)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("move ideas/pitch/Offer Timing -> ideas/implemented/Offer Timing", r.stdout)
+        self.assertIn("link INDEX.md: 4", r.stdout)
+        self.assertIn("run echo checked; exit 3", r.stdout)
+        self.assertEqual(self.snapshot(p), before)
+        r = self.cli("stage", "offer", "done", "--apply", cwd=p)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("checked\nlink_check exit 3", r.stdout)
+        new = p / "ideas" / "implemented" / "Offer Timing"
+        self.assertFalse((p / "ideas" / "pitch" / "Offer Timing").exists())
+        self.assertEqual((new / "local" / "rows.csv").read_text(), "untracked")
+        self.assertEqual((p / "INDEX.md").read_text(),
+                         "- [a](/ideas/implemented/Offer%20Timing/STATUS.md)\n- [b](</ideas/implemented/Offer Timing/STATUS.md>)\n"
+                         "- [c](/ideas/implemented/Offer Timing/)\n- [d](/ideas/implemented/Offer Timing)\n"
+                         "- [e](/ideas/pitch/Offer Timing Two/x.md)\n- [f](ideas/pitch/Offer Timing/STATUS.md)\n")
+        text = (new / "STATUS.md").read_text()
+        self.assertIn("[me](</ideas/implemented/Offer Timing/STATUS.md>) [plan](rounds/r1/plan.md)", text)
+        self.assertIn("done (from pitch; moved from ideas/pitch/Offer Timing) (user)", text)
+        changed = git(p, "status", "--porcelain", "--untracked-files=all").replace('"', "").splitlines()
+        self.assertEqual(sorted(changed), [  # git mv: staged renames; nothing else touched
+            " M INDEX.md", "?? ideas/implemented/Offer Timing/local/rows.csv",
+            "R  ideas/pitch/Offer Timing/rounds/r1/plan.md -> ideas/implemented/Offer Timing/rounds/r1/plan.md",
+            "RM ideas/pitch/Offer Timing/STATUS.md -> ideas/implemented/Offer Timing/STATUS.md"])
+        r = self.cli("stage", "offer", "resume", "--apply", cwd=p)  # back to pitch, folder and links too
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual((p / "INDEX.md").read_text().count("/ideas/pitch/Offer"), 5)
+        status_md = p / "ideas" / "pitch" / "Offer Timing" / "STATUS.md"
+        self.assertEqual(impctl.parse_frontmatter(status_md.read_text())["stage"], "pitch")
+        self.assertIn("resumed pitch (from done) (user)", status_md.read_text())
+
+    def test_target_exists_and_flat_note(self):
+        p = self.mapped()
+        write(p / "ideas" / "implemented" / "Offer Timing" / "keep.md", "x")
+        before = self.snapshot(p)
+        r = self.cli("stage", "offer", "done", "--apply", cwd=p)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("already exists", r.stderr)
+        self.assertEqual(self.snapshot(p), before)
+        r = self.cli("stage", "flat-note", "done", "--apply", cwd=p)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("no move: ideas/pitch/flat-note.md is a flat note", r.stdout)
+        self.assertEqual(impctl.parse_frontmatter((p / "ideas" / "pitch" / "flat-note.md").read_text())["stage"], "done")
+
+
 class TestCurrentAndCodes(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

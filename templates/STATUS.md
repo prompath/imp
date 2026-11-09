@@ -4,7 +4,7 @@ title: <Title>
 project: <project name>
 kind: <personal|company>
 group:                     # <Domain> / <use-case> from the Idea groups slot; blank if the project has none
-stage: pitch               # backlog | pitch | experiment | ship | monitor | document | done | shelved
+stage: pitch               # backlog | pitch | experiment | ship | monitor | document | on-hold | done | shelved
 round:                     # experiment round number
 waiting_on: agents         # user | marketing | agents
 gate:                      # G1 | G-data | G2 | G3 | meeting while stopped at it; blank once passed

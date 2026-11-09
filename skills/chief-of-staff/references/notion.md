@@ -8,7 +8,7 @@ Layout verified 2026-11-08. Calls marked *Assumed (live check)* were not tried l
 
 - **Nothing the sync writes may mention imp.** That covers every row, option, text and page. The Notion side calls these rows Work items.
 - Find the Notion tools by name suffix (`notion-fetch`, `notion-search`, `notion-update-data-source`, `notion-create-pages`, `notion-update-page`, `notion-query-data-sources`, `notion-delete-pages`), never by a fixed prefix. If the connector isn't connected, say so and stop.
-- Every Notion write follows `references/gates.md` (outward writes): show the list, wait for a yes, then write. A yes covers that list only. If the user grants standing permission, still show the list, then write. Exception: the `/imp:secretary` session writes without a yes and reports after (`references/gates.md`).
+- Every Notion write follows `references/gates.md` (outward writes): show the list, wait for a yes, then write. A yes covers that list only. If the user grants standing permission, still show the list, then write. Exception: the `/imp:secretary` session writes without a yes and reports after (`references/gates.md`), except a Status change away from On hold, which always waits for the user's yes (people may have set it).
 - **Ownership rule.** Write only to Work rows that have a `Key`, and only these properties: `Request` (title), `Area`, `Source`, `UR id`, `Status`, `Next step`, `Timeline`, `Blocked by`, and `Key` (on create). `icon` is set on create only and is not compared (step 7). Never write `Owner`, `Priority`, `Mandays`, `Requested by` or `Type`. The sync never writes to the Tasks database; keyed Tasks are the secretary's, other Tasks stay hand-made. Rows without a `Key` (hand-made) are never read, compared or written.
 - Never delete, except in `cleanup`, and there only the exact pages the user confirms. The secretary's deletes follow `references/gates.md` the same way: exact pages, the user's yes.
 - Do not reference removed properties: Stage, Gate, Waiting on, Branch, Round, Project type, imp_id, Kind, task_id, or an Area relation. There is no Areas database in use (the old one is in the Archive page).
@@ -36,10 +36,11 @@ Layout verified 2026-11-08. Calls marked *Assumed (live check)* were not tried l
 | gone from imp (closed) | Done |
 | `blocked_by` set | Blocked |
 | stage `monitor` | Monitoring |
+| stage `on-hold` | On hold |
 | stage `backlog` (or blank) | Not started |
 | stage `pitch`, `experiment`, `ship`, `document` | In progress |
 
-Never write On hold; people set it. A synced row whose Notion Status is On hold is **skipped entirely**: no property updates, and not closed either. Show it in the list as "left alone (On hold)".
+On hold is written from `stage: on-hold` (`impctl.py stage <id> on-hold`), like any other Status. A row set On hold by hand in Notion while its idea is not `on-hold` shows as an **update** (On hold → the mapped Status) and waits for the user's yes like every other change; in the secretary session too (Rules).
 
 **Area:** `area_names[group]`. A group with no entry stops the sync before any write: tell the user to add it to `notion.json` and, if it is a new option, to the Area select (or run `setup`).
 
@@ -67,17 +68,16 @@ Never write On hold; people set it. A synced row whose Notion Status is On hold 
    - **update**: a page exists and an owned property differs (name the property and both values).
    - **unchanged**.
    - **closed**: a Work item whose idea is gone from imp, to get Status Done. Compare against the existing rows of the repos in scope, not only what was exported. With an `id`, only that idea's row.
-   - **left alone (On hold)**: see Maps.
    Show counts first, then the list.
 6. Wait for a yes (see Rules for standing permission). No yes, no write.
 7. Write:
    - Create: `notion-create-pages` with `parent: {"data_source_id": "<requests_ds>"}` and `allow_async: false`, so page ids come back at once. At most 50 pages per call (the hard limit is 100). Update: `notion-update-page` with the changed owned properties only. *Assumed (live check)*: the first update. Run it on one row, fetch it back, then do the rest.
    - Icon, on create only: set `icon` to one emoji in the same `notion-create-pages` call, picked from the `Request` title (first match wins): 📊 deck, presentation; 🧪 dry run; 🔧 fix, job; 🕵️ investigation; 📉 negative uplift. Nothing fits: 📄. Update calls never send `icon`, and an icon already set is never changed. *Assumed (live check)*: the first create; fetch it back and check the icon. If a create errors on the icon, query the `Key` first (so no partial duplicate), retry the create with 📄, and report it.
-   - Status by option name, e.g. `"Status": "In progress"`.
+   - Status by option name, e.g. `"Status": "In progress"` or `"Status": "On hold"`.
    - Timeline: `"date:Timeline:start": "2026-11-01"`, `"date:Timeline:end": "2026-11-20"`, `"date:Timeline:is_datetime": 0`. An end on create works (verified). Leave the end out if blank. A blank export end leaves the old end in Notion.
    - `Blocked by` is an array of page ids, set in a second pass after all Work items exist (*Assumed (live check)*); skip it if that item isn't in Notion.
    - Blank values are left out.
-8. Verify: query the written rows back and compare. Report counts of created, updated, unchanged, closed and left alone, and one link to the Work database. A second sync with no STATUS change must show **0 creates**. Count the Work rows without a Key again: the number must match the count from step 3. Also check that every existing icon is unchanged.
+8. Verify: query the written rows back and compare. Report counts of created, updated, unchanged and closed, and one link to the Work database. A second sync with no STATUS change must show **0 creates**. Count the Work rows without a Key again: the number must match the count from step 3. Also check that every existing icon is unchanged.
 
 ## Verified facts
 

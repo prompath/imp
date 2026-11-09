@@ -39,7 +39,7 @@ Maintainers: raise `version` in `.claude-plugin/plugin.json` for each release.
 | `/idea <description>` | Start an idea: pick a workflow, look around, show the plan, wait for go-ahead |
 | `/continue [id]` | Resume an idea where it stopped |
 | `/notes [id] <notes>` | File your meeting notes and propose the next round |
-| `/ideas [--all] [--<stage>] [--waiting W] [--group G] [--projects] [--scan DIR]` | List open ideas in this project, or every project with `--projects`. Done and shelved ideas are hidden unless you pass `--all` or a stage flag (`--done`, `--pitch`, ...). Output is nested by domain and use-case if the project sets `Idea groups` |
+| `/ideas [--all] [--<stage>] [--waiting W] [--group G] [--projects] [--scan DIR]` | List open ideas in this project, or every project with `--projects`. Done and shelved ideas are hidden unless you pass `--all` or a stage flag (`--done`, `--pitch`, `--on-hold`, ...). Output is nested by domain and use-case if the project sets `Idea groups` |
 | `/investigate <case>` | Check whether a result is a misunderstanding, a code bug or a rulebook gap. A plain question about the data goes to the analysis workflow instead |
 | `/save [id]` | Save progress on the idea this session is working on: update STATUS with the open decisions, commit only that idea's files, and print the `/imp:continue <id>` line. With no id, it works out the idea from this session's activity, or from idea files with uncommitted changes |
 | `/imp:push [note]` | Commit the repo's changes, summarize everything unpushed, and push once you say yes |
@@ -48,6 +48,8 @@ Maintainers: raise `version` in `.claude-plugin/plugin.json` for each release.
 | `/imp-init` | Connect the current project |
 | `/imp:retro [session]` | Run a retrospective on a coding session (this one by default) and suggest changes to the agent's environment, most severe first: navigation, automated checks, coding standards, steering files, tool economy, information access. Adapted from [mattpocock/skills](https://github.com/mattpocock/skills) |
 | `/imp:dashboard [--port N]` | Open a live local page (`http://127.0.0.1:8765/`) of every registered project's ideas: waiting on you (a permission prompt, a reply, `waiting_on: user` with its gate, a monitor check due, or a passed `due:`), in progress, idle, done. `/rooms` on the same server (`http://127.0.0.1:8765/rooms`) shows a pixel campus of who works where, with a Zoom button and an Ideas chooser: live ideas and the ones you tick are in the building, the rest lounge at the pool |
+
+To park, finish or shelve an idea, the chief-of-staff runs `impctl.py stage <id> <backlog|done|shelved|on-hold|resume> [--reason TEXT] [--apply]`. Without `--apply` it only prints what it would change. It sets the STATUS frontmatter, adds a `## Decisions` line, and moves the idea folder only if `.imp/project.md` sets `stage_folders` (for example `done=implemented`). After a move it rewrites root-absolute links to the folder in the project's tracked `.md` files, then runs the project's `link_check` command, if set. `resume` puts the idea back in the stage (and folder) it left. `on-hold` ideas stay listed, are idle on the dashboard, are never due, and show as On hold in Notion.
 
 The commands are called `/ideas` and `/notes` because Claude Code's built-ins already use `/status` and `/feedback`.
 

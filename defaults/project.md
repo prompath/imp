@@ -8,6 +8,8 @@ meeting: self              # who reviews between stages
 deck: html-slides
 agent_overrides:           # role=agent, role=agent  e.g. presenter=acme-deck-builder
 notion:                    # on = /imp:notion syncs this project's ideas into an existing Notion tracker; blank = never
+stage_folders:             # stage=folder under ideas_root, comma list, e.g. done=implemented; impctl.py stage moves folder ideas there. Blank = folders never move
+link_check:                # command run at the project root after impctl.py stage --apply, e.g. python3 scripts/check-links.py; blank = none
 ---
 
 # Project settings (imp defaults)
@@ -16,7 +18,7 @@ These are the defaults imp uses when a project has no `.imp/project.md`, or leav
 
 ## Ideas layout
 
-One folder per idea: `ideas/<id>/STATUS.md`, plus the idea's research, plan, decks and a git-ignored `local/` folder. The stage is recorded only in STATUS; folders don't move between stages.
+One folder per idea: `ideas/<id>/STATUS.md`, plus the idea's research, plan, decks and a git-ignored `local/` folder. The stage is recorded only in STATUS; folders don't move between stages (`stage_folders` is blank).
 
 ## Idea groups
 
