@@ -9,7 +9,7 @@ Layout verified 2026-11-08. Calls marked *Assumed (live check)* were not tried l
 - **Nothing the sync writes may mention imp.** That covers every row, option, text and page. The Notion side calls these rows Work items.
 - Find the Notion tools by name suffix (`notion-fetch`, `notion-search`, `notion-update-data-source`, `notion-create-pages`, `notion-update-page`, `notion-query-data-sources`, `notion-delete-pages`), never by a fixed prefix. If the connector isn't connected, say so and stop.
 - Every Notion write follows `references/gates.md` (outward writes): show the list, wait for a yes, then write. A yes covers that list only. If the user grants standing permission, still show the list, then write. Exception: the `/imp:secretary` session writes without a yes and reports after (`references/gates.md`).
-- **Ownership rule.** Write only to Work rows that have a `Key`, and only these properties: `Request` (title), `Area`, `Source`, `UR id`, `Status`, `Next step`, `Timeline`, `Blocked by`, and `Key` (on create). Never write `Owner`, `Priority`, `Mandays`, `Requested by` or `Type`. The sync never writes to the Tasks database; keyed Tasks are the secretary's, other Tasks stay hand-made. Rows without a `Key` (hand-made) are never read, compared or written.
+- **Ownership rule.** Write only to Work rows that have a `Key`, and only these properties: `Request` (title), `Area`, `Source`, `UR id`, `Status`, `Next step`, `Timeline`, `Blocked by`, and `Key` (on create). `icon` is set on create only and is not compared (step 7). Never write `Owner`, `Priority`, `Mandays`, `Requested by` or `Type`. The sync never writes to the Tasks database; keyed Tasks are the secretary's, other Tasks stay hand-made. Rows without a `Key` (hand-made) are never read, compared or written.
 - Never delete, except in `cleanup`, and there only the exact pages the user confirms. The secretary's deletes follow `references/gates.md` the same way: exact pages, the user's yes.
 - Do not reference removed properties: Stage, Gate, Waiting on, Branch, Round, Project type, imp_id, Kind, task_id, or an Area relation. There is no Areas database in use (the old one is in the Archive page).
 - IDs live in `~/.config/imp/notion.json`, written by setup. IDs only, never a token:
@@ -72,11 +72,12 @@ Never write On hold; people set it. A synced row whose Notion Status is On hold 
 6. Wait for a yes (see Rules for standing permission). No yes, no write.
 7. Write:
    - Create: `notion-create-pages` with `parent: {"data_source_id": "<requests_ds>"}` and `allow_async: false`, so page ids come back at once. At most 50 pages per call (the hard limit is 100). Update: `notion-update-page` with the changed owned properties only. *Assumed (live check)*: the first update. Run it on one row, fetch it back, then do the rest.
+   - Icon, on create only: set `icon` to one emoji in the same `notion-create-pages` call, picked from the `Request` title (first match wins): 📊 deck, presentation; 🧪 dry run; 🔧 fix, job; 🕵️ investigation; 📉 negative uplift. Nothing fits: 📄. Update calls never send `icon`, and an icon already set is never changed. *Assumed (live check)*: the first create; fetch it back and check the icon. If a create errors on the icon, query the `Key` first (so no partial duplicate), retry the create with 📄, and report it.
    - Status by option name, e.g. `"Status": "In progress"`.
    - Timeline: `"date:Timeline:start": "2026-11-01"`, `"date:Timeline:end": "2026-11-20"`, `"date:Timeline:is_datetime": 0`. An end on create works (verified). Leave the end out if blank. A blank export end leaves the old end in Notion.
    - `Blocked by` is an array of page ids, set in a second pass after all Work items exist (*Assumed (live check)*); skip it if that item isn't in Notion.
    - Blank values are left out.
-8. Verify: query the written rows back and compare. Report counts of created, updated, unchanged, closed and left alone, and one link to the Work database. A second sync with no STATUS change must show **0 creates**. Count the Work rows without a Key again: the number must match the count from step 3.
+8. Verify: query the written rows back and compare. Report counts of created, updated, unchanged, closed and left alone, and one link to the Work database. A second sync with no STATUS change must show **0 creates**. Count the Work rows without a Key again: the number must match the count from step 3. Also check that every existing icon is unchanged.
 
 ## Verified facts
 
