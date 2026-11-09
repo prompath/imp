@@ -549,6 +549,9 @@ def agenda(now: float, days: int = 7, new: bool = False) -> dict:
         d = day(value, ref, "due")
         return None if not d else "overdue" if d < today else "due" if (d - today).days <= days else None
 
+    def today_note(value, other):  # "due today" makes the morning notice; the seen-file is per day
+        return "due today" if _day(value) == today else other
+
     def add_tasks(tasks, prefix, keyed, path):
         for t in tasks:
             ref = f"{prefix}/T{t['n']}"
@@ -558,7 +561,7 @@ def agenda(now: float, days: int = 7, new: bool = False) -> dict:
             if t["done"]:
                 continue
             sections[due_section(t["due"], ref) or "tasks"].append(
-                {"kind": "task", "ref": ref, "key": ref if keyed else "", "text": t["text"], "note": "",
+                {"kind": "task", "ref": ref, "key": ref if keyed else "", "text": t["text"], "note": today_note(t["due"], ""),
                  "due": t["due"], "remind": stamp, "path": str(path)})
 
     for _, _, idea, _ in dashboard_rows(now, sessions=[]):  # [] so the activity files are not cleaned up
@@ -571,7 +574,7 @@ def agenda(now: float, days: int = 7, new: bool = False) -> dict:
                 "due": idea.get("due") or "", "remind": "", "path": str(path)}
         sec = due_section(idea.get("due") or "", ref)
         if sec and stage not in ("backlog", "monitor"):  # a monitored idea is listed by its checks instead
-            sections[sec].append(item)
+            sections[sec].append(dict(item, note=today_note(item["due"], stage)))
         if stage == "monitor":
             check = day(idea.get("next_check") or "", ref, "next_check")
             until = day(idea.get("monitor_until") or "", ref, "monitor_until")

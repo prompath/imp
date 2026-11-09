@@ -37,14 +37,14 @@ Task refs and Notion `Key`s: `<repo>/<id>/T<n>` for an idea's task (`<repo>` is 
 
 ## 3. Start of day (`/imp:secretary`)
 
-1. Run `impctl.py agenda` and show it as-is: overdue, due within 7 days, monitor checks due, ideas waiting on you at a gate (with their open questions; ideas waiting on you without a gate are left out, listed only on request), open tasks, and problems (malformed dates; offer to fix each one). Then run `impctl.py agenda --json` for each item's file path, `key` and `remind`.
+1. Run `impctl.py agenda` and show it as-is: overdue, due within 7 days, monitor checks due, ideas waiting on you at a gate (with their open questions; ideas waiting on you without a gate are left out, listed only on request), open tasks, and problems (malformed dates; offer to fix each one). Then run `impctl.py agenda --json` for each item's file path, `key` and `remind`. If any item has the note "due today", send one PushNotification listing them (`Due today: <ref> <text>; …`) and write the same line in chat.
 2. If `~/.config/imp/notion.json` exists: list the Notion Tasks assigned to the user (section 6, *Read*), under a **Notion** heading. Keyed Tasks marked Done in Notion are marked done locally.
 3. Read the latest earlier journal file and list its carry-over and unfinished items.
 4. **Re-arm reminders.** Check the session's crons (CronList) so nothing is set twice. For every open task with a `(remind <today> HH:MM)` still ahead, create a one-shot session cron (CronCreate, not recurring) at that time, with the prompt `Secretary reminder: <ref> <text>`.
 5. **Check every 30 minutes.** Unless one already exists, create a recurring session cron, `*/30 * * * *`, with the prompt `Secretary check`.
 6. With arguments, handle them as a request (section 4).
 
-**`Secretary check`** (the 30-minute cron):
+**`Secretary check`** (the 30-minute cron): if today's date differs from this session's start of day (a session running past midnight), run start-of-day steps 1–4 instead, once, so the new day's "due today" notice fires and its reminders are re-armed. Otherwise:
 1. `impctl.py agenda --new --json`: only items not reported before today.
 2. Read Notion Tasks (section 6): Done read-back, and Tasks newly assigned to the user.
 3. `impctl.py journal --today`: append a `touched <project>/<id>` line for each idea not yet in today's journal.

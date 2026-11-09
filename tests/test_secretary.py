@@ -119,7 +119,7 @@ class TestAgenda(SecretaryCase):
         a = impctl.agenda(NOW)
         r = self.refs(a)
         self.assertEqual(sorted(r["overdue"]), [("secretary/T1", ""), ("team/late", "experiment"), ("team/late/T1", "")])
-        self.assertEqual(sorted(r["due"]), [("solo/mine/T1", ""), ("team/late/T2", ""), ("team/soon", "pitch")])
+        self.assertEqual(sorted(r["due"]), [("solo/mine/T1", "due today"), ("team/late/T2", ""), ("team/soon", "pitch")])
         self.assertEqual(sorted(r["checks"]), [("team/check", f"check due {D(0)}"),
                                                ("team/check", f"monitor_until {D(-1)} reached")])
         self.assertEqual(r["gates"], [("team/gate", "G1 Plan")])
@@ -151,11 +151,20 @@ class TestAgenda(SecretaryCase):
         self.assertEqual(impctl.format_agenda(again, new=True), "nothing new")
         with (self.base / "sec" / "tasks.md").open("a") as f:
             f.write("- [ ] T4: fresh (due 2027-01-15)\n")
-        self.assertEqual(self.refs(impctl.agenda(NOW, new=True))["due"], [("secretary/T4", "")])
+        self.assertEqual(self.refs(impctl.agenda(NOW, new=True))["due"], [("secretary/T4", "due today")])
         # due soon one day, overdue the next: new again, and yesterday's seen-file is dropped
         tomorrow = NOW + 3 * 86400
         self.assertIn(("secretary/T4", ""), self.refs(impctl.agenda(tomorrow, new=True))["overdue"])
         self.assertEqual([p.name for p in (self.base / "sec").glob("seen-*")], [f"seen-{D(3)}.txt"])
+
+    def test_due_today(self):
+        self.idea(self.on, "today", stage="pitch", due=D(1), title="Ship it")
+        write(self.base / "sec" / "tasks.md", "- [ ] T1: call (due 2027-01-16)\n")
+        self.assertEqual(sorted(self.refs(impctl.agenda(NOW))["due"]), [("secretary/T1", ""), ("team/today", "pitch")])
+        morning = NOW + 86400  # next day: due today, new again although seen yesterday as due soon
+        self.assertEqual(sorted(self.refs(impctl.agenda(morning, new=True))["due"]),
+                         [("secretary/T1", "due today"), ("team/today", "due today")])
+        self.assertEqual(impctl.agenda(morning + 3600, new=True)["sections"]["due"], [])  # the morning run marked it seen
 
     def test_text_output(self):
         self.fixtures()
@@ -163,6 +172,7 @@ class TestAgenda(SecretaryCase):
         self.assertIn("Overdue\n", text)
         self.assertIn("  team/gate  G1 Plan\n    ? D1: which offer", text)
         self.assertIn("  secretary/T2  loose  remind 2027-01-15 15:00", text)
+        self.assertIn("  solo/mine/T1  local only  due today  due 2027-01-15", text)
         self.assertTrue(text.endswith("Problems\n  team/bad: due 'next week' is not YYYY-MM-DD\n"
                                       "  team/bad/T1: remind 'tomorrow' is not YYYY-MM-DD HH:MM"))
 
