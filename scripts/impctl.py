@@ -334,23 +334,29 @@ def _add_decision(text: str, entry: str) -> str:
     return "".join(lines)
 
 
-def _link_edits(root: Path, old: str, new: str) -> list:
-    """(path, text, count) for tracked .md files with root-absolute links into folder `old`, rewritten to `new`.
+def _relink(text: str, old: str, new: str) -> tuple:
+    """(text, count) with root-absolute links into folder `old` pointing into `new`.
 
-    Forms: `](/old/…)`, `](</old/…>)`, `](/old%20name/…)`, and the folder itself with no trailing slash."""
+    Forms: `](/old/…)`, `](</old/…>)`, `](/old%20name/…)`, and the folder itself: `](/old)`, `#anchor`, `"title"`."""
+    count = 0
+    for o, n in {(old, new), (old.replace(" ", "%20"), new.replace(" ", "%20"))}:
+        text, k = re.subn(rf"(\]\(<?)/{re.escape(o)}(?=[/)>#]| \")", lambda m: f"{m.group(1)}/{n}", text)
+        count += k
+    return text, count
+
+
+def _link_edits(root: Path, old: str, new: str):
+    """(path, text, count) for tracked .md files with links into folder `old` (`_relink`); None outside git."""
     # shortcut: relative `../` links from outside the folder are not rewritten (none in any project yet); the link check reports them
-    out = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--", "*.md"], capture_output=True, text=True).stdout
-    forms = {(old, new), (old.replace(" ", "%20"), new.replace(" ", "%20"))}
+    r = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--", "*.md"], capture_output=True, text=True)
+    if r.returncode:
+        return None
     edits = []
-    for f in filter(None, out.split("\0")):
+    for f in filter(None, r.stdout.split("\0")):
         try:
-            text = (root / f).read_bytes().decode("utf-8")
+            text, count = _relink((root / f).read_bytes().decode("utf-8"), old, new)
         except (OSError, UnicodeDecodeError):
             continue
-        count = 0
-        for o, n in forms:
-            text, k = re.subn(rf"(\]\(<?)/{re.escape(o)}(?=[/)>])", lambda m: f"{m.group(1)}/{n}", text)
-            count += k
         if count:
             edits.append((root / f, text, count))
     return edits
@@ -366,6 +372,8 @@ def stage_change(root: Path, idea: dict, target: str, reason: str = "", apply: b
     old, today = idea.get("stage") or "", date.today().isoformat()
     folder = path.parent if path.name == "STATUS.md" else None  # a flat note never moves
     out, dest, extra = [], None, {}
+    if "#" in reason or "\n" in reason:  # `#` would start a comment in next_step
+        raise ValueError("--reason must be one line without '#'")
     if target == "resume":
         hits = list(CHANGED.finditer("\n".join(_section(text, "Decisions"))))
         if not hits:
@@ -399,27 +407,42 @@ def stage_change(root: Path, idea: dict, target: str, reason: str = "", apply: b
     entry = f"- {today}: {entry}" + (f": {reason}" if reason else "") + " (user)"
     out.append(f"frontmatter {rel(path)}: " + ", ".join(f"{k} {fm.get(k) or repr('')} -> {v or repr('')}" for k, v in changed.items()))
     out.append(f"decision {rel(path)}: {entry}")
-    if apply:
-        path.write_bytes(_add_decision(_set_frontmatter(text, changed), entry).encode("utf-8"))
+    status_text, edits = _add_decision(_set_frontmatter(text, changed), entry), []
     if dest:
         out.append(f"move {rel(folder)} -> {rel(dest)}")
-        for f, new_text, count in _link_edits(root, rel(folder), rel(dest)):  # before the move: same result, old paths
-            out.append(f"link {rel(f)}: {count}")
-            if apply:
-                f.write_bytes(new_text.encode("utf-8"))
-        if apply:
+        edits = _link_edits(root, rel(folder), rel(dest))  # read on the old paths, written after the move
+        if edits is None:
+            out.append(f"links not rewritten: {root} is not a git repo (git ls-files failed)")
+        out += [f"link {rel(f)}: {count}" for f, _, count in edits or []]
+        status_text = _relink(status_text, rel(folder), rel(dest))[0]
+        edits = [(dest / f.relative_to(folder) if f.is_relative_to(folder) else f, t)
+                 for f, t, _ in edits or [] if f != path]
+    if apply:
+        if dest:  # the move first: if it fails, no file has been written
+            made = not dest.parent.exists()
             dest.parent.mkdir(parents=True, exist_ok=True)
             tracked = subprocess.run(["git", "-C", str(root), "ls-files", "--", rel(folder)], capture_output=True, text=True).stdout
-            if tracked:
-                subprocess.run(["git", "-C", str(root), "mv", "--", rel(folder), rel(dest)], check=True, capture_output=True, text=True)
-            else:
-                os.rename(folder, dest)
+            try:
+                if tracked:
+                    subprocess.run(["git", "-C", str(root), "mv", "--", rel(folder), rel(dest)], check=True, capture_output=True, text=True)
+                else:
+                    os.rename(folder, dest)
+            except (OSError, subprocess.CalledProcessError):
+                if made:
+                    dest.parent.rmdir()  # leave no empty folder behind
+                raise
+            path = dest / path.name
+        path.write_bytes(status_text.encode("utf-8"))
+        for f, t in edits:
+            f.write_bytes(t.encode("utf-8"))
     check = cfg.get("link_check")
     if check:
         out.append(f"run {check}")
         if apply:
             r = subprocess.run(check, shell=True, cwd=root, capture_output=True, text=True)  # the project's own command, from .imp/project.md
             out += (r.stdout + r.stderr).splitlines() + [f"link_check exit {r.returncode}"]
+            if r.returncode:
+                out.append(f"link_check FAILED (exit {r.returncode})")
     if not apply:
         out.append("dry run: nothing written; run again with --apply")
     out.append(f"next (by hand): update the tracker the Ideas layout slot names, then /imp:notion sync {name}"
@@ -1515,6 +1538,9 @@ def main(argv=None) -> int:
             return 2
         except subprocess.CalledProcessError as e:
             print(f"imp: {' '.join(e.cmd)}: {e.stderr.strip()}", file=sys.stderr)
+            return 1
+        except OSError as e:
+            print(f"imp: {e}", file=sys.stderr)
             return 1
 
     if args.json:

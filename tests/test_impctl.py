@@ -244,7 +244,8 @@ class TestStage(unittest.TestCase):
         write(idea / "rounds" / "r1" / "plan.md", "plan")
         write(p / "INDEX.md", "- [a](/ideas/pitch/Offer%20Timing/STATUS.md)\n- [b](</ideas/pitch/Offer Timing/STATUS.md>)\n"
                               "- [c](/ideas/pitch/Offer Timing/)\n- [d](/ideas/pitch/Offer Timing)\n"
-                              "- [e](/ideas/pitch/Offer Timing Two/x.md)\n- [f](ideas/pitch/Offer Timing/STATUS.md)\n")
+                              "- [e](/ideas/pitch/Offer Timing Two/x.md)\n- [f](ideas/pitch/Offer Timing/STATUS.md)\n"
+                              "- [g](/ideas/pitch/Offer Timing#top)\n- [h](/ideas/pitch/Offer Timing \"title\")\n")
         write(p / "ideas" / "pitch" / "flat-note.md", status("flat-note", stage="pitch"))
         git(p, "init", "-q")
         git(p, "add", "-A")
@@ -321,19 +322,20 @@ class TestStage(unittest.TestCase):
         r = self.cli("stage", "offer", "done", cwd=p)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("move ideas/pitch/Offer Timing -> ideas/implemented/Offer Timing", r.stdout)
-        self.assertIn("link INDEX.md: 4", r.stdout)
+        self.assertIn("link INDEX.md: 6", r.stdout)
         self.assertIn("run echo checked; exit 3", r.stdout)
         self.assertEqual(self.snapshot(p), before)
         r = self.cli("stage", "offer", "done", "--apply", cwd=p)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("checked\nlink_check exit 3", r.stdout)
+        self.assertIn("checked\nlink_check exit 3\nlink_check FAILED (exit 3)", r.stdout)
         new = p / "ideas" / "implemented" / "Offer Timing"
         self.assertFalse((p / "ideas" / "pitch" / "Offer Timing").exists())
         self.assertEqual((new / "local" / "rows.csv").read_text(), "untracked")
         self.assertEqual((p / "INDEX.md").read_text(),
                          "- [a](/ideas/implemented/Offer%20Timing/STATUS.md)\n- [b](</ideas/implemented/Offer Timing/STATUS.md>)\n"
                          "- [c](/ideas/implemented/Offer Timing/)\n- [d](/ideas/implemented/Offer Timing)\n"
-                         "- [e](/ideas/pitch/Offer Timing Two/x.md)\n- [f](ideas/pitch/Offer Timing/STATUS.md)\n")
+                         "- [e](/ideas/pitch/Offer Timing Two/x.md)\n- [f](ideas/pitch/Offer Timing/STATUS.md)\n"
+                         "- [g](/ideas/implemented/Offer Timing#top)\n- [h](/ideas/implemented/Offer Timing \"title\")\n")
         text = (new / "STATUS.md").read_text()
         self.assertIn("[me](</ideas/implemented/Offer Timing/STATUS.md>) [plan](rounds/r1/plan.md)", text)
         self.assertIn("done (from pitch; moved from ideas/pitch/Offer Timing) (user)", text)
@@ -344,10 +346,39 @@ class TestStage(unittest.TestCase):
             "RM ideas/pitch/Offer Timing/STATUS.md -> ideas/implemented/Offer Timing/STATUS.md"])
         r = self.cli("stage", "offer", "resume", "--apply", cwd=p)  # back to pitch, folder and links too
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual((p / "INDEX.md").read_text().count("/ideas/pitch/Offer"), 5)
+        self.assertEqual((p / "INDEX.md").read_text().count("/ideas/pitch/Offer"), 7)
         status_md = p / "ideas" / "pitch" / "Offer Timing" / "STATUS.md"
         self.assertEqual(impctl.parse_frontmatter(status_md.read_text())["stage"], "pitch")
         self.assertIn("resumed pitch (from done) (user)", status_md.read_text())
+
+    def test_failed_move_writes_nothing(self):
+        p = self.mapped()
+        before = self.snapshot(p)
+        lock = p / ".git" / "index.lock"
+        lock.write_text("")  # git mv fails
+        r = self.cli("stage", "offer", "done", "--apply", cwd=p)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("imp: git", r.stderr)
+        self.assertEqual(self.snapshot(p), before)
+        lock.unlink()
+        write(p / "ideas" / "implemented", "a file in the way")
+        before = self.snapshot(p)
+        r = self.cli("stage", "offer", "done", "--apply", cwd=p)
+        self.assertEqual(r.returncode, 1)
+        self.assertTrue(r.stderr.startswith("imp: "), r.stderr)
+        self.assertNotIn("Traceback", r.stderr)
+        self.assertEqual(self.snapshot(p), before)
+
+    def test_reason_with_hash_and_no_git(self):
+        p = make_project(self.base, "proj", "stage_folders: done=implemented\n")
+        write(p / "ideas" / "x" / "STATUS.md", status("x-idea", stage="pitch"))
+        before = self.snapshot(p)
+        r = self.cli("stage", "x-idea", "shelved", "--reason", "see #12", "--apply", cwd=p)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("without '#'", r.stderr)
+        self.assertEqual(self.snapshot(p), before)
+        r = self.cli("stage", "x-idea", "done", cwd=p)
+        self.assertIn("links not rewritten:", r.stdout)
 
     def test_target_exists_and_flat_note(self):
         p = self.mapped()
