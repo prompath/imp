@@ -37,7 +37,7 @@ Task refs and Notion `Key`s: `<repo>/<id>/T<n>` for an idea's task (`<repo>` is 
 
 ## 3. Start of day (`/imp:secretary`)
 
-1. Run `impctl.py agenda` and show it as-is: overdue, due within 7 days, monitor checks due, ideas waiting on you at a gate (with their open questions), open tasks, and problems (malformed dates; offer to fix each one). Then run `impctl.py agenda --json` for each item's file path, `key` and `remind`.
+1. Run `impctl.py agenda` and show it as-is: overdue, due within 7 days, monitor checks due, ideas waiting on you at a gate (with their open questions; ideas waiting on you without a gate are left out, listed only on request), open tasks, and problems (malformed dates; offer to fix each one). Then run `impctl.py agenda --json` for each item's file path, `key` and `remind`.
 2. If `~/.config/imp/notion.json` exists: list the Notion Tasks assigned to the user (section 6, *Read*), under a **Notion** heading. Keyed Tasks marked Done in Notion are marked done locally.
 3. Read the latest earlier journal file and list its carry-over and unfinished items.
 4. **Re-arm reminders.** Check the session's crons (CronList) so nothing is set twice. For every open task with a `(remind <today> HH:MM)` still ahead, create a one-shot session cron (CronCreate, not recurring) at that time, with the prompt `Secretary reminder: <ref> <text>`.
@@ -57,6 +57,7 @@ Task refs and Notion `Key`s: `<repo>/<id>/T<n>` for an idea's task (`<repo>` is 
 | The user says | Do |
 |---|---|
 | "what's pending", "agenda" | Section 3, step 1 (and Notion, step 2) |
+| "what's waiting on me", "what's waiting" | Run `impctl.py ideas --projects --waiting user` and show it as-is (every registered project, gates included). Only on request: never in the start-of-day agenda or the 30-minute check |
 | "log this: …", "I did …" | Append `- HH:MM <text>` to today's journal |
 | "add task to <idea>: … (due …)" | Find the idea: `impctl.py ideas --projects`, then `impctl.py resolve <query> --project <root>`; ask if several match. Name the idea, re-read its STATUS, add the task line. Then Notion (section 6) if its project has `notion: on` |
 | "add task: …" | A loose task in `tasks.md`, then a Notion Task with no Work item (section 6) |

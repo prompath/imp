@@ -125,7 +125,8 @@ class TestSkillsAndCommands(unittest.TestCase):
         for s in ["Never use the Agent tool", "Never load the `imp:chief-of-staff` skill", "never push",
                   "Re-read the file right before each edit", "agenda --new", "journal --today", "CronCreate",
                   "PushNotification", "`ntn`", "<repo>/<id>/T<n>", "secretary/T<n>", "Never mention imp",
-                  "name the exact pages", "wrap up", "show the resolved date"]:
+                  "name the exact pages", "wrap up", "show the resolved date",
+                  "impctl.py ideas --projects --waiting user"]:
             self.assertIn(s, skill, s)
         self.assertIn("Secretary exception", read("skills/chief-of-staff/references/gates.md"))
         self.assertIn("## Tasks", read("templates/STATUS.md"))
