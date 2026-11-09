@@ -84,6 +84,7 @@ Never write On hold; people set it. A synced row whose Notion Status is On hold 
 - DDL: a drop and a rename to the same name must be separate calls (in one call the rename landed as "Area 1").
 - `page_layout` changes and property changes need separate calls.
 - A Timeline range end works on create.
+- An emoji `icon` in `notion-create-pages` works, including 🕵️ (variation selector); it comes back as `{"type": "emoji"}` (verified 2026-11-09 on a private page, not yet on a Work row).
 - Rows mode `string_starts_with` works; multi-clause `ADD COLUMN` and a database title change work.
 
 ## cleanup
