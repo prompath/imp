@@ -126,7 +126,8 @@ class TestSkillsAndCommands(unittest.TestCase):
                   "Re-read the file right before each edit", "agenda --new", "journal --today", "CronCreate",
                   "PushNotification", "`ntn`", "<repo>/<id>/T<n>", "secretary/T<n>", "Never mention imp",
                   "name the exact pages", "wrap up", "show the resolved date",
-                  "impctl.py ideas --projects --waiting user", "due today", "icon"]:
+                  "impctl.py ideas --projects --waiting user", "due today", "icon",
+                  "`started`, `due` and `next_check`", "<idea> starts", "`started` or `due` changes"]:
             self.assertIn(s, skill, s)
         notion = read("skills/chief-of-staff/references/notion.md")
         self.assertIn("icon", notion)

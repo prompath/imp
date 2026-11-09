@@ -11,7 +11,7 @@ From `templates/STATUS.md`:
 - `branch`
 - `blocked_by`: the id of an idea that has to finish first, or blank. `impctl.py ideas` shows it in place of `waiting_on`. Clear it when that idea reaches `done`, and say so.
 - `ur`: the UR id from the internal PM tool, for an MKT request. Blank means internal work (ad-hoc, no UR id). The Notion export sets `Source` and `UR id` from it.
-- `started`: the date the idea began, `YYYY-MM-DD`. Set it when you create the idea. If blank, the export uses the first date under `## Decisions`.
+- `started`: the date the idea began, `YYYY-MM-DD`. Set it when you create the idea. If blank, the export uses the first date under `## Decisions`. The secretary may move it on request.
 - `due`: the planned (or actual) end date, `YYYY-MM-DD`. It is the Notion Timeline end. If blank, the end is `monitor_until`, else `last_update`. Once it has passed, the dashboard shows the idea as waiting on you ("due <date>"), unless it is backlog, shelved, done or monitored.
 - `last_update`: today's date, `YYYY-MM-DD`
 - `monitor_until`, `next_check`: dates for the `monitor` stage (`references/lifecycle.md`). The dashboard shows a monitored idea as waiting on you once `next_check` is today or earlier, and never marks it stale. Waiting on you means: a permission prompt, a session waiting for your reply, `waiting_on: user` (with the gate), a monitor check due, or a passed `due`.
@@ -21,7 +21,7 @@ From `templates/STATUS.md`:
 
 ## Tasks
 
-`## Tasks` in STATUS holds the idea's dated to-dos, written by the `/imp:secretary` session: `- [ ] T1: <text> (start YYYY-MM-DD) (due YYYY-MM-DD) (remind YYYY-MM-DD HH:MM)`, done `- [x] T1: <text> (done YYYY-MM-DD)`. `T<n>` labels go up per file and are never reused; `start`, `due` and `remind` are optional. The secretary also writes `due`, `next_check` and `## Open questions`, and nothing else in STATUS; re-read the file before editing it in a work session too. Its own files are in `~/.config/imp/secretary/` (`IMP_SECRETARY` overrides): `journal/YYYY-MM-DD.md`, loose tasks in `tasks.md` (same line format), and a per-day seen-file for `impctl.py agenda --new`. `impctl.py agenda [--days N] [--new] [--json]` lists overdue and due-soon ideas and tasks, monitor checks, gates waiting on you and open tasks, and reports malformed dates.
+`## Tasks` in STATUS holds the idea's dated to-dos, written by the `/imp:secretary` session: `- [ ] T1: <text> (start YYYY-MM-DD) (due YYYY-MM-DD) (remind YYYY-MM-DD HH:MM)`, done `- [x] T1: <text> (done YYYY-MM-DD)`. `T<n>` labels go up per file and are never reused; `start`, `due` and `remind` are optional. The secretary also writes `started`, `due`, `next_check` and `## Open questions`, and nothing else in STATUS; re-read the file before editing it in a work session too. Its own files are in `~/.config/imp/secretary/` (`IMP_SECRETARY` overrides): `journal/YYYY-MM-DD.md`, loose tasks in `tasks.md` (same line format), and a per-day seen-file for `impctl.py agenda --new`. `impctl.py agenda [--days N] [--new] [--json]` lists overdue and due-soon ideas and tasks, monitor checks, gates waiting on you and open tasks, and reports malformed dates.
 
 ## Where state lives
 
