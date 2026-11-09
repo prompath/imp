@@ -45,6 +45,10 @@ last_update: YYYY-MM-DD
 | # | Assumption | Category (business execution / data / technical) | Evidence level | Checked against knowledge? | Impact if wrong | Who confirms | Status |
 |---|---|---|---|---|---|---|---|
 
+## Tasks
+
+<!-- - [ ] T1: <task> (due YYYY-MM-DD) (remind YYYY-MM-DD HH:MM), done: - [x] T1: <task> (done YYYY-MM-DD) -->
+
 ## Open questions
 
 -

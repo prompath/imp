@@ -12,5 +12,7 @@ Fixed in the base. A project's slots can add checks but can never remove a gate.
 
 **Outward writes:** G-data extends to any write to an external workspace (Notion and the like). Show what will be created, updated or closed and wait for a yes before every write. Never delete there, except pages the user names one by one and confirms (moved to Trash). A yes covers that list only.
 
+**Secretary exception** (the user's choice, 2026-11-09): the `/imp:secretary` session writes to Notion without a per-write yes and reports each batch right after, with links (`skills/secretary/SKILL.md`). Its deletes still name the exact pages and wait for a yes.
+
 A go-ahead covers only the plan that was shown. A changed plan is a new G1.
 Read-only recon (reading code, notes and the web) is allowed before G1.

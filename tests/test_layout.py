@@ -114,6 +114,22 @@ class TestSkillsAndCommands(unittest.TestCase):
         for a in AGENTS:
             self.assertIn(a, everything, a)
 
+    def test_secretary(self):
+        from impctl import parse_frontmatter
+        cmd = read("commands/secretary.md")
+        self.assertEqual(parse_frontmatter(cmd).get("disable-model-invocation"), "true")
+        self.assertIn('skill: "imp:secretary"', cmd)
+        self.assertNotIn("imp:chief-of-staff", cmd)
+        skill = read("skills/secretary/SKILL.md")
+        self.assertEqual(parse_frontmatter(skill).get("name"), "secretary")
+        for s in ["Never use the Agent tool", "Never load the `imp:chief-of-staff` skill", "never push",
+                  "Re-read the file right before each edit", "agenda --new", "journal --today", "CronCreate",
+                  "PushNotification", "`ntn`", "<repo>/<id>/T<n>", "secretary/T<n>", "Never mention imp",
+                  "name the exact pages", "wrap up", "show the resolved date"]:
+            self.assertIn(s, skill, s)
+        self.assertIn("Secretary exception", read("skills/chief-of-staff/references/gates.md"))
+        self.assertIn("## Tasks", read("templates/STATUS.md"))
+
     def test_workflow_files_have_frontmatter(self):
         from impctl import parse_frontmatter
         for w in WORKFLOWS:

@@ -1,6 +1,6 @@
 # Notion mirror (`/imp:notion`)
 
-The sync copies ideas, one way, into the **Work** database on the **Team Tracker** page in Notion. One idea is one Work item. Its Area comes from the idea's `group`. The sync owns the Work properties listed below; every other property and row stays with the team. **The sync writes Work items only.** It never creates, updates or closes Tasks: Tasks are hand-made (by people, or by the chief-of-staff on request) and carry no Key. The layout (properties, views, callout) is kept by hand. The sync never creates or changes it, except that `setup` may add Area options.
+The sync copies ideas, one way, into the **Work** database on the **Team Tracker** page in Notion. One idea is one Work item. Its Area comes from the idea's `group`. The sync owns the Work properties listed below; every other property and row stays with the team. **The sync writes Work items only.** It never creates, updates or closes Tasks. Tasks with a Key (`<repo>/<id>/T<n>`, or `secretary/T<n>` for a loose task) belong to the `/imp:secretary` session (`skills/secretary/SKILL.md`); every other Task is hand-made (by people, or by the chief-of-staff on request) and carries no Key. The layout (properties, views, callout) is kept by hand. The sync never creates or changes it, except that `setup` may add Area options.
 
 Layout verified 2026-11-08. Calls marked *Assumed (live check)* were not tried live; check them on first use and stop if one fails.
 
@@ -8,23 +8,23 @@ Layout verified 2026-11-08. Calls marked *Assumed (live check)* were not tried l
 
 - **Nothing the sync writes may mention imp.** That covers every row, option, text and page. The Notion side calls these rows Work items.
 - Find the Notion tools by name suffix (`notion-fetch`, `notion-search`, `notion-update-data-source`, `notion-create-pages`, `notion-update-page`, `notion-query-data-sources`, `notion-delete-pages`), never by a fixed prefix. If the connector isn't connected, say so and stop.
-- Every Notion write follows `references/gates.md` (outward writes): show the list, wait for a yes, then write. A yes covers that list only. If the user grants standing permission, still show the list, then write.
-- **Ownership rule.** Write only to Work rows that have a `Key`, and only these properties: `Request` (title), `Area`, `Source`, `UR id`, `Status`, `Next step`, `Timeline`, `Blocked by`, and `Key` (on create). Never write `Owner`, `Priority`, `Mandays`, `Requested by` or `Type`. Never write to the Tasks database. Rows without a `Key` (hand-made) are never read, compared or written.
-- Never delete, except in `cleanup`, and there only the exact pages the user confirms.
+- Every Notion write follows `references/gates.md` (outward writes): show the list, wait for a yes, then write. A yes covers that list only. If the user grants standing permission, still show the list, then write. Exception: the `/imp:secretary` session writes without a yes and reports after (`references/gates.md`).
+- **Ownership rule.** Write only to Work rows that have a `Key`, and only these properties: `Request` (title), `Area`, `Source`, `UR id`, `Status`, `Next step`, `Timeline`, `Blocked by`, and `Key` (on create). Never write `Owner`, `Priority`, `Mandays`, `Requested by` or `Type`. The sync never writes to the Tasks database; keyed Tasks are the secretary's, other Tasks stay hand-made. Rows without a `Key` (hand-made) are never read, compared or written.
+- Never delete, except in `cleanup`, and there only the exact pages the user confirms. The secretary's deletes follow `references/gates.md` the same way: exact pages, the user's yes.
 - Do not reference removed properties: Stage, Gate, Waiting on, Branch, Round, Project type, imp_id, Kind, task_id, or an Area relation. There is no Areas database in use (the old one is in the Archive page).
 - IDs live in `~/.config/imp/notion.json`, written by setup. IDs only, never a token:
   ```
   {"page_id": "<Team Tracker page>", "requests_ds": "collection://…", "tasks_ds": "collection://…",
-   "skill_page": "<page id>", "area_names": {"<group>": "<Area option>"}}
+   "skill_page": "<page id>", "area_names": {"<group>": "<Area option>"}, "me": "<user id>"}
   ```
-  `<group>` is the export's `group` string exactly (blank group: key `""`). The Area options are whatever the Work `Area` select holds; the map lives in `area_names`. `skill_page` is the id of the team's "How to use Claude with Team Tracker" page; setup records it if present, and the sync never writes to it. `tasks_ds` is used by `cleanup` only.
+  `<group>` is the export's `group` string exactly (blank group: key `""`). The Area options are whatever the Work `Area` select holds; the map lives in `area_names`. `skill_page` is the id of the team's "How to use Claude with Team Tracker" page; setup records it if present, and the sync never writes to it. `tasks_ds` is used by `cleanup` and the secretary. `me` is the user's Notion user id (from `notion-get-self` or `ntn whoami`), added by the secretary for `Assigned`.
 - The export is `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/impctl.py" ideas --json`: `{"projects", "tasks", "warnings"}` for every registered project with `notion: on`. It reads only each idea's own file (STATUS.md or flat note) and each round's plan Hypothesis line. Show its `warnings`. If it exits non-zero (two projects with one name), show the message and stop. Use `projects` only; ignore `tasks`. A "project" in the export is an idea, a Work item in Notion. Its `imp_id` (export field, not a Notion property) is the Notion `Key` (`<repo>/<id>`).
 
 ## Layout
 
 **Work** (title `Request`): `Area` select, `Source` select (MKT request, Internal), `UR id` text, `Status` status (Not started, On hold, In progress, Blocked, Monitoring, Done), `Next step` text, `Timeline` date range, `Blocked by` self-relation (back-relation `Blocking`), `Tasks` relation, `Key` text (hidden). Owned by people: Owner, Priority, Mandays, Requested by, Type. Views: Board, Timeline, MKT, All requests.
 
-**Tasks** (title `Name`): `Status`, `User Request` relation to Work, `Key`, Assigned, Due. The sync does not touch it.
+**Tasks** (title `Name`): `Status`, `User Request` relation to Work, `Key`, Assigned, Due. The sync does not touch it; the secretary writes only Tasks with a `Key`.
 
 ## Maps
 
@@ -89,7 +89,7 @@ Never write On hold; people set it. A synced row whose Notion Status is On hold 
 
 Optional, list-only helper for an untidy tracker. It changes nothing by itself.
 
-1. Read `notion.json`. Query Tasks (rows mode) and list two groups: Tasks with no `User Request`, and Tasks with an empty `Name`. Show each row's page id, name, Status and Assigned. Rows with a `Key` are not listed.
+1. Read `notion.json`. Query Tasks (rows mode) and list two groups: Tasks with no `User Request`, and Tasks with an empty `Name`. Show each row's page id, name, Status and Assigned. Rows with a `Key` (the secretary's) are not listed.
 2. The user picks rows, one by one or by listed id, and says what to do with each: trash, or leave. Attaching a Task to a Work item is the user's edit in Notion.
 3. Repeat the exact ids back and wait for a yes. Then `notion-delete-pages` on those ids only, with `user_confirmed` set only after that yes (*Assumed (live check)*: never tried live). It moves them to Trash, which the user can restore.
 

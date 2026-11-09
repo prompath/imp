@@ -18,3 +18,4 @@ Signals:
 - rename, merge, combine, shelve an idea, or "after X is done" → no workflow: `references/state.md` → *Housekeeping*
 - "change the rule", "add a condition", "implement X in the pipeline" → lifecycle
 - "new model", "try a design", "POC", "learn about" → explore
+- "what's pending", "add task", "remind me", "log this" → no workflow: point to the secretary session (`/imp:secretary`); don't record it here
