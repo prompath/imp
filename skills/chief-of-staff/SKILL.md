@@ -23,7 +23,7 @@ The arguments start with the command name.
 | Command | Do |
 |---|---|
 | `idea <description>` | Route it (`references/routing.md`), choose a short kebab-case `id`, create the idea from `templates/STATUS.md` where the `Ideas layout` slot says, set `group` and `started` (`references/state.md`), then recon → G1 |
-| `continue [id]` | Resolve the idea (section 5), read its STATUS and latest plan, and open with where it stands: stage and gate, the open decisions waiting on the user (with their plan labels, such as A1 or D1), and the next step. Then do the next step. Never skip a gate that hasn't been passed. |
+| `continue [id]` | Resolve the idea (section 5), read its STATUS and latest plan, then its `## Handover` lines, and open with the Handover lines first, then where it stands: stage and gate, the open decisions waiting on the user (with their plan labels, such as A1 or D1), and the next step. Then do the next step. Act on each Handover line; once acted on, remove it and add `- YYYY-MM-DD: handover done: <decision> (user)` under `## Decisions`. A line not acted on stays. Never skip a gate that hasn't been passed. |
 | `notes [id] <notes>` | Follow `references/state.md` → *Filing notes* |
 | `ideas [flags]` | Run `impctl.py ideas` with the same flags and show the output as-is |
 | `investigate <case>` | Follow `references/investigate.md` |

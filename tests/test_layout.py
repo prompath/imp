@@ -127,7 +127,9 @@ class TestSkillsAndCommands(unittest.TestCase):
                   "PushNotification", "`ntn`", "<repo>/<id>/T<n>", "secretary/T<n>", "Never mention imp",
                   "name the exact pages", "wrap up", "show the resolved date",
                   "impctl.py ideas --projects --waiting user", "due today", "icon",
-                  "`started`, `due` and `next_check`", "<idea> starts", "`started` or `due` changes"]:
+                  "`started`, `due` and `next_check`", "<idea> starts", "`started`, `due`, `stage` or `next_step` changes",
+                  "Bookkeeping commits", "impctl.py bookkeeping", "Never G-data", "## Handover",
+                  "never commit (except section 1 *Bookkeeping commits*), never push", "never run data, notebooks or cluster jobs"]:
             self.assertIn(s, skill, s)
         notion = read("skills/chief-of-staff/references/notion.md")
         self.assertIn("icon", notion)
@@ -139,6 +141,10 @@ class TestSkillsAndCommands(unittest.TestCase):
         self.assertIn("except a Work Status change away from On hold, which waits for a yes",
                       read("skills/chief-of-staff/references/gates.md"))
         self.assertIn("## Tasks", read("templates/STATUS.md"))
+        self.assertIn("# <Title>\n\n## Handover", read("templates/STATUS.md"))
+        cont = next(l for l in read("skills/chief-of-staff/SKILL.md").splitlines() if l.startswith("| `continue [id]`"))
+        self.assertIn("## Handover", cont)
+        self.assertIn("handover done", cont)
 
     def test_stage_changes(self):
         state = read("skills/chief-of-staff/references/state.md")
@@ -176,7 +182,7 @@ class TestDocsSite(unittest.TestCase):
         html = read("docs/site/index.html")
         for s in ["/idea", "/continue", "/notes", "/ideas", "/investigate", "/imp:notion", "/imp-init", "/imp:dashboard", "/imp:secretary",
                   "G1", "G2", "Verified", "push_forbidden", "agent_overrides", ".imp/workflows",
-                  "stage_folders", "link_check", "impctl.py stage", "an item set On hold by hand in Notion is listed as an update"]:
+                  "stage_folders", "link_check", "impctl.py stage", "impctl.py bookkeeping", "## Handover", "an item set On hold by hand in Notion is listed as an update"]:
             self.assertIn(s, html, s)
         for src in re.findall(r'<script[^>]*src="([^"]+)"', html):
             self.assertTrue(src.startswith("https://cdn.jsdelivr.net/"), src)

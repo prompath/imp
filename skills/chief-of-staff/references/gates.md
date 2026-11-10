@@ -14,5 +14,7 @@ Fixed in the base. A project's slots can add checks but can never remove a gate.
 
 **Secretary exception** (the user's choice, 2026-11-09): the `/imp:secretary` session writes to Notion without a per-write yes and reports each batch right after, with links (`skills/secretary/SKILL.md`), except a Work Status change away from On hold, which waits for a yes (`references/notion.md`). Its deletes still name the exact pages and wait for a yes.
 
+**Secretary gate records:** the `/imp:secretary` session may record a G1, G2 or G3 pass on the user's word, as `- YYYY-MM-DD: <gate> passed (user, via secretary)` under `## Decisions`. Never G-data: its approval covers the exact script and command shown in the work session. Not the meeting gate: it passes when `/notes` files the notes.
+
 A go-ahead covers only the plan that was shown. A changed plan is a new G1.
 Read-only recon (reading code, notes and the web) is allowed before G1.

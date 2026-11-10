@@ -21,7 +21,11 @@ From `templates/STATUS.md`:
 
 ## Tasks
 
-`## Tasks` in STATUS holds the idea's dated to-dos, written by the `/imp:secretary` session: `- [ ] T1: <text> (start YYYY-MM-DD) (due YYYY-MM-DD) (remind YYYY-MM-DD HH:MM)`, done `- [x] T1: <text> (done YYYY-MM-DD)`. `T<n>` labels go up per file and are never reused; `start`, `due` and `remind` are optional. The secretary also writes `started`, `due`, `next_check` and `## Open questions`, and nothing else in STATUS; re-read the file before editing it in a work session too. Its own files are in `~/.config/imp/secretary/` (`IMP_SECRETARY` overrides): `journal/YYYY-MM-DD.md`, loose tasks in `tasks.md` (same line format), and a per-day seen-file for `impctl.py agenda --new`. `impctl.py agenda [--days N] [--new] [--json]` lists overdue and due-soon ideas and tasks, monitor checks, gates waiting on you and open tasks, and reports malformed dates.
+`## Tasks` in STATUS holds the idea's dated to-dos, written by the `/imp:secretary` session: `- [ ] T1: <text> (start YYYY-MM-DD) (due YYYY-MM-DD) (remind YYYY-MM-DD HH:MM)`, done `- [x] T1: <text> (done YYYY-MM-DD)`. `T<n>` labels go up per file and are never reused; `start`, `due` and `remind` are optional. The secretary also writes `started`, `due`, `next_check`, `waiting_on`, `gate`, `next_step`, `stage` (only through `impctl.py stage`), `## Open questions`, `## Handover` and new dated lines at the end of `## Decisions`, and nothing else in STATUS. It commits a STATUS file only when `impctl.py bookkeeping <path>` exits 0 (its changes are only those), on the `integration_branch`, with `git commit -- <path>`. Re-read the file before editing it in a work session too. Its own files are in `~/.config/imp/secretary/` (`IMP_SECRETARY` overrides): `journal/YYYY-MM-DD.md`, loose tasks in `tasks.md` (same line format), and a per-day seen-file for `impctl.py agenda --new`. `impctl.py agenda [--days N] [--new] [--json]` lists overdue and due-soon ideas and tasks, monitor checks, gates waiting on you and open tasks, and reports malformed dates.
+
+## Handover
+
+`## Handover` in STATUS holds decisions the `/imp:secretary` session took with the user for the idea's next work session: `- YYYY-MM-DD: <decision>; next: <step>[; by YYYY-MM-DD]`. It sits right after the title, before `## Decisions` (the secretary inserts it above `## Decisions` when missing). The secretary only adds lines. `/imp:continue` reads them first and acts on them; a line acted on is removed and logged as `- YYYY-MM-DD: handover done: <decision> (user)` under `## Decisions`. A line not acted on stays.
 
 ## Where state lives
 
@@ -29,7 +33,7 @@ Follow the `Ideas layout` slot. Default: `ideas/<id>/STATUS.md`.
 
 When a layout uses **flat files** for a stage (for example `ideas/inbox/<name>.md`):
 - the STATUS keys go in that note's own frontmatter
-- the note holds only its own text. When the idea gets its first other file (a plan, review, sizing, findings, queries or a deck), promote it to a folder in the same stage, named as the `Ideas layout` slot names folders, before writing that file: move the note into the folder, and update the links to it and the tracker
+- the note holds only its own text, plus a `## Handover` section if the secretary adds one (above). When the idea gets its first other file (a plan, review, sizing, findings, queries or a deck), promote it to a folder in the same stage, named as the `Ideas layout` slot names folders, before writing that file: move the note into the folder, and update the links to it and the tracker
 - when the idea is promoted to a folder, move the keys into the folder's `STATUS.md` and remove them from the note, so the idea is listed once
 
 Existing ideas without STATUS get it the first time imp touches them. There's no up-front migration.
@@ -67,7 +71,7 @@ Goes in `<idea folder>/local/`, or `<stage dir>/local/<id>/` for a flat-file ide
 
 1. Resolve the idea (SKILL.md section 5) and name it.
 2. Update its STATUS: `next_step`, `gate`, `waiting_on`, `last_update`, and the open decisions waiting on the user under `## Open questions`, each with its plan label.
-3. Commit only that idea's files (its folder, or a flat note and its `<id>-*` files) and the tracker the `Ideas layout` slot names, with a message saying what was saved. Leave everything else in the working tree as it is, and say that you did. Never push.
+3. Commit only that idea's files (its folder, or a flat note and its `<id>-*` files) and the tracker the `Ideas layout` slot names, with a message saying what was saved. Leave everything else in the working tree as it is, and say that you did. This also commits the STATUS edits the secretary's bookkeeping check refused. Never push.
 4. End with: `Saved <id> (<sha>). Resume with: /imp:continue <id>`.
 
 ## Housekeeping
@@ -83,6 +87,8 @@ After a rename, merge, shelve or other stage change, if `~/.config/imp/notion.js
 ## Stage changes
 
 `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/impctl.py" stage <id> <backlog|done|shelved|on-hold|resume> [--reason TEXT] [--apply]` changes an idea's stage the same way every time. Without `--apply` it only prints the changes, one per line, and writes nothing. Show that, wait for the user's yes, then run it with `--apply`.
+
+In the `/imp:secretary` session the user's request is the yes for a frontmatter-only change; a change with a `move` line still waits for a yes on the dry run.
 
 - Frontmatter: `stage`, `last_update`, `gate` cleared; for `done` and `shelved` also `waiting_on` cleared and `next_step` set (`done`, or `shelved: <reason>`). `shelved` needs `--reason`. Every other byte of the file is kept.
 - `## Decisions` gets `- YYYY-MM-DD: <stage> (from <old stage>[; moved from <old folder>])[: <reason>] (user)`. `resume` reads the latest such line, sets that old stage back and, if the folder moved, moves it back.

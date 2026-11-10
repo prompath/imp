@@ -394,6 +394,93 @@ class TestStage(unittest.TestCase):
         self.assertEqual(impctl.parse_frontmatter((p / "ideas" / "pitch" / "flat-note.md").read_text())["stage"], "done")
 
 
+BOOK = ("---\nid: offer-timing\ntitle: Offer timing\n# a comment\ntags:\n  - a\nstage: pitch\ngate: G1\nnext_step: plan\n---\n\n"
+        "# Offer timing\n\nSome text.\n\n## Tasks\n\n- [ ] T1: a\n\n## Open questions\n\n- q\n\n"
+        "## Decisions\n\n- 2026-01-01: start (user)\n\n## Rounds\n\n- r1\n")
+
+
+class TestBookkeeping(unittest.TestCase):
+    setUp, tearDown, cli = TestRegistryAndCli.setUp, TestRegistryAndCli.tearDown, TestRegistryAndCli.cli
+
+    def repo(self) -> Path:
+        p = self.base / "proj"
+        write(p / "ideas" / "offer-timing" / "STATUS.md", BOOK)
+        write(p / "other.md", "x\n")
+        git(p, "init", "-q")
+        git(p, "add", "-A")
+        git(p, "commit", "-qm", "init")
+        return p
+
+    def check(self, new: str, path="ideas/offer-timing/STATUS.md") -> tuple:
+        p = self.repo()
+        if new is not None:
+            write(p / path, new)
+        r = self.cli("bookkeeping", path, "--project", str(p))
+        return r.returncode, r.stdout
+
+    def test_allowed(self):
+        cases = {
+            "frontmatter keys": BOOK.replace("stage: pitch", "stage: experiment").replace("gate: G1", "gate:")
+                                    .replace("next_step: plan", "next_step: build\nwaiting_on: agents\ndue: 2026-12-01"),
+            "tasks and questions": BOOK.replace("- [ ] T1: a", "- [x] T1: a (done 2026-02-01)\n- [ ] T2: b").replace("- q\n", ""),
+            "handover inserted": BOOK.replace("## Decisions", "## Handover\n\n- 2026-02-01: G1 passed; next: build\n\n## Decisions"),
+            "questions dropped": BOOK.replace("## Open questions\n\n- q\n\n", ""),
+            "decision appended": BOOK.replace("start (user)\n", "start (user)\n- 2026-02-01: G1 passed (user, via secretary)\n"),
+        }
+        for label, new in cases.items():
+            with self.subTest(label):
+                self.assertEqual(self.check(new), (0, "bookkeeping only\n"))
+                self.tearDown()
+                self.setUp()
+        with_h = BOOK.replace("## Decisions", "## Handover\n\n- 2026-02-01: a; next: b\n\n## Decisions")
+        self.assertEqual(impctl.bookkeeping(with_h, with_h.replace("- 2026-02-01: a; next: b\n", "")), [])
+        self.assertEqual(impctl.bookkeeping(with_h, BOOK), [])
+
+    def test_refused(self):
+        cases = {
+            "frontmatter changed: title": BOOK.replace("title: Offer timing", "title: Offer"),
+            "frontmatter changed: # a comment": BOOK.replace("# a comment", "# other"),
+            "frontmatter changed: - a": BOOK.replace("  - a", "  - b"),
+            "frontmatter changed: --- fence": BOOK.replace("next_step: plan\n---", "next_step: plan"),
+            "section Notes changed": BOOK.replace("## Rounds", "## Notes\n\n## Rounds"),
+            "section Rounds changed": BOOK.replace("## Decisions\n\n- 2026-01-01: start (user)\n\n## Rounds\n\n- r1\n",
+                                                   "## Rounds\n\n- r1\n\n## Decisions\n\n- 2026-01-01: start (user)\n"),
+            "Decisions: existing line changed": BOOK.replace("start (user)", "begin (user)"),
+            "Decisions: new line not": BOOK.replace("start (user)\n", "start (user)\nlater\n"),
+            "section Rounds changed\n": BOOK.replace("- r1", "- r2"),
+            "body before the first section changed": BOOK.replace("Some text.", "Other text."),
+        }
+        for want, new in cases.items():
+            with self.subTest(want):
+                code, out = self.check(new)
+                self.assertEqual(code, 1)
+                self.assertIn(want, out)
+                self.tearDown()
+                self.setUp()
+
+    def test_untracked_renamed_deleted_unchanged(self):
+        self.assertEqual(self.check(None), (1, "no changes\n"))
+        p = self.base / "proj"
+        write(p / "ideas" / "new" / "STATUS.md", BOOK)
+        self.assertIn("not in HEAD", self.cli("bookkeeping", "ideas/new/STATUS.md", "--project", str(p)).stdout)
+        git(p, "mv", "ideas/offer-timing", "ideas/done")
+        for path, want in [("ideas/done/STATUS.md", "not in HEAD"), ("ideas/offer-timing/STATUS.md", "not in the working tree")]:
+            r = self.cli("bookkeeping", path, "--project", str(p))
+            self.assertEqual(r.returncode, 1)
+            self.assertIn(want, r.stdout)
+
+    def test_commit_with_path_takes_only_that_file(self):
+        p = self.repo()
+        write(p / "other.md", "staged\n")
+        git(p, "add", "other.md")
+        f = p / "ideas" / "offer-timing" / "STATUS.md"
+        write(f, BOOK.replace("gate: G1", "gate:"))
+        self.assertEqual(self.cli("bookkeeping", str(f)).returncode, 0)
+        git(p, "commit", "-qm", "offer-timing: gate cleared", "--", "ideas/offer-timing/STATUS.md")
+        self.assertEqual(git(p, "show", "--name-only", "--format=", "HEAD").split(), ["ideas/offer-timing/STATUS.md"])
+        self.assertEqual(git(p, "diff", "--staged", "--name-only").split(), ["other.md"])
+
+
 class TestCurrentAndCodes(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

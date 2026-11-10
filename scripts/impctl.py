@@ -6,6 +6,7 @@ hooks/activity.py, and by `impctl.py dashboard` (a local server on 127.0.0.1 onl
 live, and /rooms, a pixel campus of who works where).
 """
 import argparse
+import difflib
 import hashlib
 import html
 import json
@@ -447,6 +448,70 @@ def stage_change(root: Path, idea: dict, target: str, reason: str = "", apply: b
         out.append("dry run: nothing written; run again with --apply")
     out.append(f"next (by hand): update the tracker the Ideas layout slot names, then /imp:notion sync {name}"
                + ("; live sessions keep the old path until they touch the idea again" if dest else ""))
+    return out
+
+
+# --- bookkeeping check -------------------------------------------------------
+
+BOOKKEEPING_KEYS = {"started", "due", "next_check", "stage", "waiting_on", "gate", "next_step", "last_update"}
+FREE_SECTIONS = {"tasks", "open questions", "handover"}  # may change, appear or disappear
+DECISION = re.compile(r"- \d{4}-\d{2}-\d{2}: \S")
+
+
+def _trim(lines: list) -> list:
+    n = len(lines)
+    while n and not lines[n - 1].strip():
+        n -= 1
+    return lines[:n]
+
+
+def _split(text: str) -> tuple:
+    """(frontmatter lines with their --- fences, body lines); without a closing --- every line is frontmatter."""
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return [], lines
+    end = next((n for n in range(1, len(lines)) if lines[n].strip() == "---"), len(lines))
+    return lines[:end + 1], lines[end + 1:]
+
+
+def _changed(a: list, b: list, name) -> list:
+    """`name(item)` of each item where lists a and b differ, once each, in order."""
+    out = []
+    for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
+        if op != "equal":
+            out += [name(x) for x in a[i1:i2] + b[j1:j2]]
+    return list(dict.fromkeys(out))
+
+
+def bookkeeping(old: str, new: str) -> list:
+    """Why the change old -> new is more than secretary bookkeeping, one line per part; [] when it is only that."""
+    if old == new:
+        return ["no changes"]
+    (fa, ba), (fb, bb) = _split(old), _split(new)
+    fence = lambda f: (bool(f), len(f) > 1 and f[-1].strip() == "---")
+    if fence(fa) != fence(fb):  # the body moved in or out of the frontmatter: nothing else lines up
+        return ["frontmatter changed: --- fence"]
+    top = lambda l: l[:1] not in " \t-#" and ":" in l  # same top-level rule as parse_frontmatter
+    keep = lambda f: [l for l in f if not (top(l) and l.partition(":")[0].strip() in BOOKKEEPING_KEYS)]
+    name = lambda l: l.partition(":")[0].strip() if top(l) else (l.strip() or "blank line")
+    out = [f"frontmatter changed: {k}" for k in _changed(keep(fa), keep(fb), name)]
+    first = lambda b: next((n for n, l in enumerate(b) if l.startswith("## ")), len(b))
+    if _trim(ba[:first(ba)]) != _trim(bb[:first(bb)]):
+        out.append("body before the first section changed")
+    fixed = lambda b: [l[3:].strip() for l in b if l.startswith("## ") and l[3:].strip().lower() not in FREE_SECTIONS]
+    sa, sb = fixed(ba), fixed(bb)
+    moved = _changed(sa, sb, str)
+    out += [f"section {t} changed" for t in moved]
+    for t in dict.fromkeys(sa):
+        if t not in sb or t in moved:
+            continue
+        a, b = _trim(_section("\n".join(ba), t)), _trim(_section("\n".join(bb), t))
+        if t.lower() != "decisions":
+            out += [f"section {t} changed"] if a != b else []
+        elif b[:len(a)] != a:
+            out.append("Decisions: existing line changed")
+        elif any(l.strip() and not DECISION.match(l) for l in b[len(a):]):
+            out.append("Decisions: new line not `- YYYY-MM-DD: ...`")
     return out
 
 
@@ -1472,6 +1537,9 @@ def main(argv=None) -> int:
     p_st.add_argument("--reason", default="", help="one line for ## Decisions; required for shelved")
     p_st.add_argument("--apply", action="store_true", help="make the changes (default: only print them)")
     p_st.add_argument("--project")
+    p_bk = sub.add_parser("bookkeeping", help="exit 0 when a file's uncommitted changes are only secretary bookkeeping")
+    p_bk.add_argument("path", help="relative to --project, or to here")
+    p_bk.add_argument("--project")
     p_cur = sub.add_parser("current")
     p_cur.add_argument("--session", default="")
     p_cur.add_argument("--project")
@@ -1508,6 +1576,19 @@ def main(argv=None) -> int:
     if args.cmd == "dashboard":
         serve(args.port)
         return 0
+
+    if args.cmd == "bookkeeping":
+        path = Path(args.project or "", args.path)
+        if not path.is_file():
+            print(f"{args.path}: not in the working tree (deleted or moved)")
+            return 1
+        r = subprocess.run(["git", "-C", str(path.parent), "show", f"HEAD:./{path.name}"], capture_output=True)
+        if r.returncode:  # new, or renamed by a `stage` move: the work session's /imp:save commits it
+            print(f"{args.path}: not in HEAD (new or moved)")
+            return 1
+        found = bookkeeping(r.stdout.decode("utf-8", "replace"), path.read_bytes().decode("utf-8", "replace"))
+        print("\n".join(found) or "bookkeeping only")
+        return 1 if found else 0
 
     if args.cmd == "current":
         root = _project_arg(args.project)

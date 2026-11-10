@@ -21,6 +21,10 @@ last_update: YYYY-MM-DD
 
 # <Title>
 
+## Handover
+
+<!-- - YYYY-MM-DD: <decision>; next: <step>[; by YYYY-MM-DD]; written by the secretary, cleared by /imp:continue when acted on -->
+
 ## Decisions
 
 - YYYY-MM-DD: <decision> (<who>)
