@@ -16,6 +16,7 @@ next_check:                # monitor stage: date the next check is due
 ur:                        # UR id from the internal PM tool for an MKT request; blank = internal work
 started:                   # YYYY-MM-DD the idea began; set on /idea
 due:                       # YYYY-MM-DD planned end date; the Notion Timeline end
+notion:                    # off = never export this idea to Notion (personal work in a shared project)
 last_update: YYYY-MM-DD
 ---
 

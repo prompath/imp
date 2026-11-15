@@ -668,6 +668,13 @@ class TestNotionExport(unittest.TestCase):
         self.assertEqual(out["projects"], [])
         self.assertEqual(len(out["warnings"]), 1)
 
+    def test_idea_notion_off_skipped(self):
+        self.idea("a")
+        self.idea("b", notion="off")
+        out = self.export()
+        self.assertEqual([p["imp_id"] for p in out["projects"]], ["agents/a"])
+        self.assertEqual(out["warnings"], [])
+
     def test_name_clash_stops(self):
         twin = make_project(self.base / "sub", "agents")
         impctl.register(twin)

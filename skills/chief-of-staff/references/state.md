@@ -9,6 +9,7 @@ From `templates/STATUS.md`:
 - `gate`: `G1 | G-data | G2 | G3 | meeting`. Set it when you stop at a gate; clear it (blank) once the user passes it. The dashboard shows it.
 - `round`: the experiment round
 - `branch`
+- `notion`: `off` keeps the idea out of the Notion export (`references/notion.md`), for personal work in a project with `notion: on`. Blank = exported.
 - `blocked_by`: the id of an idea that has to finish first, or blank. `impctl.py ideas` shows it in place of `waiting_on`. Clear it when that idea reaches `done`, and say so.
 - `ur`: the UR id from the internal PM tool, for an MKT request. Blank means internal work (ad-hoc, no UR id). The Notion export sets `Source` and `UR id` from it.
 - `started`: the date the idea began, `YYYY-MM-DD`. Set it when you create the idea. If blank, the export uses the first date under `## Decisions`. The secretary may move it on request.

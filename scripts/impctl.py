@@ -690,6 +690,8 @@ def notion_export(now: float) -> dict:
         parts = Path(idea["_path"]).parts
         if {"db", "local"} & set(parts):  # db/ and local/ dumps: never read, never listed
             continue
+        if idea.get("notion") == "off":  # personal idea in a shared project: kept off the tracker
+            continue
         if not idea.get("id"):
             warnings.append(f"{repo}: {idea['_path']} skipped (no id)")
             continue
@@ -816,7 +818,7 @@ def agenda(now: float, days: int = 7, new: bool = False) -> dict:
         if idea.get("waiting_on") == "user" and idea.get("gate"):
             sections["gates"].append(dict(item, note=GATES.get(idea["gate"], idea["gate"]),
                                           questions=_open_questions(body)))
-        keyed = idea["project"] in notion and idea.get("id") and not {"db", "local"} & set(Path(idea["_path"]).parts)
+        keyed = idea["project"] in notion and idea.get("notion") != "off" and idea.get("id") and not {"db", "local"} & set(Path(idea["_path"]).parts)
         add_tasks(_tasks("\n".join(_section(body, "Tasks"))), ref, keyed, path)
 
     loose = secretary_path() / "tasks.md"

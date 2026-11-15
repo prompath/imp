@@ -139,9 +139,11 @@ class TestAgenda(SecretaryCase):
 
     def test_keys(self):
         self.fixtures()
+        self.idea(self.on, "private", stage="pitch", notion="off", body="## Tasks\n\n- [ ] T1: mine (due 2027-01-15)\n")
         items = {i["ref"]: i for items in impctl.agenda(NOW)["sections"].values() for i in items}
         self.assertEqual(items["team/late/T1"]["key"], "team/late/T1")
         self.assertEqual(items["solo/mine/T1"]["key"], "")  # project without notion: on stays local
+        self.assertEqual(items["team/private/T1"]["key"], "")  # idea with notion: off stays local
         self.assertEqual(items["secretary/T2"]["key"], "secretary/T2")
         self.assertEqual(items["secretary/T2"]["remind"], "2027-01-15 15:00")
         self.assertEqual(items["team/late"]["key"], "")
