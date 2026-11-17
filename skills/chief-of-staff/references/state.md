@@ -26,7 +26,7 @@ From `templates/STATUS.md`:
 
 ## Handover
 
-`## Handover` in STATUS holds decisions the `/imp:secretary` session took with the user for the idea's next work session: `- YYYY-MM-DD: <decision>; next: <step>[; by YYYY-MM-DD]`. It sits right after the title, before `## Decisions` (the secretary inserts it above `## Decisions` when missing). The secretary only adds lines. `/imp:continue` reads them first and acts on them; a line acted on is removed and logged as `- YYYY-MM-DD: handover done: <decision> (user)` under `## Decisions`. A line not acted on stays.
+`## Handover` in STATUS holds decisions the `/imp:secretary` session took with the user for the idea's next work session, and "results back" notices the `/imp:dispatch` session writes (`- YYYY-MM-DD: results back for batch <bid>: <paths>; next: write result.md (dispatch)`): `- YYYY-MM-DD: <decision>; next: <step>[; by YYYY-MM-DD]`. It sits right after the title, before `## Decisions` (the secretary inserts it above `## Decisions` when missing). The secretary only adds lines. `/imp:continue` reads them first and acts on them; a line acted on is removed and logged as `- YYYY-MM-DD: handover done: <decision> (user)` under `## Decisions`. A line not acted on stays.
 
 ## Where state lives
 

@@ -41,6 +41,10 @@ Agents commit only to these branches. Agents never push and never open PRs. The 
 
 None. Data queries are drafts for the user to run; every run needs the user's approval of the exact script and command.
 
+## Dispatch
+
+None. A project that runs batches through a gated push-and-pull tunnel lists its commands here for `/imp:dispatch`: Inventory, Build sheet, Push, Pull (prints JSON), Fingerprint (prints a notebook's approval fingerprint) and Tests.
+
 ## Deck
 
 HTML slides: use the frontend-slides plugin if it's installed; otherwise one self-contained HTML file per deck in `<idea>/decks/`.

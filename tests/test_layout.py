@@ -114,6 +114,24 @@ class TestSkillsAndCommands(unittest.TestCase):
         for a in AGENTS:
             self.assertIn(a, everything, a)
 
+    def test_dispatch(self):
+        from impctl import parse_frontmatter
+        cmd = read("commands/dispatch.md")
+        self.assertEqual(parse_frontmatter(cmd).get("disable-model-invocation"), "true")
+        self.assertIn('skill: "imp:dispatch"', cmd)
+        self.assertNotIn("imp:chief-of-staff", cmd)
+        skill = read("skills/dispatch/SKILL.md")
+        self.assertEqual(parse_frontmatter(skill).get("name"), "dispatch")
+        for s in ["Never grant or record G-data", "Never run anything on a cluster", "Never write `result.md`",
+                  "Never use the Agent tool", "Push only through the slot's Push command", "## Dispatch",
+                  "impctl.py bookkeeping", "waiting_on: agents", "results back for batch", "Unrouted", "Head:",
+                  "If the project has no `## Dispatch` slot"]:
+            self.assertIn(s, skill, s)
+        self.assertIn("## Dispatch", read("defaults/project.md"))
+        self.assertIn("Dispatch exception", read("skills/chief-of-staff/references/gates.md"))
+        self.assertIn("G-data approved:", read("skills/chief-of-staff/SKILL.md"))
+        self.assertIn("/imp:dispatch", read("skills/chief-of-staff/references/routing.md"))
+
     def test_secretary(self):
         from impctl import parse_frontmatter
         cmd = read("commands/secretary.md")
@@ -180,7 +198,7 @@ class TestDocsSite(unittest.TestCase):
     def test_site(self):
         import re
         html = read("docs/site/index.html")
-        for s in ["/idea", "/continue", "/notes", "/ideas", "/investigate", "/imp:notion", "/imp-init", "/imp:dashboard", "/imp:secretary",
+        for s in ["/idea", "/continue", "/notes", "/ideas", "/investigate", "/imp:notion", "/imp-init", "/imp:dashboard", "/imp:secretary", "/imp:dispatch",
                   "G1", "G2", "Verified", "push_forbidden", "agent_overrides", ".imp/workflows",
                   "stage_folders", "link_check", "impctl.py stage", "impctl.py bookkeeping", "## Handover", "an item set On hold by hand in Notion is listed as an update"]:
             self.assertIn(s, html, s)
