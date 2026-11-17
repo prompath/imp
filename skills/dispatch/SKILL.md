@@ -31,17 +31,18 @@ The project's own commands live in its `## Dispatch` slot (`.imp/project.md`): I
 
 ## 3. Pull gate
 
-1. **Pull.** Run the slot's Pull command (it prints JSON). Do not edit the tree by hand. If it reports a dirty tree or a diverged branch it did not pull, report that and stop.
+1. **Pull.** Run the slot's Pull command (it prints JSON). Do not edit the tree by hand. If the JSON field `pulled` is false, report `problems` and stop; write no Handover lines.
 2. **Expected against received.** For each batch in the output, list what it expected, what came back, and what is missing.
 3. **Route.** Each result names its idea and round. List `unrouted` results and `problems` as they are; the user routes them. Never guess an idea.
 4. **Hand over.** Section 4, for each routed result.
-5. **Report** in the format of section 5.
+5. **Pasted results.** When the user says a batch's results were pasted (not pushed through git), first hand the pasted results to the owning session (section 4). Then run the Pull command with `--mark-synced <bid>`. Never use that flag otherwise.
+6. **Report** in the format of section 5.
 
 ## 4. Handover to the owning idea
 
 For each idea with results back, once per batch:
 
-1. Re-read its STATUS. Add under `## Handover`: `- YYYY-MM-DD: results back for batch <bid>: <comma-separated result paths>; next: write result.md (dispatch)`. A STATUS without `## Handover` gets it right above `## Decisions`.
+1. Re-read its STATUS. If a `results back for batch <bid>` line for this batch id is already there, skip this idea (no duplicates). Otherwise add under `## Handover`: `- YYYY-MM-DD: results back for batch <bid>: <comma-separated result paths>; next: write result.md (dispatch)`. A STATUS without `## Handover` gets it right above `## Decisions`.
 2. Set `waiting_on: agents`.
 3. Run `impctl.py bookkeeping <path> --project <root>`. Only on exit 0, commit that one file: `git -C <root> commit -m "<id>: results back for batch <bid>" -- <path>`. On exit 1, show the blocking lines and leave the file. Commit only on the project's `integration_branch`. Never push.
 
